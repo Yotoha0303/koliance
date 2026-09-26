@@ -1,0 +1,18 @@
+{
+  "name": "Koliance | Monad On-Chain Trust & Identity Infrastructure",
+  "short_name": "Koliance",
+  "description": "Verifiable on-chain identity and cryptographic trust attestations powered by Monad parallel EVM.",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#08060f",
+  "theme_color": "#836EF9",
+  "categories": ["finance", "utilities", "productivity"],
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "64x64 32x32 24x24 16x16",
+      "type": "image/x-icon"
+    }
+  ]
+}

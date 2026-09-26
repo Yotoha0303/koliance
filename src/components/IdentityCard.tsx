@@ -5,7 +5,6 @@ import { motion, AnimatePresence } from "framer-motion";
 import { UserCheck, Fingerprint, Sparkles, CheckCircle2, Clock, Globe, ArrowUpRight, Loader2 } from "lucide-react";
 import { formatTimestamp, truncateAddress } from "@/lib/utils";
 import { IdentityData, monadTestnet } from "@/lib/contract";
-import confetti from "canvas-confetti";
 
 interface IdentityCardProps {
   account: `0x${string}` | null;
@@ -33,6 +32,7 @@ export function IdentityCard({ account, identity, isLoading, onRegister }: Ident
       const hash = await onRegister(finalHash);
       if (hash) {
         setTxHash(hash);
+        const confetti = (await import("canvas-confetti")).default;
         confetti({
           particleCount: 80,
           spread: 70,

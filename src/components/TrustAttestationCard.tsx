@@ -5,7 +5,6 @@ import { motion, AnimatePresence } from "framer-motion";
 import { ShieldAlert, Zap, KeyRound, CheckCircle2, ArrowUpRight, Loader2, Sparkles } from "lucide-react";
 import { generateProof, truncateAddress } from "@/lib/utils";
 import { monadTestnet } from "@/lib/contract";
-import confetti from "canvas-confetti";
 
 interface TrustAttestationCardProps {
   account: `0x${string}` | null;
@@ -41,6 +40,7 @@ export function TrustAttestationCard({ account, onAddTrust }: TrustAttestationCa
       const hash = await onAddTrust(toAddress as `0x${string}`, finalAction, currentProof);
       if (hash) {
         setTxHash(hash);
+        const confetti = (await import("canvas-confetti")).default;
         confetti({
           particleCount: 90,
           spread: 80,

@@ -61,28 +61,50 @@ export function HeroGsap({ onRegisterClick, onExploreClick }: HeroGsapProps) {
       });
     }
 
+    let isVisible = true;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        const wasVisible = isVisible;
+        isVisible = entry.isIntersecting;
+        if (!wasVisible && isVisible) {
+          cancelAnimationFrame(animationFrameId);
+          animationFrameId = requestAnimationFrame(render);
+        }
+      },
+      { threshold: 0.05 }
+    );
+
+    if (containerRef.current) {
+      observer.observe(containerRef.current);
+    }
+
     const render = () => {
+      if (!isVisible) return;
+
       ctx.clearRect(0, 0, width, height);
 
-      // Draw connection lines
+      const maxDistSq = 10000; // 100^2
+
+      // Draw connection lines with squared distance check (no Math.sqrt)
       for (let i = 0; i < particles.length; i++) {
         for (let j = i + 1; j < particles.length; j++) {
           const dx = particles[i].x - particles[j].x;
           const dy = particles[i].y - particles[j].y;
-          const dist = Math.sqrt(dx * dx + dy * dy);
+          const distSq = dx * dx + dy * dy;
 
-          if (dist < 110) {
+          if (distSq < maxDistSq) {
+            const ratio = 1 - distSq / maxDistSq;
             ctx.beginPath();
             ctx.moveTo(particles[i].x, particles[i].y);
             ctx.lineTo(particles[j].x, particles[j].y);
-            ctx.strokeStyle = `rgba(131, 110, 249, ${0.15 * (1 - dist / 110)})`;
-            ctx.lineWidth = 0.8;
+            ctx.strokeStyle = `rgba(131, 110, 249, ${0.14 * ratio})`;
+            ctx.lineWidth = 0.75;
             ctx.stroke();
           }
         }
       }
 
-      // Draw particles
+      // Draw particles (fast fill without heavy shadowBlur)
       for (const p of particles) {
         p.x += p.vx;
         p.y += p.vy;
@@ -94,11 +116,9 @@ export function HeroGsap({ onRegisterClick, onExploreClick }: HeroGsapProps) {
         ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
         ctx.fillStyle = p.color;
         ctx.globalAlpha = p.alpha;
-        ctx.shadowBlur = 10;
-        ctx.shadowColor = p.color;
         ctx.fill();
-        ctx.globalAlpha = 1;
       }
+      ctx.globalAlpha = 1;
 
       animationFrameId = requestAnimationFrame(render);
     };
@@ -106,6 +126,7 @@ export function HeroGsap({ onRegisterClick, onExploreClick }: HeroGsapProps) {
     render();
 
     return () => {
+      observer.disconnect();
       window.removeEventListener("resize", handleResize);
       cancelAnimationFrame(animationFrameId);
     };
