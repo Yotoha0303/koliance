@@ -1,0 +1,49 @@
+{
+  "_format": "hh3-sol-build-info-1",
+  "id": "solc-0_8_31-44d62ef03ef09ee6e3355ffb48412c9d30dce0f4",
+  "solcVersion": "0.8.31",
+  "solcLongVersion": "0.8.31+commit.fd3a2265",
+  "compilerType": "solc",
+  "toolVersions": {
+    "hardhat": "3.14.0"
+  },
+  "userSourceNameMap": {
+    "contracts/Koliance.sol": "project/contracts/Koliance.sol"
+  },
+  "input": {
+    "language": "Solidity",
+    "settings": {
+      "evmVersion": "osaka",
+      "optimizer": {
+        "enabled": true,
+        "runs": 200
+      },
+      "outputSelection": {
+        "*": {
+          "": [
+            "ast"
+          ],
+          "*": [
+            "abi",
+            "evm.bytecode.linkReferences",
+            "evm.bytecode.object",
+            "evm.bytecode.opcodes",
+            "evm.bytecode.sourceMap",
+            "evm.deployedBytecode.immutableReferences",
+            "evm.deployedBytecode.linkReferences",
+            "evm.deployedBytecode.object",
+            "evm.deployedBytecode.opcodes",
+            "evm.deployedBytecode.sourceMap",
+            "evm.methodIdentifiers"
+          ]
+        }
+      },
+      "remappings": []
+    },
+    "sources": {
+      "project/contracts/Koliance.sol": {
+        "content": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.31;\n\ncontract Koliance {\n\n    struct Identity {\n        bool exists;\n        uint256 createdAt;\n        string metadataHash;\n    }\n\n    struct TrustRecord {\n        address from;\n        address to;\n        string action;\n        bytes32 proof;\n        uint256 timestamp;\n    }\n\n    mapping(address => Identity) public identities;\n    TrustRecord[] public records;\n\n    // Events for real-time frontend and indexer listening\n    event IdentityRegistered(address indexed user, uint256 timestamp, string metadataHash);\n    event TrustAdded(address indexed from, address indexed to, string action, bytes32 proof, uint256 timestamp);\n\n    function register(string calldata metadataHash) external {\n        identities[msg.sender] = Identity(\n            true,\n            block.timestamp,\n            metadataHash\n        );\n        emit IdentityRegistered(msg.sender, block.timestamp, metadataHash);\n    }\n\n    function addTrust(\n        address to,\n        string calldata action,\n        bytes32 proof\n    ) external {\n        TrustRecord memory newRecord = TrustRecord(\n            msg.sender,\n            to,\n            action,\n            proof,\n            block.timestamp\n        );\n        records.push(newRecord);\n        emit TrustAdded(msg.sender, to, action, proof, block.timestamp);\n    }\n\n    function getRecordsCount() external view returns (uint256) {\n        return records.length;\n    }\n\n    function getAllRecords() external view returns (TrustRecord[] memory) {\n        return records;\n    }\n}\n"
+      }
+    }
+  }
+}
