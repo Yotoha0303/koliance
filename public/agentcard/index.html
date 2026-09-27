@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#050510" />
+    <title>AI Card Scanner</title>
+    <link rel="stylesheet" href="./styles.css" />
+    <script defer src="./script.js"></script>
+  </head>
+  <body>
+    <canvas id="ambientCanvas" class="ambient-canvas" aria-hidden="true"></canvas>
+    <div class="digital-grid" aria-hidden="true"></div>
+    <div class="screen-noise" aria-hidden="true"></div>
+
+    <main id="scannerApp" class="scanner-app" data-ready="false" data-paused="false">
+      <header class="system-header">
+        <div class="brand-lockup" aria-label="AI Card Scanner">
+          <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+          <span class="brand-copy">
+            <h1>AI CARD SCANNER</h1>
+            <small>NEURAL ASSET PROCESSOR</small>
+          </span>
+        </div>
+
+        <div class="system-readouts" aria-label="系统状态">
+          <span><i class="status-dot"></i>CORE ONLINE</span>
+          <span>ENCRYPTION / AES-256</span>
+          <span>ASSET BUFFER / 06</span>
+        </div>
+
+        <div class="system-actions">
+          <button
+            id="pauseButton"
+            class="icon-button"
+            type="button"
+            aria-label="暂停扫描"
+            aria-pressed="false"
+            data-tooltip="暂停扫描"
+          >
+            <svg class="pause-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M8 5v14M16 5v14" />
+            </svg>
+            <svg class="play-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="m8 5 11 7-11 7Z" />
+            </svg>
+          </button>
+          <button
+            id="resetButton"
+            class="icon-button"
+            type="button"
+            aria-label="重新校准"
+            data-tooltip="重新校准"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M20 11a8 8 0 1 0-2.34 5.66M20 5v6h-6" />
+            </svg>
+          </button>
+        </div>
+      </header>
+
+      <section id="scanStage" class="scan-stage" aria-label="银行卡 AI 数字化扫描区域">
+        <div class="rail-line rail-line-top" aria-hidden="true"></div>
+        <div class="rail-line rail-line-bottom" aria-hidden="true"></div>
+
+        <div id="cardTrack" class="card-track" aria-label="六张银行卡循环扫描轨道"></div>
+
+        <div class="scanner-assembly" aria-hidden="true">
+          <span class="scanner-index">034</span>
+          <span class="scanner-cap scanner-cap-top"></span>
+          <span class="scanner-cap scanner-cap-bottom"></span>
+          <span class="scanner-bracket scanner-bracket-left"></span>
+          <span class="scanner-bracket scanner-bracket-right"></span>
+          <span class="scanner-ring scanner-ring-a"></span>
+          <span class="scanner-ring scanner-ring-b"></span>
+          <span class="scanner-beam"></span>
+          <span class="scanner-sweep"></span>
+        </div>
+        <canvas id="scannerCanvas" class="scanner-canvas" aria-hidden="true"></canvas>
+
+        <div id="loadingState" class="loading-state" role="status" aria-live="polite">
+          <span class="loader-glyph" aria-hidden="true"><i></i><i></i><i></i></span>
+          <strong>INITIALIZING CARD MATRIX</strong>
+          <span id="loadCount">0 / 6</span>
+        </div>
+      </section>
+
+      <footer class="telemetry-bar" aria-label="实时扫描遥测">
+        <div class="active-asset">
+          <span>ACTIVE ASSET</span>
+          <strong id="activeAsset">CARD_01 / GLM</strong>
+        </div>
+
+        <div class="scan-progress">
+          <div class="progress-heading">
+            <span>NEURAL CONVERSION</span>
+            <strong id="scanPercent">50%</strong>
+          </div>
+          <span class="progress-track"><i id="progressMeter"></i></span>
+        </div>
+
+        <div class="telemetry-values">
+          <span><small>STREAM</small><strong id="streamRate">2.41 GB/s</strong></span>
+          <span><small>CHECKSUM</small><strong id="checksum">8F2A:91C4</strong></span>
+        </div>
+      </footer>
+
+      <div id="announcer" class="sr-only" aria-live="polite"></div>
+    </main>
+
+    <template id="cardTemplate">
+      <div class="card-wrapper" data-scan-state="original">
+        <canvas class="original-layer" width="800" height="500"></canvas>
+        <canvas class="code-layer" width="800" height="500"></canvas>
+        <span class="card-edge" aria-hidden="true"></span>
+        <span class="scan-contact" aria-hidden="true"></span>
+      </div>
+    </template>
+
+    <noscript>
+      <p class="noscript-message">此扫描界面需要启用 JavaScript。</p>
+    </noscript>
+  </body>
+</html>

@@ -19,541 +19,365 @@ import {
   Lock,
   ChevronRight,
   Filter,
+  Bell,
+  Wallet,
+  Settings,
+  Grid,
+  ChevronDown,
+  Plus,
+  Minus,
+  RotateCcw,
+  MoreHorizontal,
+  Info,
+  Check,
+  User,
 } from "lucide-react";
 import { monadTestnet } from "@/lib/contract";
-import { truncateAddress } from "@/lib/utils";
 
-interface ConstellationNode {
+interface NodeItem {
   id: string;
   label: string;
-  address: string;
-  category: "validator" | "ai_agent" | "oracle" | "protocol" | "user";
-  trustScore: number; // 0 - 100
-  stake: string;
-  attestations: number;
-  status: "active" | "validating" | "syncing";
-  latency: string;
+  subLabel?: string;
+  cluster: "violet" | "cyan" | "gold" | "core";
+  score?: number;
   x: number;
   y: number;
-  z: number;
-  vx: number;
-  vy: number;
-  vz: number;
   radius: number;
   color: string;
   connections: string[];
 }
 
-const INITIAL_NODES: ConstellationNode[] = [
-  {
-    id: "genesis",
-    label: "Monad Parallel Engine",
-    address: "0x00000000000000000000000000000000000010143",
-    category: "validator",
-    trustScore: 99.9,
-    stake: "1,500,000 MON",
-    attestations: 12480,
-    status: "validating",
-    latency: "0.2ms",
-    x: 0,
-    y: 0,
-    z: 0,
-    vx: 0,
-    vy: 0,
-    vz: 0,
-    radius: 12,
-    color: "#836EF9",
-    connections: ["val-1", "val-2", "val-3", "ai-1", "oracle-1", "koliance-core"],
-  },
-  {
-    id: "val-1",
-    label: "Consensus Leader #01",
-    address: "0x89205A3A3b2A69De6Dbf7f01ED13B2108B2c43e7",
-    category: "validator",
-    trustScore: 99.4,
-    stake: "420,000 MON",
-    attestations: 4321,
-    status: "validating",
-    latency: "0.4ms",
-    x: -120,
-    y: -80,
-    z: 40,
-    vx: 0,
-    vy: 0,
-    vz: 0,
-    radius: 8,
-    color: "#00F2FE",
-    connections: ["genesis", "val-2", "ai-1"],
-  },
-  {
-    id: "val-2",
-    label: "Monad Validator #02",
-    address: "0x250b7305986c7C0D0190Fe0141a0F911b333E43D",
-    category: "validator",
-    trustScore: 98.7,
-    stake: "380,000 MON",
-    attestations: 3890,
-    status: "validating",
-    latency: "0.5ms",
-    x: 130,
-    y: -70,
-    z: -30,
-    vx: 0,
-    vy: 0,
-    vz: 0,
-    radius: 7.5,
-    color: "#00F2FE",
-    connections: ["genesis", "val-3", "koliance-core"],
-  },
-  {
-    id: "val-3",
-    label: "Monad Validator #03",
-    address: "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC",
-    category: "validator",
-    trustScore: 97.9,
-    stake: "310,000 MON",
-    attestations: 2950,
-    status: "validating",
-    latency: "0.6ms",
-    x: -90,
-    y: 110,
-    z: -40,
-    vx: 0,
-    vy: 0,
-    vz: 0,
-    radius: 7,
-    color: "#00F2FE",
-    connections: ["genesis", "val-1", "oracle-1"],
-  },
-  {
-    id: "ai-1",
-    label: "Sentinel AI Audit Agent",
-    address: "0x1Db3439a222C519ab44bb1144fC23CC7c1405e98",
-    category: "ai_agent",
-    trustScore: 96.8,
-    stake: "150,000 MON",
-    attestations: 8940,
-    status: "active",
-    latency: "0.8ms",
-    x: -160,
-    y: 20,
-    z: 70,
-    vx: 0,
-    vy: 0,
-    vz: 0,
-    radius: 8.5,
-    color: "#a78bfa",
-    connections: ["genesis", "val-1", "ai-2", "koliance-core"],
-  },
-  {
-    id: "ai-2",
-    label: "ZKP Prover Sentinel",
-    address: "0x90F79bf6EB2c4f870365E785982E1f101E93b906",
-    category: "ai_agent",
-    trustScore: 98.2,
-    stake: "200,000 MON",
-    attestations: 6420,
-    status: "active",
-    latency: "0.3ms",
-    x: -70,
-    y: -140,
-    z: -60,
-    vx: 0,
-    vy: 0,
-    vz: 0,
-    radius: 7,
-    color: "#a78bfa",
-    connections: ["ai-1", "genesis"],
-  },
-  {
-    id: "oracle-1",
-    label: "zkState Oracle Node",
-    address: "0x5B38Da6a701c568545dCfcB03FcB875f56beddC4",
-    category: "oracle",
-    trustScore: 95.9,
-    stake: "120,000 MON",
-    attestations: 5120,
-    status: "active",
-    latency: "1.1ms",
-    x: 140,
-    y: 90,
-    z: 60,
-    vx: 0,
-    vy: 0,
-    vz: 0,
-    radius: 7,
-    color: "#38bdf8",
-    connections: ["genesis", "val-3", "koliance-core"],
-  },
-  {
-    id: "koliance-core",
-    label: "Koliance Trust Registry",
-    address: "0x32fDd6B096EE14246b5b6971135286Bad01F4928",
-    category: "protocol",
-    trustScore: 99.8,
-    stake: "850,000 MON",
-    attestations: 15420,
-    status: "active",
-    latency: "0.1ms",
-    x: 60,
-    y: 130,
-    z: -20,
-    vx: 0,
-    vy: 0,
-    vz: 0,
-    radius: 9,
-    color: "#ff007a",
-    connections: ["genesis", "val-2", "ai-1", "oracle-1"],
-  },
-  {
-    id: "user-1",
-    label: "Dev Sovereign DID",
-    address: "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
-    category: "user",
-    trustScore: 94.2,
-    stake: "45,000 MON",
-    attestations: 312,
-    status: "active",
-    latency: "0.9ms",
-    x: 100,
-    y: -130,
-    z: 50,
-    vx: 0,
-    vy: 0,
-    vz: 0,
-    radius: 6,
-    color: "#10b981",
-    connections: ["koliance-core", "val-2"],
-  },
-];
-
-interface ProofEvent {
-  id: string;
-  slot: number;
-  block: number;
-  txHash: string;
-  source: string;
-  target: string;
-  action: string;
-  latencyMs: number;
-  timestamp: string;
-}
-
 export function TrustConstellation() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [selectedNode, setSelectedNode] = useState<ConstellationNode | null>(INITIAL_NODES[0]);
-  const [hoveredNode, setHoveredNode] = useState<ConstellationNode | null>(null);
-  const [filterCategory, setFilterCategory] = useState<string>("all");
-  const [copiedAddress, setCopiedAddress] = useState<string | null>(null);
-  const [isRotating, setIsRotating] = useState(true);
+  const [activeSideNav, setActiveSideNav] = useState("trust_graph");
+  const [activeTooltip, setActiveTooltip] = useState(true);
+  const [scaleFactor, setScaleFactor] = useState(1);
+  const [searchQuery, setSearchQuery] = useState("");
 
-  // Live cryptographic proof stream
-  const [proofs, setProofs] = useState<ProofEvent[]>([
-    {
-      id: "proof-1",
-      slot: 1948291,
-      block: 4920318,
-      txHash: "0x3f9a...812d",
-      source: "0x8920...43e7",
-      target: "0x250b...E43D",
-      action: "ENDORSE_CORE_DEV",
-      latencyMs: 382,
-      timestamp: "Just now",
-    },
-    {
-      id: "proof-2",
-      slot: 1948290,
-      block: 4920317,
-      txHash: "0x77c2...e0e0",
-      source: "0x3C44...93BC",
-      target: "0x8920...43e7",
-      action: "SECURITY_AUDIT_PASS",
-      latencyMs: 395,
-      timestamp: "2s ago",
-    },
-    {
-      id: "proof-3",
-      slot: 1948289,
-      block: 4920316,
-      txHash: "0xfe31...19d4",
-      source: "0x1Db3...5e98",
-      target: "0x90F7...b906",
-      action: "AI_SENTINEL_CONSENSUS",
-      latencyMs: 374,
-      timestamp: "4s ago",
-    },
-    {
-      id: "proof-4",
-      slot: 1948288,
-      block: 4920315,
-      txHash: "0x1a8c...b439",
-      source: "0x5B38...ddC4",
-      target: "0x32fD...4928",
-      action: "ZK_IDENTITY_ATTEST",
-      latencyMs: 410,
-      timestamp: "7s ago",
-    },
-  ]);
+  // Initial nodes positioning matching Image 2 exactly
+  const nodes: NodeItem[] = useMemo(
+    () => [
+      // Core Bright Node
+      {
+        id: "core",
+        label: "KOLIANCEID",
+        cluster: "core",
+        score: 99.8,
+        x: 440,
+        y: 350,
+        radius: 12,
+        color: "#ffffff",
+        connections: [
+          "user_014",
+          "koliance_mid",
+          "koliance_top",
+          "koliance_cyan",
+          "dao_main",
+          "police_ath",
+        ],
+      },
+      // Violet Cluster (Left/Top)
+      {
+        id: "user_014",
+        label: "user_014.trustgraph",
+        cluster: "violet",
+        score: 94.7,
+        x: 370,
+        y: 450,
+        radius: 8,
+        color: "#c084fc",
+        connections: ["core", "violet_star_1", "violet_star_2", "violet_left_1", "violet_bot_1"],
+      },
+      {
+        id: "violet_star_1",
+        label: "KOLIANCEID",
+        subLabel: "⭐ 95.79",
+        cluster: "violet",
+        score: 95.79,
+        x: 450,
+        y: 170,
+        radius: 7,
+        color: "#a855f7",
+        connections: ["core", "violet_star_2", "top_addr_1", "dao_top"],
+      },
+      {
+        id: "violet_star_2",
+        label: "KOLIANCEID",
+        subLabel: "⭐ 59.77",
+        cluster: "violet",
+        score: 59.77,
+        x: 330,
+        y: 330,
+        radius: 8,
+        color: "#c084fc",
+        connections: ["core", "user_014", "violet_left_1", "violet_top_1"],
+      },
+      {
+        id: "violet_left_1",
+        label: "0x8a...e2f",
+        cluster: "violet",
+        x: 200,
+        y: 430,
+        radius: 6,
+        color: "#c084fc",
+        connections: ["violet_star_2", "user_014", "violet_left_2", "violet_bot_1"],
+      },
+      {
+        id: "violet_left_2",
+        label: "user_014.trgraph",
+        cluster: "violet",
+        x: 180,
+        y: 360,
+        radius: 5,
+        color: "#a855f7",
+        connections: ["violet_left_1", "violet_star_2", "violet_top_1"],
+      },
+      {
+        id: "violet_top_1",
+        label: "*0x8a...e2f",
+        cluster: "violet",
+        x: 230,
+        y: 230,
+        radius: 5.5,
+        color: "#a855f7",
+        connections: ["violet_left_2", "violet_star_1", "violet_star_2"],
+      },
+      {
+        id: "top_addr_1",
+        label: "*0x8a...e2f",
+        cluster: "violet",
+        x: 410,
+        y: 120,
+        radius: 5,
+        color: "#c084fc",
+        connections: ["violet_star_1", "violet_star_2"],
+      },
+      {
+        id: "violet_bot_1",
+        label: "KOLIANCEID",
+        cluster: "violet",
+        x: 250,
+        y: 570,
+        radius: 6,
+        color: "#c084fc",
+        connections: ["user_014", "violet_left_1", "bot_addr_1"],
+      },
+      // Cyan Cluster (Center/Right)
+      {
+        id: "koliance_cyan",
+        label: "KOLIANCEID",
+        cluster: "cyan",
+        score: 96.2,
+        x: 520,
+        y: 350,
+        radius: 8.5,
+        color: "#00F2FE",
+        connections: ["core", "user_014_trust", "police_ath", "cyan_bot"],
+      },
+      {
+        id: "user_014_trust",
+        label: "user_014.trust",
+        subLabel: "94.7",
+        cluster: "cyan",
+        score: 94.7,
+        x: 650,
+        y: 390,
+        radius: 7,
+        color: "#38bdf8",
+        connections: ["koliance_cyan", "police_ath", "gold_right_1"],
+      },
+      {
+        id: "police_ath",
+        label: "Police_Ath_Cosh",
+        cluster: "cyan",
+        x: 570,
+        y: 460,
+        radius: 6.5,
+        color: "#00F2FE",
+        connections: ["koliance_cyan", "user_014", "cyan_bot"],
+      },
+      {
+        id: "cyan_bot",
+        label: "0x8a...e2f",
+        cluster: "cyan",
+        x: 350,
+        y: 600,
+        radius: 5,
+        color: "#38bdf8",
+        connections: ["user_014", "core", "dao_bot"],
+      },
+      // Gold/Amber Cluster (Right/Bottom)
+      {
+        id: "dao_top",
+        label: "VerifiableDAO",
+        cluster: "gold",
+        score: 98.1,
+        x: 560,
+        y: 190,
+        radius: 7,
+        color: "#fbbf24",
+        connections: ["violet_star_1", "gold_right_1", "koliance_cyan"],
+      },
+      {
+        id: "gold_right_1",
+        label: "0x8a...",
+        cluster: "gold",
+        x: 640,
+        y: 280,
+        radius: 5.5,
+        color: "#f59e0b",
+        connections: ["dao_top", "user_014_trust", "koliance_cyan"],
+      },
+      {
+        id: "gold_right_2",
+        label: "0x8a...e2f",
+        cluster: "gold",
+        x: 660,
+        y: 480,
+        radius: 5,
+        color: "#fbbf24",
+        connections: ["user_014_trust", "dao_bot"],
+      },
+      {
+        id: "dao_bot",
+        label: "VerifiableDAO",
+        cluster: "gold",
+        score: 97.4,
+        x: 510,
+        y: 640,
+        radius: 6.5,
+        color: "#fbbf24",
+        connections: ["core", "cyan_bot", "gold_right_2"],
+      },
+    ],
+    []
+  );
 
-  // Periodic new proof generation (simulating Monad ~400ms single slot)
-  useEffect(() => {
-    const interval = setInterval(() => {
-      const actions = [
-        "ZK_IDENTITY_ATTEST",
-        "ENDORSE_CORE_DEV",
-        "SENTINEL_WEIGHT_REBALANCE",
-        "DAO_REPUTATION_UPDATE",
-        "SINGLE_SLOT_CONSENSUS_VOTE",
-      ];
-      const randomAction = actions[Math.floor(Math.random() * actions.length)];
-      const randomSlot = 1948292 + Math.floor(Math.random() * 50);
-
-      const newProof: ProofEvent = {
-        id: `proof-${Date.now()}`,
-        slot: randomSlot,
-        block: 4920319 + Math.floor(Math.random() * 50),
-        txHash: `0x${Math.random().toString(16).slice(2, 6)}...${Math.random().toString(16).slice(2, 6)}`,
-        source: `0x${Math.random().toString(16).slice(2, 6)}...${Math.random().toString(16).slice(2, 6)}`,
-        target: `0x${Math.random().toString(16).slice(2, 6)}...${Math.random().toString(16).slice(2, 6)}`,
-        action: randomAction,
-        latencyMs: Math.floor(360 + Math.random() * 65),
-        timestamp: "Just now",
-      };
-
-      setProofs((prev) => [newProof, ...prev.slice(0, 5)]);
-    }, 2800);
-
-    return () => clearInterval(interval);
-  }, []);
-
-  const copyAddress = (addr: string) => {
-    navigator.clipboard.writeText(addr);
-    setCopiedAddress(addr);
-    setTimeout(() => setCopiedAddress(null), 2000);
-  };
-
-  // 3D Interactive Force Constellation Canvas
+  // Canvas Constellation Rendering
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    let width = (canvas.width = canvas.parentElement?.clientWidth || 800);
-    let height = (canvas.height = 560);
+    let width = (canvas.width = canvas.parentElement?.clientWidth || 780);
+    let height = (canvas.height = 680);
 
     const handleResize = () => {
       if (!canvas || !canvas.parentElement) return;
       width = canvas.width = canvas.parentElement.clientWidth;
-      height = canvas.height = 560;
+      height = canvas.height = 680;
     };
     window.addEventListener("resize", handleResize);
 
-    const nodes = JSON.parse(JSON.stringify(INITIAL_NODES)) as ConstellationNode[];
-
-    let rotX = 0.2;
-    let rotY = 0;
-    let targetRotX = 0.2;
-    let targetRotY = 0;
-    let isDragging = false;
-    let lastMouseX = 0;
-    let lastMouseY = 0;
-    let mouse2DX = -1000;
-    let mouse2DY = -1000;
-
-    const onMouseDown = (e: MouseEvent) => {
-      isDragging = true;
-      lastMouseX = e.clientX;
-      lastMouseY = e.clientY;
-    };
-
-    const onMouseMove = (e: MouseEvent) => {
-      const rect = canvas.getBoundingClientRect();
-      mouse2DX = e.clientX - rect.left;
-      mouse2DY = e.clientY - rect.top;
-
-      if (isDragging) {
-        const dx = e.clientX - lastMouseX;
-        const dy = e.clientY - lastMouseY;
-        targetRotY += dx * 0.006;
-        targetRotX += dy * 0.006;
-        lastMouseX = e.clientX;
-        lastMouseY = e.clientY;
-      }
-    };
-
-    const onMouseUp = () => {
-      isDragging = false;
-    };
-
-    const onMouseLeave = () => {
-      isDragging = false;
-      mouse2DX = -1000;
-      mouse2DY = -1000;
-      setHoveredNode(null);
-    };
-
-    canvas.addEventListener("mousedown", onMouseDown);
-    window.addEventListener("mousemove", onMouseMove);
-    window.addEventListener("mouseup", onMouseUp);
-    canvas.addEventListener("mouseleave", onMouseLeave);
-
-    // Pulse energy animation
-    let pulseT = 0;
     let animationId: number;
-
-    const focalLength = 400;
+    let pulseT = 0;
 
     const render = () => {
       ctx.clearRect(0, 0, width, height);
+      pulseT += 0.025;
 
-      // Smooth camera rotation
-      if (isRotating && !isDragging) {
-        targetRotY += 0.0025;
-      }
-      rotX += (targetRotX - rotX) * 0.08;
-      rotY += (targetRotY - rotY) * 0.08;
-      pulseT += 0.04;
+      const scale = (width / 800) * scaleFactor;
+      const offsetX = (width - 800 * scale) / 2;
+      const offsetY = 10;
 
-      const cosX = Math.cos(rotX);
-      const sinX = Math.sin(rotX);
-      const cosY = Math.cos(rotY);
-      const sinY = Math.sin(rotY);
+      // 1. Draw central bright radial flare
+      const centerNode = nodes.find((n) => n.id === "core");
+      if (centerNode) {
+        const cx = centerNode.x * scale + offsetX;
+        const cy = centerNode.y * scale + offsetY;
 
-      const centerX = width / 2;
-      const centerY = height / 2;
+        const flareGrad = ctx.createRadialGradient(cx, cy, 5, cx, cy, 140 * scale);
+        flareGrad.addColorStop(0, "rgba(192, 132, 252, 0.45)");
+        flareGrad.addColorStop(0.3, "rgba(0, 242, 254, 0.2)");
+        flareGrad.addColorStop(0.7, "rgba(131, 110, 249, 0.05)");
+        flareGrad.addColorStop(1, "rgba(0, 0, 0, 0)");
 
-      // Project 3D nodes to 2D
-      interface ProjectedNode {
-        node: ConstellationNode;
-        px: number;
-        py: number;
-        scale: number;
-        zDepth: number;
+        ctx.fillStyle = flareGrad;
+        ctx.beginPath();
+        ctx.arc(cx, cy, 140 * scale, 0, Math.PI * 2);
+        ctx.fill();
       }
 
-      const projected: ProjectedNode[] = [];
-      let closestHovered: ConstellationNode | null = null;
-      let minHoverDist = 24;
+      // 2. Draw Connections with traveling energy packets
+      const nodeMap = new Map(nodes.map((n) => [n.id, n]));
 
-      for (const node of nodes) {
-        // Rotate around Y
-        let x1 = node.x * cosY + node.z * sinY;
-        let y1 = node.y;
-        let z1 = -node.x * sinY + node.z * cosY;
+      for (const n of nodes) {
+        const sx = n.x * scale + offsetX;
+        const sy = n.y * scale + offsetY;
 
-        // Rotate around X
-        let x2 = x1;
-        let y2 = y1 * cosX - z1 * sinX;
-        let z2 = y1 * sinX + z1 * cosX;
-
-        // Perspective
-        const scale = focalLength / (focalLength + z2 + 250);
-        const px = centerX + x2 * scale;
-        const py = centerY + y2 * scale;
-
-        projected.push({
-          node,
-          px,
-          py,
-          scale,
-          zDepth: z2,
-        });
-
-        // Hover test
-        const dist = Math.hypot(mouse2DX - px, mouse2DY - py);
-        if (dist < minHoverDist) {
-          closestHovered = node;
-          minHoverDist = dist;
-        }
-      }
-
-      setHoveredNode(closestHovered);
-
-      // Sort by depth (back to front)
-      projected.sort((a, b) => a.zDepth - b.zDepth);
-
-      const nodeMap = new Map<string, ProjectedNode>();
-      projected.forEach((p) => nodeMap.set(p.node.id, p));
-
-      // 1. Draw Connection Lines & Pulses
-      ctx.lineWidth = 1;
-      for (const p of projected) {
-        const srcNode = p.node;
-        for (const connId of srcNode.connections) {
+        for (const connId of n.connections) {
           const target = nodeMap.get(connId);
-          if (!target) continue;
+          if (!target || n.id > connId) continue;
 
-          // Avoid double drawing by order check
-          if (srcNode.id > connId) continue;
+          const tx = target.x * scale + offsetX;
+          const ty = target.y * scale + offsetY;
 
-          const isHighlighted =
-            (closestHovered && (closestHovered.id === srcNode.id || closestHovered.id === connId)) ||
-            (selectedNode && (selectedNode.id === srcNode.id || selectedNode.id === connId));
+          // Color by cluster relationship
+          let strokeColor = "rgba(168, 85, 247, 0.25)";
+          if (n.cluster === "cyan" || target.cluster === "cyan") {
+            strokeColor = "rgba(0, 242, 254, 0.25)";
+          } else if (n.cluster === "gold" || target.cluster === "gold") {
+            strokeColor = "rgba(251, 191, 36, 0.22)";
+          }
 
           ctx.beginPath();
-          ctx.moveTo(p.px, p.py);
-          ctx.lineTo(target.px, target.py);
-
-          if (isHighlighted) {
-            ctx.strokeStyle = "rgba(0, 242, 254, 0.7)";
-            ctx.lineWidth = 2;
-          } else {
-            ctx.strokeStyle = "rgba(131, 110, 249, 0.18)";
-            ctx.lineWidth = 0.8;
-          }
+          ctx.moveTo(sx, sy);
+          ctx.lineTo(tx, ty);
+          ctx.strokeStyle = strokeColor;
+          ctx.lineWidth = 1;
           ctx.stroke();
 
-          // Traveling energy pulse dot
-          const pulseOffset = (pulseT + (srcNode.id.charCodeAt(0) % 5) * 0.5) % 1;
-          const pulseX = p.px + (target.px - p.px) * pulseOffset;
-          const pulseY = p.py + (target.py - p.py) * pulseOffset;
+          // Traveling pulse particle
+          const pulseOffset = (pulseT + (n.id.charCodeAt(0) % 7) * 0.3) % 1;
+          const px = sx + (tx - sx) * pulseOffset;
+          const py = sy + (ty - sy) * pulseOffset;
 
           ctx.beginPath();
-          ctx.arc(pulseX, pulseY, isHighlighted ? 3 : 1.8, 0, Math.PI * 2);
-          ctx.fillStyle = isHighlighted ? "#00F2FE" : "#836EF9";
+          ctx.arc(px, py, 1.8, 0, Math.PI * 2);
+          ctx.fillStyle = n.cluster === "cyan" ? "#00F2FE" : n.cluster === "gold" ? "#fbbf24" : "#c084fc";
           ctx.fill();
         }
       }
 
-      // 2. Draw Nodes
-      for (const p of projected) {
-        const { node, px, py, scale } = p;
-        const isSelected = selectedNode?.id === node.id;
-        const isHovered = closestHovered?.id === node.id;
-        const radius = Math.max(4, node.radius * scale * (isSelected || isHovered ? 1.3 : 1));
+      // 3. Draw Nodes with Rings and Labels
+      for (const n of nodes) {
+        const nx = n.x * scale + offsetX;
+        const ny = n.y * scale + offsetY;
+        const r = n.radius * scale;
 
-        // Outer glow ring
+        // Outer glow aura
         ctx.beginPath();
-        ctx.arc(px, py, radius + (isHovered ? 6 : 3), 0, Math.PI * 2);
-        ctx.fillStyle = isSelected
-          ? "rgba(0, 242, 254, 0.3)"
-          : isHovered
-          ? "rgba(131, 110, 249, 0.3)"
-          : "rgba(131, 110, 249, 0.1)";
+        ctx.arc(nx, ny, r + 4, 0, Math.PI * 2);
+        ctx.fillStyle = `${n.color}25`;
         ctx.fill();
 
-        // Node center
+        // Node circle
         ctx.beginPath();
-        ctx.arc(px, py, radius, 0, Math.PI * 2);
-        ctx.fillStyle = isSelected ? "#00F2FE" : node.color;
+        ctx.arc(nx, ny, r, 0, Math.PI * 2);
+        ctx.fillStyle = n.color;
         ctx.fill();
 
-        // Highlight ring on selected
-        if (isSelected || isHovered) {
-          ctx.strokeStyle = "#ffffff";
-          ctx.lineWidth = 1.5;
-          ctx.beginPath();
-          ctx.arc(px, py, radius + 4, 0, Math.PI * 2);
-          ctx.stroke();
-        }
+        // Node outline
+        ctx.lineWidth = 1.2;
+        ctx.strokeStyle = "#ffffff";
+        ctx.stroke();
 
-        // Label if scale is large or hovered/selected
-        if (scale > 0.8 || isHovered || isSelected) {
-          ctx.font = `${Math.max(10, Math.round(11 * scale))}px monospace`;
-          ctx.fillStyle = isSelected ? "#ffffff" : "rgba(255, 255, 255, 0.85)";
-          ctx.textAlign = "center";
-          ctx.fillText(node.label, px, py + radius + 14);
+        // Node Label Pill
+        const isUserTarget = n.id === "user_014";
+        const labelText = n.subLabel ? `${n.label} ${n.subLabel}` : n.label;
+
+        ctx.font = `${Math.max(9, Math.round(11 * scale))}px monospace`;
+        ctx.textAlign = "center";
+
+        if (!isUserTarget) {
+          // Label pill background
+          const textWidth = ctx.measureText(labelText).width;
+          ctx.fillStyle = "rgba(15, 18, 28, 0.75)";
+          ctx.fillRect(nx - textWidth / 2 - 4, ny + r + 4, textWidth + 8, 14);
+
+          ctx.fillStyle = n.color === "#ffffff" ? "#f1f5f9" : n.color;
+          ctx.fillText(labelText, nx, ny + r + 15);
         }
       }
 
@@ -562,369 +386,421 @@ export function TrustConstellation() {
 
     render();
 
-    // Click handler to select node
-    const onCanvasClick = (e: MouseEvent) => {
-      const rect = canvas.getBoundingClientRect();
-      const clickX = e.clientX - rect.left;
-      const clickY = e.clientY - rect.top;
-
-      // Find closest node within 30px
-      let closest: ConstellationNode | null = null;
-      let minDist = 30;
-
-      const cosX = Math.cos(rotX);
-      const sinX = Math.sin(rotX);
-      const cosY = Math.cos(rotY);
-      const sinY = Math.sin(rotY);
-      const centerX = width / 2;
-      const centerY = height / 2;
-
-      for (const node of nodes) {
-        let x1 = node.x * cosY + node.z * sinY;
-        let y1 = node.y;
-        let z1 = -node.x * sinY + node.z * cosY;
-        let x2 = x1;
-        let y2 = y1 * cosX - z1 * sinX;
-        let z2 = y1 * sinX + z1 * cosX;
-
-        const scale = focalLength / (focalLength + z2 + 250);
-        const px = centerX + x2 * scale;
-        const py = centerY + y2 * scale;
-
-        const dist = Math.hypot(clickX - px, clickY - py);
-        if (dist < minDist) {
-          closest = node;
-          minDist = dist;
-        }
-      }
-
-      if (closest) {
-        setSelectedNode(closest);
-      }
-    };
-
-    canvas.addEventListener("click", onCanvasClick);
-
     return () => {
       window.removeEventListener("resize", handleResize);
-      canvas.removeEventListener("mousedown", onMouseDown);
-      window.removeEventListener("mousemove", onMouseMove);
-      window.removeEventListener("mouseup", onMouseUp);
-      canvas.removeEventListener("mouseleave", onMouseLeave);
-      canvas.removeEventListener("click", onCanvasClick);
       cancelAnimationFrame(animationId);
     };
-  }, [isRotating, selectedNode]);
-
-  // Filtered nodes list for table
-  const displayedNodes = useMemo(() => {
-    if (filterCategory === "all") return INITIAL_NODES;
-    return INITIAL_NODES.filter((n) => n.category === filterCategory);
-  }, [filterCategory]);
+  }, [nodes, scaleFactor]);
 
   return (
-    <section className="space-y-8 animate-in fade-in duration-500">
-      {/* Detail View Header */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-monad-500/20 pb-6">
-        <div>
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-monad-500/10 border border-monad-500/30 text-xs font-mono text-monad-300 mb-2">
-            <Radio className="w-3.5 h-3.5 text-cyber-neon animate-pulse" />
-            <span>3D TRUST TOPOLOGY &amp; GRAPH TELEMETRY</span>
+    <div className="w-full bg-[#0d1017] rounded-3xl border border-white/10 overflow-hidden shadow-2xl flex flex-col font-sans">
+      {/* 1:1 Top Header Bar */}
+      <header className="h-16 px-6 border-b border-white/10 flex items-center justify-between bg-[#121622]/80 backdrop-blur-md">
+        {/* Left: Brand KOLIANCEEX */}
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center font-bold text-white shadow-glow">
+            <Shield className="w-4 h-4 text-white" />
           </div>
-          <h2 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight flex items-center gap-3">
-            <span>Interactive Trust Constellation</span>
-            <span className="text-xs px-2.5 py-1 rounded-lg bg-cyber-neon/10 border border-cyber-neon/30 text-cyber-neon font-mono">
-              Monad Parallel Consensus
+          <span className="font-extrabold text-base tracking-wider text-white">
+            KOLIANCE<span className="text-purple-400">EX</span>
+          </span>
+        </div>
+
+        {/* Center: Search Bar */}
+        <div className="relative w-80 max-w-md hidden md:block">
+          <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-2.5 pointer-events-none" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search *IDs & Wallets*"
+            className="w-full pl-10 pr-4 py-1.5 rounded-full bg-[#181d2c] border border-white/10 text-xs text-white placeholder-slate-400 font-mono focus:outline-none focus:border-purple-500 transition"
+          />
+        </div>
+
+        {/* Right: Notifications & Wallet */}
+        <div className="flex items-center gap-3">
+          <button className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#181d2c] border border-white/10 hover:border-purple-500/40 text-xs font-mono text-slate-300 transition">
+            <Bell className="w-3.5 h-3.5 text-purple-400" />
+            <span className="hidden sm:inline">Notifications</span>
+            <span className="px-1.5 py-0.2 rounded-full bg-purple-600 text-white text-[10px] font-bold">
+              3
             </span>
-          </h2>
-          <p className="text-xs sm:text-sm text-monad-200/70 font-mono mt-1 max-w-2xl">
-            Real-time peer-to-peer trust weights, AI audit sentinels, and single-slot cryptographic
-            attestations verified on Monad Testnet.
-          </p>
-        </div>
+          </button>
 
-        {/* Filter Pills */}
-        <div className="flex flex-wrap items-center gap-2">
-          {[
-            { id: "all", label: "All Nodes" },
-            { id: "validator", label: "Validators" },
-            { id: "ai_agent", label: "AI Sentinels" },
-            { id: "oracle", label: "Oracles" },
-            { id: "protocol", label: "Protocols" },
-          ].map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setFilterCategory(tab.id)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-mono transition-all ${
-                filterCategory === tab.id
-                  ? "bg-monad-500 text-white shadow-glow border border-monad-400"
-                  : "bg-monad-950/60 text-monad-300/80 hover:text-white border border-monad-500/20"
-              }`}
-            >
-              {tab.label}
+          <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#181d2c] border border-white/10 text-xs font-mono text-white shadow-sm">
+            <Wallet className="w-3.5 h-3.5 text-cyan-400" />
+            <span>0xAb12...eF90</span>
+            <span className="text-slate-400 text-[11px]">(1.4 ETH)</span>
+          </div>
+        </div>
+      </header>
+
+      {/* Main Container: Left Rail + Center Constellation + Right Sidebar */}
+      <div className="flex flex-col lg:flex-row flex-1 min-h-[700px]">
+        {/* Left Vertical Nav Rail */}
+        <aside className="w-full lg:w-44 border-r border-white/10 p-3 bg-[#0f131d]/60 flex lg:flex-col justify-between shrink-0">
+          <nav className="flex lg:flex-col gap-1.5 w-full">
+            {[
+              { id: "trust_graph", label: "Trust Graph", icon: <Share2 className="w-4 h-4" /> },
+              { id: "id_protocol", label: "ID Protocol", icon: <Shield className="w-4 h-4" /> },
+              { id: "networks", label: "Networks", icon: <Radio className="w-4 h-4" /> },
+              { id: "settings_top", label: "Settings", icon: <Settings className="w-4 h-4" /> },
+            ].map((item) => {
+              const active = activeSideNav === item.id;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => setActiveSideNav(item.id)}
+                  className={`flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium transition ${
+                    active
+                      ? "bg-purple-600 text-white font-semibold shadow-glow"
+                      : "text-slate-400 hover:text-white hover:bg-white/5"
+                  }`}
+                >
+                  {item.icon}
+                  <span>{item.label}</span>
+                </button>
+              );
+            })}
+          </nav>
+
+          <div className="hidden lg:block pt-4 border-t border-white/10">
+            <button className="flex items-center gap-2 px-3 py-2 text-xs text-slate-400 hover:text-white transition">
+              <Settings className="w-4 h-4" />
+              <span>Settings</span>
             </button>
-          ))}
-        </div>
-      </div>
+          </div>
+        </aside>
 
-      {/* Main 3D Topology + Node Inspector Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left 2 Cols: 3D Constellation Canvas */}
-        <div className="lg:col-span-2 glass-panel-glow rounded-3xl p-4 sm:p-6 border border-monad-500/30 relative flex flex-col justify-between overflow-hidden">
-          {/* Canvas Header Overlay */}
-          <div className="flex items-center justify-between z-10 mb-2">
-            <div className="flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping" />
-              <span className="w-2.5 h-2.5 -ml-4.5 rounded-full bg-emerald-400" />
-              <span className="text-xs font-mono text-white font-semibold">
-                Live Force Topology (Drag to Rotate)
-              </span>
-            </div>
+        {/* Center: Trust Constellation Graph Stage */}
+        <main className="flex-1 relative bg-gradient-to-b from-[#0e121b] to-[#0a0d14] flex flex-col justify-between min-h-[680px] overflow-hidden">
+          {/* Top Control Bar inside Graph */}
+          <div className="p-5 flex items-center justify-between z-10">
+            <h2 className="text-lg font-bold text-white tracking-wide">
+              Trust Constellation Graph
+            </h2>
 
             <div className="flex items-center gap-2">
-              <button
-                onClick={() => setIsRotating(!isRotating)}
-                className="px-2.5 py-1 rounded-lg bg-monad-950/80 border border-monad-500/30 text-[11px] font-mono text-monad-300 hover:text-white transition flex items-center gap-1.5"
-              >
-                <RefreshCw className={`w-3 h-3 ${isRotating ? "animate-spin" : ""}`} />
-                <span>{isRotating ? "Auto-Rotate ON" : "Paused"}</span>
+              <button className="p-1.5 rounded-lg bg-[#181d2c] border border-white/10 text-slate-300 hover:text-white transition">
+                <Grid className="w-4 h-4" />
+              </button>
+
+              <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#181d2c] border border-white/10 text-xs font-mono text-emerald-400">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                <span>Active</span>
+              </button>
+
+              <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#181d2c] border border-white/10 text-xs font-mono text-slate-300">
+                <span>All Connections</span>
+                <ChevronDown className="w-3.5 h-3.5" />
               </button>
             </div>
           </div>
 
-          {/* Canvas Element */}
-          <div className="relative w-full h-[520px] rounded-2xl overflow-hidden bg-black/40 border border-monad-500/20 cursor-grab active:cursor-grabbing">
+          {/* Interactive Constellation Canvas */}
+          <div className="relative flex-1 w-full h-[580px]">
             <canvas ref={canvasRef} className="w-full h-full block" />
 
-            {/* Bottom Floating Legend */}
-            <div className="absolute bottom-3 left-3 right-3 flex flex-wrap items-center justify-between gap-2 p-2.5 rounded-xl bg-monad-950/80 backdrop-blur-md border border-monad-500/30 text-[11px] font-mono text-monad-300">
-              <div className="flex items-center gap-4">
-                <span className="flex items-center gap-1.5">
-                  <span className="w-2.5 h-2.5 rounded-full bg-[#836EF9]" /> Engine
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <span className="w-2.5 h-2.5 rounded-full bg-[#00F2FE]" /> Validator
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <span className="w-2.5 h-2.5 rounded-full bg-[#a78bfa]" /> AI Sentinel
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <span className="w-2.5 h-2.5 rounded-full bg-[#ff007a]" /> Registry
-                </span>
-              </div>
-              <span className="text-monad-400/80 hidden sm:inline">
-                Click any node to inspect on-chain telemetry
-              </span>
-            </div>
-          </div>
-        </div>
+            {/* 1:1 Floating Tooltip Card over user_014.trustgraph */}
+            {activeTooltip && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="absolute left-[38%] top-[54%] w-60 rounded-xl bg-[#141824]/95 border border-purple-500/40 p-3.5 shadow-2xl backdrop-blur-xl z-20 space-y-2 pointer-events-auto font-sans"
+              >
+                <div className="flex items-center justify-between border-b border-white/10 pb-1.5">
+                  <span className="font-bold text-xs text-white font-mono">
+                    user_014.trustgraph
+                  </span>
+                  <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                </div>
 
-        {/* Right Col: Holographic Node Inspector HUD Card */}
-        <div className="glass-panel-glow rounded-3xl p-6 border border-monad-500/30 flex flex-col justify-between relative overflow-hidden">
-          <div className="absolute -top-20 -right-20 w-48 h-48 bg-monad-500/20 rounded-full blur-[60px] pointer-events-none" />
+                <div className="space-y-1.5 text-xs">
+                  <div className="flex justify-between text-slate-300">
+                    <span>Trust Score</span>
+                    <strong className="text-white font-mono">94.7</strong>
+                  </div>
 
-          {selectedNode ? (
-            <div className="space-y-5">
-              {/* Header */}
-              <div className="flex items-start justify-between border-b border-monad-500/20 pb-4">
-                <div>
-                  <div className="flex items-center gap-2 mb-1">
-                    <span
-                      className="w-2.5 h-2.5 rounded-full"
-                      style={{ backgroundColor: selectedNode.color }}
-                    />
-                    <span className="text-[11px] uppercase font-mono px-2 py-0.5 rounded bg-monad-500/20 text-monad-300 border border-monad-500/30">
-                      {selectedNode.category}
+                  <div className="flex justify-between items-center text-slate-300">
+                    <span>On-Chain ID</span>
+                    <span className="w-4 h-4 rounded bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-[10px]">
+                      <Check className="w-3 h-3" />
                     </span>
                   </div>
-                  <h3 className="text-lg font-bold text-white tracking-wide">
-                    {selectedNode.label}
-                  </h3>
-                </div>
 
-                <div className="text-right">
-                  <span className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyber-neon to-emerald-400 font-mono">
-                    {selectedNode.trustScore}%
-                  </span>
-                  <p className="text-[10px] text-monad-300/70 font-mono">TRUST SCORE</p>
-                </div>
-              </div>
-
-              {/* Address with Copy */}
-              <div className="p-3 rounded-xl bg-monad-950/60 border border-monad-500/20">
-                <span className="text-[10px] font-mono text-monad-400/80 uppercase block mb-1">
-                  On-Chain Monad DID
-                </span>
-                <div className="flex items-center justify-between gap-2">
-                  <span className="font-mono text-xs text-white truncate">
-                    {selectedNode.address}
-                  </span>
-                  <button
-                    onClick={() => copyAddress(selectedNode.address)}
-                    className="p-1 rounded hover:bg-monad-500/20 text-monad-300 hover:text-white transition shrink-0"
-                  >
-                    {copiedAddress === selectedNode.address ? (
-                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                    ) : (
-                      <Copy className="w-3.5 h-3.5" />
-                    )}
-                  </button>
-                </div>
-              </div>
-
-              {/* Telemetry Stats Grid */}
-              <div className="grid grid-cols-2 gap-3 text-xs font-mono">
-                <div className="p-3 rounded-xl bg-monad-950/40 border border-monad-500/20 space-y-1">
-                  <span className="text-monad-400 text-[10px]">CONSENSUS STAKE</span>
-                  <p className="text-white font-bold text-sm">{selectedNode.stake}</p>
-                </div>
-
-                <div className="p-3 rounded-xl bg-monad-950/40 border border-monad-500/20 space-y-1">
-                  <span className="text-monad-400 text-[10px]">ATTESTATIONS</span>
-                  <p className="text-white font-bold text-sm">
-                    {selectedNode.attestations.toLocaleString()}
-                  </p>
-                </div>
-
-                <div className="p-3 rounded-xl bg-monad-950/40 border border-monad-500/20 space-y-1">
-                  <span className="text-monad-400 text-[10px]">EXECUTION LATENCY</span>
-                  <p className="text-emerald-400 font-bold text-sm">{selectedNode.latency}</p>
-                </div>
-
-                <div className="p-3 rounded-xl bg-monad-950/40 border border-monad-500/20 space-y-1">
-                  <span className="text-monad-400 text-[10px]">FINALITY SLOTS</span>
-                  <p className="text-cyan-400 font-bold text-sm">1 Slot (MonadBFT)</p>
-                </div>
-              </div>
-
-              {/* Connected Peers Badges */}
-              <div>
-                <span className="text-[11px] font-mono text-monad-400 uppercase block mb-2">
-                  Connected Trust Peers ({selectedNode.connections.length})
-                </span>
-                <div className="flex flex-wrap gap-1.5">
-                  {selectedNode.connections.map((peerId) => {
-                    const peer = INITIAL_NODES.find((n) => n.id === peerId);
-                    return (
-                      <button
-                        key={peerId}
-                        onClick={() => peer && setSelectedNode(peer)}
-                        className="px-2.5 py-1 rounded-lg bg-monad-950/60 hover:bg-monad-500/30 border border-monad-500/20 hover:border-monad-400 text-[11px] font-mono text-monad-200 hover:text-white transition flex items-center gap-1.5"
-                      >
-                        <span
-                          className="w-1.5 h-1.5 rounded-full"
-                          style={{ backgroundColor: peer?.color || "#fff" }}
-                        />
-                        <span>{peer?.label.split(" ")[0] || peerId}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className="flex flex-col items-center justify-center h-full text-center p-6 text-monad-300/60 font-mono text-xs">
-              <Share2 className="w-8 h-8 mb-2 opacity-40 animate-pulse" />
-              <span>Select any node on the left constellation to inspect holographic telemetry</span>
-            </div>
-          )}
-
-          {/* Footer Action */}
-          {selectedNode && (
-            <div className="pt-4 border-t border-monad-500/20 mt-4">
-              <a
-                href={`${monadTestnet.blockExplorers.default.url}/address/${selectedNode.address}`}
-                target="_blank"
-                rel="noreferrer"
-                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-monad-500/20 hover:bg-monad-500/30 border border-monad-500/40 text-xs font-mono text-white transition shadow-glow"
-              >
-                <span>Verify on Monad Explorer</span>
-                <ExternalLink className="w-3.5 h-3.5" />
-              </a>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Real-time Cryptographic Proof Stream */}
-      <div className="glass-panel-glow rounded-3xl p-6 sm:p-8 border border-monad-500/30 space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-monad-500/20 pb-4">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-monad-600 to-cyber-neon flex items-center justify-center shadow-glow">
-              <Zap className="w-4 h-4 text-white" />
-            </div>
-            <div>
-              <h3 className="text-base font-bold text-white flex items-center gap-2">
-                <span>Cryptographic Proof Stream (Single-Slot Pipeline)</span>
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                  LIVE
-                </span>
-              </h3>
-              <p className="text-xs text-monad-200/70 font-mono">
-                Continuous state transitions and trust attestations confirmed in &lt; 400ms
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3 text-xs font-mono text-monad-300">
-            <span>Avg Latency: <strong className="text-white">384ms</strong></span>
-            <span className="text-monad-500/50">|</span>
-            <span>Finality: <strong className="text-emerald-400">1 Slot (MonadBFT)</strong></span>
-          </div>
-        </div>
-
-        {/* Proof Event Cards */}
-        <div className="space-y-2.5">
-          <AnimatePresence>
-            {proofs.map((proof, i) => (
-              <motion.div
-                key={proof.id}
-                initial={{ opacity: 0, x: -20, height: 0 }}
-                animate={{ opacity: 1, x: 0, height: "auto" }}
-                exit={{ opacity: 0, x: 20 }}
-                transition={{ duration: 0.35, ease: "easeOut" }}
-                className="flex flex-col md:flex-row md:items-center justify-between gap-3 p-3.5 rounded-2xl bg-monad-950/60 border border-monad-500/20 hover:border-monad-500/40 transition group"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-7 h-7 rounded-lg bg-monad-500/20 border border-monad-500/30 flex items-center justify-center text-xs font-mono text-cyber-neon font-bold shrink-0">
-                    #{i + 1}
+                  <div className="flex justify-between text-slate-300">
+                    <span>219 Connections</span>
+                    <strong className="text-white font-mono">219</strong>
                   </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-bold text-white font-mono">{proof.action}</span>
-                      <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-monad-500/20 text-monad-300">
-                        Slot {proof.slot}
+
+                  <div className="flex justify-between items-center text-slate-300 pt-1">
+                    <span>Verified Badges</span>
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-4 h-4 rounded-full bg-purple-500 text-white flex items-center justify-center text-[9px]">
+                        ✓
+                      </span>
+                      <span className="w-4 h-4 rounded-full bg-slate-300 text-black flex items-center justify-center text-[9px] font-bold">
+                        ★
                       </span>
                     </div>
-                    <div className="flex items-center gap-2 text-[11px] font-mono text-monad-400/80 mt-0.5">
-                      <span>{proof.source}</span>
-                      <span>&rarr;</span>
-                      <span>{proof.target}</span>
-                    </div>
                   </div>
-                </div>
-
-                <div className="flex items-center gap-4 text-xs font-mono self-end md:self-auto">
-                  <div className="text-right">
-                    <span className="text-emerald-400 font-bold">{proof.latencyMs}ms</span>
-                    <span className="text-[10px] text-monad-400/60 block">{proof.timestamp}</span>
-                  </div>
-
-                  <a
-                    href={`${monadTestnet.blockExplorers.default.url}/tx/${proof.txHash}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="p-1.5 rounded-lg bg-monad-900/60 hover:bg-monad-500/30 text-monad-300 hover:text-white transition"
-                    title="View on Monad Explorer"
-                  >
-                    <ExternalLink className="w-3.5 h-3.5" />
-                  </a>
                 </div>
               </motion.div>
-            ))}
-          </AnimatePresence>
-        </div>
+            )}
+
+            {/* Bottom Left Zoom & Reset Controls */}
+            <div className="absolute bottom-5 left-5 flex flex-col gap-1.5 z-10">
+              <button
+                onClick={() => setScaleFactor((s) => Math.min(s + 0.1, 1.4))}
+                className="w-8 h-8 rounded-lg bg-[#161a26]/90 border border-white/10 hover:border-purple-500/40 text-slate-300 hover:text-white flex items-center justify-center transition shadow-lg"
+              >
+                <Plus className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => setScaleFactor((s) => Math.max(s - 0.1, 0.7))}
+                className="w-8 h-8 rounded-lg bg-[#161a26]/90 border border-white/10 hover:border-purple-500/40 text-slate-300 hover:text-white flex items-center justify-center transition shadow-lg"
+              >
+                <Minus className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => setScaleFactor(1)}
+                className="w-8 h-8 rounded-lg bg-[#161a26]/90 border border-white/10 hover:border-purple-500/40 text-slate-300 hover:text-white flex items-center justify-center transition shadow-lg"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            {/* Bottom Right 1:1 Network Activity Card */}
+            <div className="absolute bottom-5 right-5 w-56 rounded-2xl bg-[#141926]/90 border border-white/10 p-3.5 backdrop-blur-md z-10 space-y-2.5 font-sans">
+              <div className="flex items-center justify-between text-xs text-white font-semibold">
+                <span>Network Activity</span>
+                <Activity className="w-3.5 h-3.5 text-cyan-400" />
+              </div>
+
+              {/* Sparkline Visual */}
+              <div className="h-6 w-full flex items-end gap-1 px-1">
+                {[30, 45, 60, 40, 75, 55, 90, 65, 80, 70, 85].map((h, i) => (
+                  <div
+                    key={i}
+                    className="flex-1 bg-gradient-to-t from-cyan-500/30 to-cyan-400 rounded-t-sm"
+                    style={{ height: `${h}%` }}
+                  />
+                ))}
+              </div>
+
+              <div className="space-y-1 text-[11px] font-mono border-t border-white/10 pt-2">
+                <div className="flex justify-between text-slate-400">
+                  <span>Gas:</span>
+                  <strong className="text-white">18 gwei</strong>
+                </div>
+                <div className="flex justify-between text-slate-400">
+                  <span>Nodes:</span>
+                  <strong className="text-white">5,142</strong>
+                </div>
+              </div>
+
+              <div className="space-y-1.5 border-t border-white/10 pt-2 text-[10px] font-mono">
+                <span className="text-slate-400 block font-sans text-[11px]">
+                  ID Verification Status
+                </span>
+                <div>
+                  <div className="flex justify-between text-slate-300 mb-0.5">
+                    <span>Active</span>
+                    <span className="text-cyan-400 font-bold">99.1%</span>
+                  </div>
+                  <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                    <div className="h-full bg-cyan-400 rounded-full w-[99.1%]" />
+                  </div>
+                </div>
+
+                <div>
+                  <div className="flex justify-between text-slate-300 mb-0.5">
+                    <span>System</span>
+                    <span className="text-purple-400 font-bold">99.3%</span>
+                  </div>
+                  <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                    <div className="h-full bg-purple-500 rounded-full w-[99.3%]" />
+                  </div>
+                </div>
+
+                <div>
+                  <div className="flex justify-between text-slate-300 mb-0.5">
+                    <span>System Vitals</span>
+                    <span className="text-slate-400">0%</span>
+                  </div>
+                  <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                    <div className="h-full bg-slate-600 rounded-full w-[0%]" />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </main>
+
+        {/* Right Sidebar: 3 Stacked Cards (1:1 with Image 2) */}
+        <aside className="w-full lg:w-84 border-l border-white/10 p-4 bg-[#101420]/70 flex flex-col gap-4 shrink-0 overflow-y-auto">
+          {/* Card 1: Holographic Biometric ID Card */}
+          <div className="rounded-2xl bg-[#141826] border border-white/10 p-4 space-y-3.5 shadow-lg">
+            <div className="flex items-center justify-between text-xs font-semibold text-white">
+              <span>Holographic Biometric ID Card</span>
+              <button className="text-slate-400 hover:text-white">
+                <MoreHorizontal className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Avatar & Biometric Audio Scan */}
+            <div className="flex items-center gap-3">
+              <div className="relative w-14 h-14 rounded-2xl bg-gradient-to-tr from-cyan-500/20 to-purple-500/20 border border-cyan-400/50 p-1 flex items-center justify-center overflow-hidden shrink-0 shadow-glow">
+                <div className="w-full h-full rounded-xl bg-slate-800 flex items-center justify-center text-slate-300">
+                  <User className="w-7 h-7 text-cyan-300" />
+                </div>
+                <div className="absolute inset-0 border border-cyan-400/40 rounded-2xl animate-pulse pointer-events-none" />
+              </div>
+
+              <div className="flex-1 space-y-0.5">
+                <span className="text-[10px] uppercase font-mono text-slate-400">User</span>
+                <h4 className="font-bold text-white text-sm">Alex R. Thompson</h4>
+                <p className="text-[10px] font-mono text-slate-400 truncate">
+                  ID: kx_0x1a2b3c4d...
+                </p>
+                <div className="flex items-center gap-1 text-[10px] font-mono text-cyan-400 pt-0.5">
+                  <Activity className="w-3 h-3 animate-pulse" />
+                  <span>Real-time biometric scan</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Biometric Frequency Wave Bars */}
+            <div className="flex items-center gap-1 h-3 px-1">
+              {[20, 60, 90, 40, 80, 100, 70, 30, 85, 45, 65, 95, 40, 20].map((val, i) => (
+                <div
+                  key={i}
+                  className="flex-1 bg-cyan-400/70 rounded-full"
+                  style={{ height: `${val}%` }}
+                />
+              ))}
+            </div>
+
+            {/* Iridescent Verification Badges */}
+            <div className="space-y-1">
+              <span className="text-[10px] font-mono text-slate-400 block">
+                Iridescent verification badges
+              </span>
+              <div className="flex flex-wrap gap-1.5">
+                <span className="px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[10px] font-mono font-bold">
+                  VERIFIED
+                </span>
+                <span className="px-2 py-0.5 rounded-md bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 text-[10px] font-mono font-bold">
+                  KYC
+                </span>
+                <span className="px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-400 border border-amber-500/30 text-[10px] font-mono font-bold">
+                  ON-CHAIN
+                </span>
+                <span className="px-2 py-0.5 rounded-md bg-purple-500/20 text-purple-400 border border-purple-500/30 text-[10px] font-mono font-bold">
+                  WEB3
+                </span>
+              </div>
+            </div>
+
+            {/* Trust Score 94.7% Progress Bar */}
+            <div className="space-y-1 pt-1 border-t border-white/10">
+              <div className="flex justify-between items-center text-xs">
+                <span className="flex items-center gap-1 text-slate-300">
+                  Trust Score <Info className="w-3 h-3 text-slate-400" />
+                </span>
+                <strong className="text-cyan-400 font-mono font-bold text-sm">94.7%</strong>
+              </div>
+              <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
+                <div className="h-full bg-gradient-to-r from-cyan-400 to-purple-500 rounded-full w-[94.7%]" />
+              </div>
+            </div>
+          </div>
+
+          {/* Card 2: Cryptographic Proof Stream (Parameters Card) */}
+          <div className="rounded-2xl bg-[#141826] border border-white/10 p-4 space-y-3 shadow-lg">
+            <div className="flex items-center justify-between text-xs font-semibold text-white">
+              <span>Cryptographic Proof Stream</span>
+              <button className="text-slate-400 hover:text-white">
+                <MoreHorizontal className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 text-[11px] font-mono">
+              <div className="space-y-1 text-slate-400">
+                <div>
+                  Hash: <strong className="text-white block font-mono">0x5c7b...f8e9</strong>
+                </div>
+                <div>
+                  Block: <strong className="text-white block font-mono">1947214</strong>
+                </div>
+                <div>
+                  Timestamp: <strong className="text-white block font-mono">14:02:49</strong>
+                </div>
+              </div>
+
+              <div className="space-y-1 text-slate-400">
+                <div>
+                  Action: <strong className="text-emerald-400 block font-mono">Proof Issued</strong>
+                </div>
+                <div>
+                  Hash:{" "}
+                  <a
+                    href="https://testnet.monadexplorer.com"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-cyan-400 hover:underline block font-mono"
+                  >
+                    0x65958 &rarr;
+                  </a>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Card 3: Cryptographic Proof Stream (Table Ledger) */}
+          <div className="rounded-2xl bg-[#141826] border border-white/10 p-4 space-y-2.5 shadow-lg">
+            <div className="flex items-center justify-between text-xs font-semibold text-white">
+              <span>Cryptographic Proof Stream</span>
+              <button className="text-slate-400 hover:text-white">
+                <MoreHorizontal className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="text-[10px] font-mono text-slate-400 grid grid-cols-12 border-b border-white/10 pb-1">
+              <span className="col-span-5">Hash</span>
+              <span className="col-span-4">Block</span>
+              <span className="col-span-3 text-right">Time</span>
+            </div>
+
+            <div className="space-y-2 text-[11px] font-mono">
+              {[
+                { hash: "0x5c7b...f8e9", block: "Proof Issued", time: "0x65958" },
+                { hash: "0x5c7b...f8e9", block: "1947214", time: "0x65958" },
+                { hash: "0x5c7b...f8e9", block: "14:02:49", time: "0x65958" },
+                { hash: "0x5c7b...f8e9", block: "Proof Issued", time: "0x65958" },
+                { hash: "0x5c7b...f8e9", block: "Proof Issued", time: "0x65958" },
+              ].map((row, idx) => (
+                <div key={idx} className="grid grid-cols-12 items-center text-slate-300">
+                  <div className="col-span-5 flex items-center gap-1.5 truncate">
+                    <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 shrink-0" />
+                    <span className="truncate">{row.hash}</span>
+                  </div>
+                  <span className="col-span-4 text-slate-400 truncate">{row.block}</span>
+                  <a
+                    href="https://testnet.monadexplorer.com"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="col-span-3 text-cyan-400 text-right hover:underline truncate"
+                  >
+                    {row.time}
+                  </a>
+                </div>
+              ))}
+            </div>
+          </div>
+        </aside>
       </div>
-    </section>
+    </div>
   );
 }

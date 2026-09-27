@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, Suspense } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useSearchParams } from "next/navigation";
 import {
   createPublicClient,
   createWalletClient,
@@ -26,11 +27,13 @@ import {
   ArrowRight,
   Database,
   Lock,
+  CreditCard,
 } from "lucide-react";
 import { Navbar, NavView } from "@/components/Navbar";
 import { CursorTrail } from "@/components/CursorTrail";
 import { EnergyCoreHero } from "@/components/EnergyCoreHero";
 import { TrustConstellation } from "@/components/TrustConstellation";
+import { ProductStudio } from "@/components/ProductStudio";
 import { IdentityCard } from "@/components/IdentityCard";
 import { TrustAttestationCard } from "@/components/TrustAttestationCard";
 import { TrustStream } from "@/components/TrustStream";
@@ -44,17 +47,20 @@ import {
 } from "@/lib/contract";
 import { checkBackendHealth } from "@/lib/api";
 
-export default function Home() {
+function MainContent() {
+  const searchParams = useSearchParams();
+  const initialView = (searchParams.get("view") as NavView) || "INDEX";
+
   const [account, setAccount] = useState<`0x${string}` | null>(null);
   const [balance, setBalance] = useState("0.00");
   const [chainId, setChainId] = useState<number | null>(null);
   const [networkModalOpen, setNetworkModalOpen] = useState(false);
 
-  // Top Nav View: INDEX | DETAIL | PRODUCT
-  const [currentView, setCurrentView] = useState<NavView>("INDEX");
+  // Top Nav View: INDEX | DETAIL | PRODUCT | AGENTCARD
+  const [currentView, setCurrentView] = useState<NavView>(initialView);
 
-  // Sub-tabs in PRODUCT view
-  const [productSubTab, setProductSubTab] = useState<"identity" | "attest" | "stream" | "architecture">("identity");
+  // Sub-tab under Product Studio (for direct contract transactions)
+  const [contractStudioOpen, setContractStudioOpen] = useState(false);
 
   // Contract State
   const [identity, setIdentity] = useState<IdentityData | null>(null);
@@ -161,11 +167,9 @@ export default function Home() {
     if (!account) return;
     setIsLoading(true);
     try {
-      // 1. Balance
       const bal = await publicClient.getBalance({ address: account });
       setBalance(parseFloat(formatEther(bal)).toFixed(4));
 
-      // 2. Fetch Identity from Koliance contract if contract address configured
       if (KOLIANCE_ADDRESS && KOLIANCE_ADDRESS !== "0x0000000000000000000000000000000000000000") {
         try {
           const idData = (await publicClient.readContract({
@@ -181,7 +185,6 @@ export default function Home() {
             metadataHash: idData[2],
           });
 
-          // Fetch all records
           const onchainRecords = (await publicClient.readContract({
             address: KOLIANCE_ADDRESS,
             abi: KOLIANCE_ABI,
@@ -200,7 +203,7 @@ export default function Home() {
             );
           }
         } catch (contractErr) {
-          console.warn("Contract read warning (mock data fallback active):", contractErr);
+          console.warn("Contract read warning:", contractErr);
         }
       }
     } catch (e) {
@@ -210,7 +213,6 @@ export default function Home() {
     }
   }, [account, publicClient]);
 
-  // Initial and reactive effects
   useEffect(() => {
     fetchData();
   }, [fetchData]);
@@ -260,14 +262,6 @@ export default function Home() {
         await publicClient.waitForTransactionReceipt({ hash });
         await fetchData();
         return hash;
-      } else {
-        await new Promise((r) => setTimeout(r, 1200));
-        setIdentity({
-          exists: true,
-          createdAt: BigInt(Math.floor(Date.now() / 1000)),
-          metadataHash,
-        });
-        return "0x7d8fa30113bc30f295bc18b0e774aa1d1290326417fa11c3905e321bf4a0c8b2";
       }
     } catch (err: any) {
       alert(`Registration failed: ${err?.shortMessage || err?.message || err}`);
@@ -294,17 +288,6 @@ export default function Home() {
         await publicClient.waitForTransactionReceipt({ hash });
         await fetchData();
         return hash;
-      } else {
-        await new Promise((r) => setTimeout(r, 1200));
-        const newRecord: TrustRecordData = {
-          from: account,
-          to,
-          action,
-          proof,
-          timestamp: BigInt(Math.floor(Date.now() / 1000)),
-        };
-        setRecords((prev) => [newRecord, ...prev]);
-        return "0x91b2c41804e386da6dd4b61a7a24558e8b0108be65e0ebc5cbe82e0e0a5c48b1";
       }
     } catch (err: any) {
       alert(`Trust attestation failed: ${err?.shortMessage || err?.message || err}`);
@@ -312,11 +295,11 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col justify-between selection:bg-monad-500 selection:text-white bg-[#06040A] text-white relative">
+    <div className="min-h-screen flex flex-col justify-between selection:bg-purple-500 selection:text-white relative">
       {/* World-Class Cursor Trail Particle Ribbon */}
       <CursorTrail />
 
-      {/* Top Fixed Navigation with INDEX | DETAIL | PRODUCT */}
+      {/* Top Fixed Navigation: INDEX | DETAIL | PRODUCT | AGENTCARD */}
       <Navbar
         currentView={currentView}
         onSelectView={setCurrentView}
@@ -339,7 +322,7 @@ export default function Home() {
               transition={{ duration: 0.35, ease: "easeInOut" }}
               className="w-full"
             >
-              {/* World-Class 3D Energy Core Hero */}
+              {/* Fixed & Prominent 3D Energy Core Hero */}
               <EnergyCoreHero
                 onLaunchDApps={() => setCurrentView("PRODUCT")}
                 onExploreDetails={() => setCurrentView("DETAIL")}
@@ -348,14 +331,14 @@ export default function Home() {
               {/* Protocol Architecture Bento Highlights */}
               <div className="max-w-7xl mx-auto px-4 sm:px-8 py-16 space-y-8">
                 <div className="text-center max-w-3xl mx-auto space-y-3">
-                  <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-monad-500/10 border border-monad-500/30 text-xs font-mono text-monad-300">
-                    <Sparkles className="w-3.5 h-3.5 text-cyber-neon" />
+                  <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-purple-500/10 border border-purple-500/30 text-xs font-mono text-purple-300">
+                    <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
                     <span>NEXT-GENERATION DECENTRALIZED TRUST LAYER</span>
                   </div>
                   <h2 className="text-3xl sm:text-4xl font-black text-white tracking-tight">
                     Engineered for Monad 10,000 TPS Parallel EVM
                   </h2>
-                  <p className="text-sm text-monad-200/70 font-mono">
+                  <p className="text-sm text-slate-400 font-mono">
                     Koliance combines single-slot consensus with holographic trust topology to deliver
                     instantaneous identity attestations for decentralized communities, validators, and AI agents.
                   </p>
@@ -365,23 +348,23 @@ export default function Home() {
                   {/* Card 1 */}
                   <div
                     onClick={() => setCurrentView("DETAIL")}
-                    className="glass-panel-glow rounded-3xl p-6 border border-monad-500/30 hover:border-monad-400 transition-all cursor-pointer group space-y-4 relative overflow-hidden"
+                    className="rounded-3xl p-6 bg-[#131722]/80 border border-white/10 hover:border-purple-500/60 transition-all cursor-pointer group space-y-4 relative overflow-hidden shadow-lg"
                   >
-                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-monad-600 to-cyber-neon flex items-center justify-center text-white shadow-glow group-hover:scale-110 transition-transform">
+                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-purple-600 to-indigo-600 flex items-center justify-center text-white shadow-glow group-hover:scale-110 transition-transform">
                       <Network className="w-6 h-6" />
                     </div>
                     <div>
                       <div className="flex items-center justify-between mb-1">
-                        <h3 className="font-bold text-lg text-white">3D Trust Constellation</h3>
-                        <ArrowRight className="w-4 h-4 text-cyber-neon group-hover:translate-x-1 transition-transform" />
+                        <h3 className="font-bold text-lg text-white">Trust Constellation Graph</h3>
+                        <ArrowRight className="w-4 h-4 text-cyan-400 group-hover:translate-x-1 transition-transform" />
                       </div>
-                      <p className="text-xs text-monad-200/70 leading-relaxed font-mono">
-                        Explore the interactive multi-node force topology. Inspect validator trust scores,
-                        AI audit agents, and consensus weights in real time.
+                      <p className="text-xs text-slate-400 leading-relaxed font-mono">
+                        1:1 Replicated force topology. Inspect real-time multi-cluster trust weights,
+                        AI audit agents, and consensus metrics.
                       </p>
                     </div>
                     <div className="pt-2 flex items-center gap-2 text-[11px] font-mono text-cyan-400">
-                      <span>View Live Constellation</span>
+                      <span>View Detail Topology</span>
                       <span>&rarr;</span>
                     </div>
                   </div>
@@ -389,50 +372,47 @@ export default function Home() {
                   {/* Card 2 */}
                   <div
                     onClick={() => setCurrentView("PRODUCT")}
-                    className="glass-panel-glow rounded-3xl p-6 border border-monad-500/30 hover:border-emerald-400/60 transition-all cursor-pointer group space-y-4 relative overflow-hidden"
+                    className="rounded-3xl p-6 bg-[#131722]/80 border border-white/10 hover:border-cyan-400/60 transition-all cursor-pointer group space-y-4 relative overflow-hidden shadow-lg"
                   >
-                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-400 flex items-center justify-center text-white shadow-glow group-hover:scale-110 transition-transform">
-                      <Shield className="w-6 h-6" />
+                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-cyan-400 to-teal-500 flex items-center justify-center text-black font-extrabold shadow-glow group-hover:scale-110 transition-transform">
+                      <Shield className="w-6 h-6 text-black" />
                     </div>
                     <div>
                       <div className="flex items-center justify-between mb-1">
-                        <h3 className="font-bold text-lg text-white">Attestation Studio</h3>
-                        <ArrowRight className="w-4 h-4 text-emerald-400 group-hover:translate-x-1 transition-transform" />
+                        <h3 className="font-bold text-lg text-white">Holographic Verification</h3>
+                        <ArrowRight className="w-4 h-4 text-cyan-400 group-hover:translate-x-1 transition-transform" />
                       </div>
-                      <p className="text-xs text-monad-200/70 leading-relaxed font-mono">
-                        Register your sovereign on-chain DID and sign zero-knowledge trust attestations
-                        directly to the deployed Monad Testnet smart contract.
+                      <p className="text-xs text-slate-400 leading-relaxed font-mono">
+                        1:1 Replicated 3D identity badge, digital assets staking dashboard, and biometric
+                        fingerprint protocol.
                       </p>
                     </div>
-                    <div className="pt-2 flex items-center gap-2 text-[11px] font-mono text-emerald-400">
-                      <span>Launch Web3 Studio</span>
+                    <div className="pt-2 flex items-center gap-2 text-[11px] font-mono text-cyan-400">
+                      <span>Open Product Studio</span>
                       <span>&rarr;</span>
                     </div>
                   </div>
 
                   {/* Card 3 */}
                   <div
-                    onClick={() => {
-                      setCurrentView("PRODUCT");
-                      setProductSubTab("architecture");
-                    }}
-                    className="glass-panel-glow rounded-3xl p-6 border border-monad-500/30 hover:border-purple-400/60 transition-all cursor-pointer group space-y-4 relative overflow-hidden"
+                    onClick={() => setCurrentView("AGENTCARD")}
+                    className="rounded-3xl p-6 bg-[#131722]/80 border border-white/10 hover:border-indigo-400/60 transition-all cursor-pointer group space-y-4 relative overflow-hidden shadow-lg"
                   >
-                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-purple-600 to-pink-500 flex items-center justify-center text-white shadow-glow group-hover:scale-110 transition-transform">
-                      <Cpu className="w-6 h-6" />
+                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white shadow-glow group-hover:scale-110 transition-transform">
+                      <CreditCard className="w-6 h-6" />
                     </div>
                     <div>
                       <div className="flex items-center justify-between mb-1">
-                        <h3 className="font-bold text-lg text-white">Single-Slot Finality</h3>
+                        <h3 className="font-bold text-lg text-white">AI Card Scanner</h3>
                         <ArrowRight className="w-4 h-4 text-purple-400 group-hover:translate-x-1 transition-transform" />
                       </div>
-                      <p className="text-xs text-monad-200/70 leading-relaxed font-mono">
-                        Instantaneous single-slot MonadBFT state confirmations with sub-400ms finality and
-                        asynchronous transaction execution.
+                      <p className="text-xs text-slate-400 leading-relaxed font-mono">
+                        Full-stack Neural Asset Processor featuring 6-card circulating conveyor belt
+                        with matrix digitization.
                       </p>
                     </div>
                     <div className="pt-2 flex items-center gap-2 text-[11px] font-mono text-purple-400">
-                      <span>Inspect Go Architecture</span>
+                      <span>Launch AI Scanner</span>
                       <span>&rarr;</span>
                     </div>
                   </div>
@@ -441,7 +421,7 @@ export default function Home() {
             </motion.div>
           )}
 
-          {/* TAB 2: DETAIL (Option 2: Interactive 3D Trust Constellation & Holographic Motion) */}
+          {/* TAB 2: DETAIL (1:1 Replica of Image 2) */}
           {currentView === "DETAIL" && (
             <motion.div
               key="view-detail"
@@ -449,13 +429,13 @@ export default function Home() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
               transition={{ duration: 0.35, ease: "easeInOut" }}
-              className="pt-24 max-w-7xl mx-auto px-4 sm:px-8 py-8"
+              className="pt-20 max-w-7xl mx-auto px-2 sm:px-6 py-4"
             >
               <TrustConstellation />
             </motion.div>
           )}
 
-          {/* TAB 3: PRODUCT (Holographic Identity Hub & Attestation Studio) */}
+          {/* TAB 3: PRODUCT (1:1 Replica of Image 3 + Web3 Contract Studio) */}
           {currentView === "PRODUCT" && (
             <motion.div
               key="view-product"
@@ -463,311 +443,136 @@ export default function Home() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
               transition={{ duration: 0.35, ease: "easeInOut" }}
-              className="pt-24 max-w-7xl mx-auto px-4 sm:px-8 py-8 space-y-8"
+              className="pt-20 max-w-7xl mx-auto px-4 sm:px-6 py-4 space-y-6"
             >
-              {/* Product Header */}
-              <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-monad-500/20 pb-6">
-                <div>
-                  <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-monad-500/10 border border-monad-500/30 text-xs font-mono text-monad-300 mb-2">
-                    <Shield className="w-3.5 h-3.5 text-emerald-400" />
-                    <span>ON-CHAIN SMART CONTRACT STUDIO</span>
-                  </div>
-                  <h2 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight flex items-center gap-3">
-                    <span>Koliance Identity &amp; Attestation Studio</span>
-                  </h2>
-                  <p className="text-xs sm:text-sm text-monad-200/70 font-mono mt-1">
-                    Direct on-chain interaction with contract{" "}
-                    <code className="text-monad-300 bg-monad-950/60 px-2 py-0.5 rounded border border-monad-500/30">
-                      {KOLIANCE_ADDRESS}
-                    </code>{" "}
-                    on Monad Testnet (Chain ID 10143).
-                  </p>
-                </div>
+              {/* 1:1 Image 3 Dashboard & Holographic Certs */}
+              <ProductStudio
+                account={account}
+                onStakeAction={() => setContractStudioOpen(true)}
+                onRegisterAction={() => setContractStudioOpen(true)}
+              />
 
-                <div className="flex items-center gap-3">
+              {/* Direct On-Chain Contract Studio Drawer/Section */}
+              <div className="rounded-3xl bg-[#121622]/90 border border-white/10 p-6 space-y-6 shadow-xl">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/10 pb-4">
+                  <div>
+                    <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                      <Shield className="w-5 h-5 text-cyan-400" />
+                      <span>Monad On-Chain Smart Contract Attestation</span>
+                    </h3>
+                    <p className="text-xs text-slate-400 font-mono mt-0.5">
+                      Direct contract: <code className="text-purple-300">{KOLIANCE_ADDRESS}</code> (Chain ID 10143)
+                    </p>
+                  </div>
+
                   <a
                     href={`${monadTestnet.blockExplorers.default.url}/address/${KOLIANCE_ADDRESS}`}
                     target="_blank"
                     rel="noreferrer"
-                    className="px-3.5 py-1.5 rounded-xl bg-monad-950/80 border border-monad-500/40 hover:border-monad-400 text-xs font-mono text-white transition flex items-center gap-1.5 shadow-glow"
+                    className="px-3.5 py-1.5 rounded-xl bg-[#181d2c] border border-white/10 text-xs font-mono text-white hover:border-purple-400 transition flex items-center gap-1.5 self-start sm:self-auto"
                   >
                     <span>Sourcify Verified</span>
                     <ExternalLink className="w-3.5 h-3.5 text-emerald-400" />
                   </a>
                 </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <IdentityCard
+                    account={account}
+                    identity={identity}
+                    isLoading={isLoading}
+                    onRegister={handleRegister}
+                  />
+
+                  <TrustAttestationCard
+                    account={account}
+                    onAddTrust={handleAddTrust}
+                  />
+                </div>
+
+                <TrustStream
+                  records={records}
+                  isLoading={isLoading}
+                  onRefresh={fetchData}
+                />
               </div>
+            </motion.div>
+          )}
 
-              {/* Sub-Tab Navigation Switcher */}
-              <div className="flex flex-wrap items-center justify-center gap-2 p-1.5 rounded-2xl glass-panel max-w-xl mx-auto border border-monad-500/20">
-                <button
-                  onClick={() => setProductSubTab("identity")}
-                  className={`relative flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold tracking-wide transition-all ${
-                    productSubTab === "identity" ? "text-white" : "text-monad-300/80 hover:text-white"
-                  }`}
-                >
-                  {productSubTab === "identity" && (
-                    <motion.div
-                      layoutId="subTabPill"
-                      className="absolute inset-0 rounded-xl bg-gradient-to-r from-monad-600 to-monad-500 shadow-glow"
-                      transition={{ type: "spring", stiffness: 350, damping: 30 }}
-                    />
-                  )}
-                  <span className="relative z-10 flex items-center gap-1.5">
-                    <Shield className="w-3.5 h-3.5" />
-                    Identity Hub
-                  </span>
-                </button>
-
-                <button
-                  onClick={() => setProductSubTab("attest")}
-                  className={`relative flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold tracking-wide transition-all ${
-                    productSubTab === "attest" ? "text-white" : "text-monad-300/80 hover:text-white"
-                  }`}
-                >
-                  {productSubTab === "attest" && (
-                    <motion.div
-                      layoutId="subTabPill"
-                      className="absolute inset-0 rounded-xl bg-gradient-to-r from-monad-600 to-monad-500 shadow-glow"
-                      transition={{ type: "spring", stiffness: 350, damping: 30 }}
-                    />
-                  )}
-                  <span className="relative z-10 flex items-center gap-1.5">
-                    <KeyRound className="w-3.5 h-3.5" />
-                    Add Trust
-                  </span>
-                </button>
-
-                <button
-                  onClick={() => setProductSubTab("stream")}
-                  className={`relative flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold tracking-wide transition-all ${
-                    productSubTab === "stream" ? "text-white" : "text-monad-300/80 hover:text-white"
-                  }`}
-                >
-                  {productSubTab === "stream" && (
-                    <motion.div
-                      layoutId="subTabPill"
-                      className="absolute inset-0 rounded-xl bg-gradient-to-r from-monad-600 to-monad-500 shadow-glow"
-                      transition={{ type: "spring", stiffness: 350, damping: 30 }}
-                    />
-                  )}
-                  <span className="relative z-10 flex items-center gap-1.5">
-                    <Layers className="w-3.5 h-3.5" />
-                    Ledger Stream
-                  </span>
-                </button>
-
-                <button
-                  onClick={() => setProductSubTab("architecture")}
-                  className={`relative flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold tracking-wide transition-all ${
-                    productSubTab === "architecture" ? "text-white" : "text-monad-300/80 hover:text-white"
-                  }`}
-                >
-                  {productSubTab === "architecture" && (
-                    <motion.div
-                      layoutId="subTabPill"
-                      className="absolute inset-0 rounded-xl bg-gradient-to-r from-monad-600 to-monad-500 shadow-glow"
-                      transition={{ type: "spring", stiffness: 350, damping: 30 }}
-                    />
-                  )}
-                  <span className="relative z-10 flex items-center gap-1.5">
-                    <Server className="w-3.5 h-3.5" />
-                    Go &amp; Arch
-                  </span>
-                </button>
-              </div>
-
-              {/* Sub-Tab Panels */}
-              <div className="max-w-4xl mx-auto">
-                <AnimatePresence mode="wait">
-                  {productSubTab === "identity" && (
-                    <motion.div
-                      key="identity-tab"
-                      initial={{ opacity: 0, y: 15 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -15 }}
-                      transition={{ duration: 0.3 }}
-                    >
-                      <IdentityCard
-                        account={account}
-                        identity={identity}
-                        isLoading={isLoading}
-                        onRegister={handleRegister}
-                      />
-                    </motion.div>
-                  )}
-
-                  {productSubTab === "attest" && (
-                    <motion.div
-                      key="attest-tab"
-                      initial={{ opacity: 0, y: 15 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -15 }}
-                      transition={{ duration: 0.3 }}
-                    >
-                      <TrustAttestationCard
-                        account={account}
-                        onAddTrust={handleAddTrust}
-                      />
-                    </motion.div>
-                  )}
-
-                  {productSubTab === "stream" && (
-                    <motion.div
-                      key="stream-tab"
-                      initial={{ opacity: 0, y: 15 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -15 }}
-                      transition={{ duration: 0.3 }}
-                    >
-                      <TrustStream
-                        records={records}
-                        isLoading={isLoading}
-                        onRefresh={fetchData}
-                      />
-                    </motion.div>
-                  )}
-
-                  {productSubTab === "architecture" && (
-                    <motion.div
-                      key="arch-tab"
-                      initial={{ opacity: 0, y: 15 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -15 }}
-                      transition={{ duration: 0.3 }}
-                      className="glass-panel-glow rounded-3xl p-6 sm:p-8 border border-monad-500/30 space-y-6"
-                    >
-                      <div className="flex items-center justify-between border-b border-monad-500/20 pb-4">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-xl bg-monad-500/20 border border-monad-500/40 flex items-center justify-center text-monad-300">
-                            <Server className="w-5 h-5" />
-                          </div>
-                          <div>
-                            <h4 className="font-bold text-white text-base">Full-Stack Architecture &amp; Go Backend</h4>
-                            <p className="text-xs text-monad-200/70 font-mono">
-                              Zero-Config Vercel + Monad Testnet + Go High-Speed Indexer
-                            </p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className={`w-2.5 h-2.5 rounded-full ${backendHealthy ? "bg-emerald-400" : "bg-monad-500/50"}`} />
-                          <span className="text-xs font-mono text-monad-300">
-                            {backendHealthy ? "Go Service Online" : "Direct RPC Mode"}
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="p-4 rounded-2xl bg-monad-950/60 border border-monad-500/20 space-y-2">
-                          <div className="flex items-center gap-2 text-monad-300 text-xs font-bold font-mono">
-                            <Terminal className="w-4 h-4 text-cyber-accent" />
-                            <span>SMART CONTRACT (HARDHAT)</span>
-                          </div>
-                          <p className="text-xs text-monad-200/70 leading-relaxed">
-                            Pre-configured for Monad Testnet (Chain ID 10143) in <code className="text-white">contracts/</code>.
-                            Supports single-slot execution, automated Ignition deployments, and Solidity 0.8.31.
-                          </p>
-                          <div className="text-[11px] font-mono text-monad-400 bg-black/40 p-2 rounded-lg">
-                            npx hardhat ignition deploy ignition/modules/Koliance.ts --network monadTestnet
-                          </div>
-                        </div>
-
-                        <div className="p-4 rounded-2xl bg-monad-950/60 border border-monad-500/20 space-y-2">
-                          <div className="flex items-center gap-2 text-monad-300 text-xs font-bold font-mono">
-                            <Cpu className="w-4 h-4 text-emerald-400" />
-                            <span>GO BACKEND READY</span>
-                          </div>
-                          <p className="text-xs text-monad-200/70 leading-relaxed">
-                            Standard Go Clean Architecture in <code className="text-white">backend/</code>. Ready to index
-                            identity events, cache trust graphs, and serve REST endpoints at microsecond latency.
-                          </p>
-                          <div className="text-[11px] font-mono text-monad-400 bg-black/40 p-2 rounded-lg">
-                            cd backend &amp;&amp; go run cmd/api/main.go
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="p-4 rounded-2xl bg-monad-950/40 border border-monad-500/20 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs font-mono">
-                        <div className="text-monad-300">
-                          <span className="text-emerald-400 font-bold">Vercel Production Deployment: </span>
-                          Live on Edge Network with instant global distribution.
-                        </div>
-                        <a
-                          href="https://koliance.vercel.app"
-                          target="_blank"
-                          rel="noreferrer"
-                          className="px-3.5 py-1.5 rounded-lg bg-white text-black font-bold hover:bg-neutral-200 transition shrink-0 flex items-center gap-1.5"
-                        >
-                          <span>Open Live dApp</span>
-                          <ExternalLink className="w-3.5 h-3.5" />
-                        </a>
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
+          {/* TAB 4: AGENTCARD (Neural Asset Processor / AI Card Scanner) */}
+          {currentView === "AGENTCARD" && (
+            <motion.div
+              key="view-agentcard"
+              initial={{ opacity: 0, scale: 0.98 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.98 }}
+              transition={{ duration: 0.35, ease: "easeInOut" }}
+              className="pt-16 w-full h-[calc(100vh-64px)]"
+            >
+              <iframe
+                src="/agentcard/index.html"
+                className="w-full h-full border-0"
+                title="AI Card Scanner // Neural Asset Processor"
+              />
             </motion.div>
           )}
         </AnimatePresence>
       </main>
 
-      {/* Global Footer */}
-      <footer className="border-t border-monad-500/20 py-8 px-4 sm:px-8 mt-20 glass-panel">
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-xs font-mono text-monad-400/80">
-          <div className="flex items-center gap-3">
-            <span className="font-extrabold text-white tracking-wider">KOLIANCE</span>
-            <span className="text-monad-500/50">|</span>
-            <span>&copy; {new Date().getFullYear()} Monad Ecosystem Trust Protocol.</span>
-          </div>
+      {/* Global Footer (shown on INDEX, DETAIL, PRODUCT) */}
+      {currentView !== "AGENTCARD" && (
+        <footer className="border-t border-white/10 py-6 px-4 sm:px-8 mt-12 bg-[#0d1017]/80 backdrop-blur-md">
+          <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-xs font-mono text-slate-400">
+            <div className="flex items-center gap-3">
+              <span className="font-extrabold text-white tracking-wider">KOLIANCE</span>
+              <span className="text-white/20">|</span>
+              <span>&copy; {new Date().getFullYear()} Monad Ecosystem Trust Architecture.</span>
+            </div>
 
-          <div className="flex items-center gap-6">
-            <button
-              onClick={() => setCurrentView("INDEX")}
-              className="hover:text-white transition"
-            >
-              INDEX
-            </button>
-            <button
-              onClick={() => setCurrentView("DETAIL")}
-              className="hover:text-white transition"
-            >
-              DETAIL
-            </button>
-            <button
-              onClick={() => setCurrentView("PRODUCT")}
-              className="hover:text-white transition"
-            >
-              PRODUCT
-            </button>
-            <a
-              href="https://docs.monad.xyz"
-              target="_blank"
-              rel="noreferrer"
-              className="hover:text-white transition flex items-center gap-1"
-            >
-              <span>Monad Docs</span>
-              <ExternalLink className="w-3 h-3" />
-            </a>
-            <a
-              href="https://testnet.monadexplorer.com"
-              target="_blank"
-              rel="noreferrer"
-              className="hover:text-white transition flex items-center gap-1"
-            >
-              <span>Explorer</span>
-              <ExternalLink className="w-3 h-3" />
-            </a>
-            <a
-              href="https://github.com/monad-developers/hardhat3-monad"
-              target="_blank"
-              rel="noreferrer"
-              className="hover:text-white transition flex items-center gap-1"
-            >
-              <Github className="w-3.5 h-3.5" />
-              <span>Hardhat</span>
-            </a>
+            <div className="flex items-center gap-5">
+              <button onClick={() => setCurrentView("INDEX")} className="hover:text-white transition">
+                INDEX
+              </button>
+              <button onClick={() => setCurrentView("DETAIL")} className="hover:text-white transition">
+                DETAIL
+              </button>
+              <button onClick={() => setCurrentView("PRODUCT")} className="hover:text-white transition">
+                PRODUCT
+              </button>
+              <button onClick={() => setCurrentView("AGENTCARD")} className="text-cyan-400 hover:text-cyan-300 transition">
+                AGENTCARD
+              </button>
+              <a
+                href="https://docs.monad.xyz"
+                target="_blank"
+                rel="noreferrer"
+                className="hover:text-white transition flex items-center gap-1"
+              >
+                <span>Docs</span>
+                <ExternalLink className="w-3 h-3" />
+              </a>
+              <a
+                href="https://testnet.monadexplorer.com"
+                target="_blank"
+                rel="noreferrer"
+                className="hover:text-white transition flex items-center gap-1"
+              >
+                <span>Explorer</span>
+                <ExternalLink className="w-3 h-3" />
+              </a>
+              <a
+                href="https://github.com/monad-developers/hardhat3-monad"
+                target="_blank"
+                rel="noreferrer"
+                className="hover:text-white transition flex items-center gap-1"
+              >
+                <Github className="w-3.5 h-3.5" />
+                <span>Hardhat</span>
+              </a>
+            </div>
           </div>
-        </div>
-      </footer>
+        </footer>
+      )}
 
       {/* Network Switch Modal */}
       <NetworkModal
@@ -776,5 +581,13 @@ export default function Home() {
         onSwitch={handleSwitchNetwork}
       />
     </div>
+  );
+}
+
+export default function Home() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-[#0d1017] text-white flex items-center justify-center font-mono">Loading Koliance...</div>}>
+      <MainContent />
+    </Suspense>
   );
 }
