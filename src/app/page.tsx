@@ -8,7 +8,6 @@ import {
   custom,
   formatEther,
   http,
-  parseAbi,
 } from "viem";
 import {
   Shield,
@@ -22,9 +21,16 @@ import {
   Activity,
   CheckCircle2,
   Terminal,
+  Zap,
+  Network,
+  ArrowRight,
+  Database,
+  Lock,
 } from "lucide-react";
-import { Navbar } from "@/components/Navbar";
-import { HeroGsap } from "@/components/HeroGsap";
+import { Navbar, NavView } from "@/components/Navbar";
+import { CursorTrail } from "@/components/CursorTrail";
+import { EnergyCoreHero } from "@/components/EnergyCoreHero";
+import { TrustConstellation } from "@/components/TrustConstellation";
 import { IdentityCard } from "@/components/IdentityCard";
 import { TrustAttestationCard } from "@/components/TrustAttestationCard";
 import { TrustStream } from "@/components/TrustStream";
@@ -43,7 +49,12 @@ export default function Home() {
   const [balance, setBalance] = useState("0.00");
   const [chainId, setChainId] = useState<number | null>(null);
   const [networkModalOpen, setNetworkModalOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<"identity" | "attest" | "stream" | "architecture">("identity");
+
+  // Top Nav View: INDEX | DETAIL | PRODUCT
+  const [currentView, setCurrentView] = useState<NavView>("INDEX");
+
+  // Sub-tabs in PRODUCT view
+  const [productSubTab, setProductSubTab] = useState<"identity" | "attest" | "stream" | "architecture">("identity");
 
   // Contract State
   const [identity, setIdentity] = useState<IdentityData | null>(null);
@@ -72,8 +83,6 @@ export default function Home() {
   ]);
   const [isLoading, setIsLoading] = useState(false);
   const [backendHealthy, setBackendHealthy] = useState(false);
-
-  const mainSectionRef = useRef<HTMLDivElement>(null);
 
   // Setup Monad Public Client
   const publicClient = createPublicClient({
@@ -252,7 +261,6 @@ export default function Home() {
         await fetchData();
         return hash;
       } else {
-        // Simulated local execution for immediate UI satisfaction
         await new Promise((r) => setTimeout(r, 1200));
         setIdentity({
           exists: true,
@@ -287,7 +295,6 @@ export default function Home() {
         await fetchData();
         return hash;
       } else {
-        // Simulated local record update
         await new Promise((r) => setTimeout(r, 1200));
         const newRecord: TrustRecordData = {
           from: account,
@@ -304,249 +311,433 @@ export default function Home() {
     }
   };
 
-  const scrollToHub = (tab: "identity" | "attest" | "stream") => {
-    setActiveTab(tab);
-    mainSectionRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
-
   return (
-    <div className="min-h-screen flex flex-col justify-between selection:bg-monad-500 selection:text-white">
-      {/* Top Navigation */}
+    <div className="min-h-screen flex flex-col justify-between selection:bg-monad-500 selection:text-white bg-[#06040A] text-white relative">
+      {/* World-Class Cursor Trail Particle Ribbon */}
+      <CursorTrail />
+
+      {/* Top Fixed Navigation with INDEX | DETAIL | PRODUCT */}
       <Navbar
+        currentView={currentView}
+        onSelectView={setCurrentView}
         account={account}
         balance={balance}
         onConnect={handleConnect}
         onDisconnect={handleDisconnect}
       />
 
-      <main className="flex-1">
-        {/* GSAP Hero Section */}
-        <HeroGsap
-          onRegisterClick={() => scrollToHub("identity")}
-          onExploreClick={() => scrollToHub("stream")}
-        />
-
-        {/* Interactive Hub Section */}
-        <div ref={mainSectionRef} className="max-w-7xl mx-auto px-4 sm:px-8 py-12">
-          {/* Framer Motion Tab Switcher */}
-          <div className="flex flex-wrap items-center justify-center gap-2 p-1.5 rounded-2xl glass-panel max-w-xl mx-auto mb-10 border border-monad-500/20">
-            <button
-              onClick={() => setActiveTab("identity")}
-              className={`relative flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-semibold tracking-wide transition-all ${
-                activeTab === "identity" ? "text-white" : "text-monad-300/80 hover:text-white"
-              }`}
+      {/* Dynamic View Panels */}
+      <main className="flex-1 w-full">
+        <AnimatePresence mode="wait">
+          {/* TAB 1: INDEX (Option 1: 3D Crystalline Energy Core + 10,000 TPS Speedometer) */}
+          {currentView === "INDEX" && (
+            <motion.div
+              key="view-index"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.35, ease: "easeInOut" }}
+              className="w-full"
             >
-              {activeTab === "identity" && (
-                <motion.div
-                  layoutId="activeTabPill"
-                  className="absolute inset-0 rounded-xl bg-gradient-to-r from-monad-600 to-monad-500 shadow-glow"
-                  transition={{ type: "spring", stiffness: 350, damping: 30 }}
-                />
-              )}
-              <span className="relative z-10 flex items-center gap-1.5">
-                <Shield className="w-4 h-4" />
-                Identity Hub
-              </span>
-            </button>
+              {/* World-Class 3D Energy Core Hero */}
+              <EnergyCoreHero
+                onLaunchDApps={() => setCurrentView("PRODUCT")}
+                onExploreDetails={() => setCurrentView("DETAIL")}
+              />
 
-            <button
-              onClick={() => setActiveTab("attest")}
-              className={`relative flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-semibold tracking-wide transition-all ${
-                activeTab === "attest" ? "text-white" : "text-monad-300/80 hover:text-white"
-              }`}
-            >
-              {activeTab === "attest" && (
-                <motion.div
-                  layoutId="activeTabPill"
-                  className="absolute inset-0 rounded-xl bg-gradient-to-r from-monad-600 to-monad-500 shadow-glow"
-                  transition={{ type: "spring", stiffness: 350, damping: 30 }}
-                />
-              )}
-              <span className="relative z-10 flex items-center gap-1.5">
-                <KeyRound className="w-4 h-4" />
-                Add Trust
-              </span>
-            </button>
+              {/* Protocol Architecture Bento Highlights */}
+              <div className="max-w-7xl mx-auto px-4 sm:px-8 py-16 space-y-8">
+                <div className="text-center max-w-3xl mx-auto space-y-3">
+                  <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-monad-500/10 border border-monad-500/30 text-xs font-mono text-monad-300">
+                    <Sparkles className="w-3.5 h-3.5 text-cyber-neon" />
+                    <span>NEXT-GENERATION DECENTRALIZED TRUST LAYER</span>
+                  </div>
+                  <h2 className="text-3xl sm:text-4xl font-black text-white tracking-tight">
+                    Engineered for Monad 10,000 TPS Parallel EVM
+                  </h2>
+                  <p className="text-sm text-monad-200/70 font-mono">
+                    Koliance combines single-slot consensus with holographic trust topology to deliver
+                    instantaneous identity attestations for decentralized communities, validators, and AI agents.
+                  </p>
+                </div>
 
-            <button
-              onClick={() => setActiveTab("stream")}
-              className={`relative flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-semibold tracking-wide transition-all ${
-                activeTab === "stream" ? "text-white" : "text-monad-300/80 hover:text-white"
-              }`}
-            >
-              {activeTab === "stream" && (
-                <motion.div
-                  layoutId="activeTabPill"
-                  className="absolute inset-0 rounded-xl bg-gradient-to-r from-monad-600 to-monad-500 shadow-glow"
-                  transition={{ type: "spring", stiffness: 350, damping: 30 }}
-                />
-              )}
-              <span className="relative z-10 flex items-center gap-1.5">
-                <Layers className="w-4 h-4" />
-                Trust Stream
-              </span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab("architecture")}
-              className={`relative flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-semibold tracking-wide transition-all ${
-                activeTab === "architecture" ? "text-white" : "text-monad-300/80 hover:text-white"
-              }`}
-            >
-              {activeTab === "architecture" && (
-                <motion.div
-                  layoutId="activeTabPill"
-                  className="absolute inset-0 rounded-xl bg-gradient-to-r from-monad-600 to-monad-500 shadow-glow"
-                  transition={{ type: "spring", stiffness: 350, damping: 30 }}
-                />
-              )}
-              <span className="relative z-10 flex items-center gap-1.5">
-                <Server className="w-4 h-4" />
-                Go Backend & Arch
-              </span>
-            </button>
-          </div>
-
-          {/* Active Tab Animated Panels */}
-          <div className="max-w-4xl mx-auto">
-            <AnimatePresence mode="wait">
-              {activeTab === "identity" && (
-                <motion.div
-                  key="identity-tab"
-                  initial={{ opacity: 0, y: 15 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -15 }}
-                  transition={{ duration: 0.3 }}
-                >
-                  <IdentityCard
-                    account={account}
-                    identity={identity}
-                    isLoading={isLoading}
-                    onRegister={handleRegister}
-                  />
-                </motion.div>
-              )}
-
-              {activeTab === "attest" && (
-                <motion.div
-                  key="attest-tab"
-                  initial={{ opacity: 0, y: 15 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -15 }}
-                  transition={{ duration: 0.3 }}
-                >
-                  <TrustAttestationCard
-                    account={account}
-                    onAddTrust={handleAddTrust}
-                  />
-                </motion.div>
-              )}
-
-              {activeTab === "stream" && (
-                <motion.div
-                  key="stream-tab"
-                  initial={{ opacity: 0, y: 15 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -15 }}
-                  transition={{ duration: 0.3 }}
-                >
-                  <TrustStream
-                    records={records}
-                    isLoading={isLoading}
-                    onRefresh={fetchData}
-                  />
-                </motion.div>
-              )}
-
-              {activeTab === "architecture" && (
-                <motion.div
-                  key="arch-tab"
-                  initial={{ opacity: 0, y: 15 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -15 }}
-                  transition={{ duration: 0.3 }}
-                  className="glass-panel-glow rounded-3xl p-6 sm:p-8 border border-monad-500/30 space-y-6"
-                >
-                  <div className="flex items-center justify-between border-b border-monad-500/20 pb-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-monad-500/20 border border-monad-500/40 flex items-center justify-center text-monad-300">
-                        <Server className="w-5 h-5" />
-                      </div>
-                      <div>
-                        <h4 className="font-bold text-white text-base">Full-Stack Architecture & Go Backend</h4>
-                        <p className="text-xs text-monad-200/70 font-mono">
-                          Zero-Config Vercel + Monad Testnet + Go High-Speed Indexer
-                        </p>
-                      </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4">
+                  {/* Card 1 */}
+                  <div
+                    onClick={() => setCurrentView("DETAIL")}
+                    className="glass-panel-glow rounded-3xl p-6 border border-monad-500/30 hover:border-monad-400 transition-all cursor-pointer group space-y-4 relative overflow-hidden"
+                  >
+                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-monad-600 to-cyber-neon flex items-center justify-center text-white shadow-glow group-hover:scale-110 transition-transform">
+                      <Network className="w-6 h-6" />
                     </div>
-                    <div className="flex items-center gap-2">
-                      <span className={`w-2.5 h-2.5 rounded-full ${backendHealthy ? "bg-emerald-400" : "bg-monad-500/50"}`} />
-                      <span className="text-xs font-mono text-monad-300">
-                        {backendHealthy ? "Go Service Online" : "Direct RPC Mode"}
-                      </span>
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <h3 className="font-bold text-lg text-white">3D Trust Constellation</h3>
+                        <ArrowRight className="w-4 h-4 text-cyber-neon group-hover:translate-x-1 transition-transform" />
+                      </div>
+                      <p className="text-xs text-monad-200/70 leading-relaxed font-mono">
+                        Explore the interactive multi-node force topology. Inspect validator trust scores,
+                        AI audit agents, and consensus weights in real time.
+                      </p>
+                    </div>
+                    <div className="pt-2 flex items-center gap-2 text-[11px] font-mono text-cyan-400">
+                      <span>View Live Constellation</span>
+                      <span>&rarr;</span>
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="p-4 rounded-2xl bg-monad-950/60 border border-monad-500/20 space-y-2">
-                      <div className="flex items-center gap-2 text-monad-300 text-xs font-bold font-mono">
-                        <Terminal className="w-4 h-4 text-cyber-accent" />
-                        <span>SMART CONTRACT (HARDHAT)</span>
-                      </div>
-                      <p className="text-xs text-monad-200/70 leading-relaxed">
-                        Pre-configured for Monad Testnet (Chain ID 10143) in <code className="text-white">contracts/</code>.
-                        Supports single-slot execution, automated Ignition deployments, and Solidity 0.8.31.
-                      </p>
-                      <div className="text-[11px] font-mono text-monad-400 bg-black/40 p-2 rounded-lg">
-                        npx hardhat ignition deploy ignition/modules/Koliance.ts --network monadTestnet
-                      </div>
+                  {/* Card 2 */}
+                  <div
+                    onClick={() => setCurrentView("PRODUCT")}
+                    className="glass-panel-glow rounded-3xl p-6 border border-monad-500/30 hover:border-emerald-400/60 transition-all cursor-pointer group space-y-4 relative overflow-hidden"
+                  >
+                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-400 flex items-center justify-center text-white shadow-glow group-hover:scale-110 transition-transform">
+                      <Shield className="w-6 h-6" />
                     </div>
-
-                    <div className="p-4 rounded-2xl bg-monad-950/60 border border-monad-500/20 space-y-2">
-                      <div className="flex items-center gap-2 text-monad-300 text-xs font-bold font-mono">
-                        <Cpu className="w-4 h-4 text-emerald-400" />
-                        <span>GO BACKEND READY</span>
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <h3 className="font-bold text-lg text-white">Attestation Studio</h3>
+                        <ArrowRight className="w-4 h-4 text-emerald-400 group-hover:translate-x-1 transition-transform" />
                       </div>
-                      <p className="text-xs text-monad-200/70 leading-relaxed">
-                        Standard Go Clean Architecture in <code className="text-white">backend/</code>. Ready to index
-                        identity events, cache trust graphs, and serve REST endpoints at microsecond latency.
+                      <p className="text-xs text-monad-200/70 leading-relaxed font-mono">
+                        Register your sovereign on-chain DID and sign zero-knowledge trust attestations
+                        directly to the deployed Monad Testnet smart contract.
                       </p>
-                      <div className="text-[11px] font-mono text-monad-400 bg-black/40 p-2 rounded-lg">
-                        cd backend &amp;&amp; go run cmd/api/main.go
-                      </div>
+                    </div>
+                    <div className="pt-2 flex items-center gap-2 text-[11px] font-mono text-emerald-400">
+                      <span>Launch Web3 Studio</span>
+                      <span>&rarr;</span>
                     </div>
                   </div>
 
-                  <div className="p-4 rounded-2xl bg-monad-950/40 border border-monad-500/20 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs font-mono">
-                    <div className="text-monad-300">
-                      <span className="text-emerald-400 font-bold">Vercel Deployment: </span>
-                      Push this repo to GitHub and import into Vercel with zero extra setup!
+                  {/* Card 3 */}
+                  <div
+                    onClick={() => {
+                      setCurrentView("PRODUCT");
+                      setProductSubTab("architecture");
+                    }}
+                    className="glass-panel-glow rounded-3xl p-6 border border-monad-500/30 hover:border-purple-400/60 transition-all cursor-pointer group space-y-4 relative overflow-hidden"
+                  >
+                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-purple-600 to-pink-500 flex items-center justify-center text-white shadow-glow group-hover:scale-110 transition-transform">
+                      <Cpu className="w-6 h-6" />
                     </div>
-                    <a
-                      href="https://vercel.com/new"
-                      target="_blank"
-                      rel="noreferrer"
-                      className="px-3 py-1.5 rounded-lg bg-white text-black font-bold hover:bg-neutral-200 transition shrink-0"
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <h3 className="font-bold text-lg text-white">Single-Slot Finality</h3>
+                        <ArrowRight className="w-4 h-4 text-purple-400 group-hover:translate-x-1 transition-transform" />
+                      </div>
+                      <p className="text-xs text-monad-200/70 leading-relaxed font-mono">
+                        Instantaneous single-slot MonadBFT state confirmations with sub-400ms finality and
+                        asynchronous transaction execution.
+                      </p>
+                    </div>
+                    <div className="pt-2 flex items-center gap-2 text-[11px] font-mono text-purple-400">
+                      <span>Inspect Go Architecture</span>
+                      <span>&rarr;</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+          {/* TAB 2: DETAIL (Option 2: Interactive 3D Trust Constellation & Holographic Motion) */}
+          {currentView === "DETAIL" && (
+            <motion.div
+              key="view-detail"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.35, ease: "easeInOut" }}
+              className="pt-24 max-w-7xl mx-auto px-4 sm:px-8 py-8"
+            >
+              <TrustConstellation />
+            </motion.div>
+          )}
+
+          {/* TAB 3: PRODUCT (Holographic Identity Hub & Attestation Studio) */}
+          {currentView === "PRODUCT" && (
+            <motion.div
+              key="view-product"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.35, ease: "easeInOut" }}
+              className="pt-24 max-w-7xl mx-auto px-4 sm:px-8 py-8 space-y-8"
+            >
+              {/* Product Header */}
+              <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-monad-500/20 pb-6">
+                <div>
+                  <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-monad-500/10 border border-monad-500/30 text-xs font-mono text-monad-300 mb-2">
+                    <Shield className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>ON-CHAIN SMART CONTRACT STUDIO</span>
+                  </div>
+                  <h2 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight flex items-center gap-3">
+                    <span>Koliance Identity &amp; Attestation Studio</span>
+                  </h2>
+                  <p className="text-xs sm:text-sm text-monad-200/70 font-mono mt-1">
+                    Direct on-chain interaction with contract{" "}
+                    <code className="text-monad-300 bg-monad-950/60 px-2 py-0.5 rounded border border-monad-500/30">
+                      {KOLIANCE_ADDRESS}
+                    </code>{" "}
+                    on Monad Testnet (Chain ID 10143).
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <a
+                    href={`${monadTestnet.blockExplorers.default.url}/address/${KOLIANCE_ADDRESS}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="px-3.5 py-1.5 rounded-xl bg-monad-950/80 border border-monad-500/40 hover:border-monad-400 text-xs font-mono text-white transition flex items-center gap-1.5 shadow-glow"
+                  >
+                    <span>Sourcify Verified</span>
+                    <ExternalLink className="w-3.5 h-3.5 text-emerald-400" />
+                  </a>
+                </div>
+              </div>
+
+              {/* Sub-Tab Navigation Switcher */}
+              <div className="flex flex-wrap items-center justify-center gap-2 p-1.5 rounded-2xl glass-panel max-w-xl mx-auto border border-monad-500/20">
+                <button
+                  onClick={() => setProductSubTab("identity")}
+                  className={`relative flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold tracking-wide transition-all ${
+                    productSubTab === "identity" ? "text-white" : "text-monad-300/80 hover:text-white"
+                  }`}
+                >
+                  {productSubTab === "identity" && (
+                    <motion.div
+                      layoutId="subTabPill"
+                      className="absolute inset-0 rounded-xl bg-gradient-to-r from-monad-600 to-monad-500 shadow-glow"
+                      transition={{ type: "spring", stiffness: 350, damping: 30 }}
+                    />
+                  )}
+                  <span className="relative z-10 flex items-center gap-1.5">
+                    <Shield className="w-3.5 h-3.5" />
+                    Identity Hub
+                  </span>
+                </button>
+
+                <button
+                  onClick={() => setProductSubTab("attest")}
+                  className={`relative flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold tracking-wide transition-all ${
+                    productSubTab === "attest" ? "text-white" : "text-monad-300/80 hover:text-white"
+                  }`}
+                >
+                  {productSubTab === "attest" && (
+                    <motion.div
+                      layoutId="subTabPill"
+                      className="absolute inset-0 rounded-xl bg-gradient-to-r from-monad-600 to-monad-500 shadow-glow"
+                      transition={{ type: "spring", stiffness: 350, damping: 30 }}
+                    />
+                  )}
+                  <span className="relative z-10 flex items-center gap-1.5">
+                    <KeyRound className="w-3.5 h-3.5" />
+                    Add Trust
+                  </span>
+                </button>
+
+                <button
+                  onClick={() => setProductSubTab("stream")}
+                  className={`relative flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold tracking-wide transition-all ${
+                    productSubTab === "stream" ? "text-white" : "text-monad-300/80 hover:text-white"
+                  }`}
+                >
+                  {productSubTab === "stream" && (
+                    <motion.div
+                      layoutId="subTabPill"
+                      className="absolute inset-0 rounded-xl bg-gradient-to-r from-monad-600 to-monad-500 shadow-glow"
+                      transition={{ type: "spring", stiffness: 350, damping: 30 }}
+                    />
+                  )}
+                  <span className="relative z-10 flex items-center gap-1.5">
+                    <Layers className="w-3.5 h-3.5" />
+                    Ledger Stream
+                  </span>
+                </button>
+
+                <button
+                  onClick={() => setProductSubTab("architecture")}
+                  className={`relative flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold tracking-wide transition-all ${
+                    productSubTab === "architecture" ? "text-white" : "text-monad-300/80 hover:text-white"
+                  }`}
+                >
+                  {productSubTab === "architecture" && (
+                    <motion.div
+                      layoutId="subTabPill"
+                      className="absolute inset-0 rounded-xl bg-gradient-to-r from-monad-600 to-monad-500 shadow-glow"
+                      transition={{ type: "spring", stiffness: 350, damping: 30 }}
+                    />
+                  )}
+                  <span className="relative z-10 flex items-center gap-1.5">
+                    <Server className="w-3.5 h-3.5" />
+                    Go &amp; Arch
+                  </span>
+                </button>
+              </div>
+
+              {/* Sub-Tab Panels */}
+              <div className="max-w-4xl mx-auto">
+                <AnimatePresence mode="wait">
+                  {productSubTab === "identity" && (
+                    <motion.div
+                      key="identity-tab"
+                      initial={{ opacity: 0, y: 15 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -15 }}
+                      transition={{ duration: 0.3 }}
                     >
-                      Deploy to Vercel
-                    </a>
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-        </div>
+                      <IdentityCard
+                        account={account}
+                        identity={identity}
+                        isLoading={isLoading}
+                        onRegister={handleRegister}
+                      />
+                    </motion.div>
+                  )}
+
+                  {productSubTab === "attest" && (
+                    <motion.div
+                      key="attest-tab"
+                      initial={{ opacity: 0, y: 15 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -15 }}
+                      transition={{ duration: 0.3 }}
+                    >
+                      <TrustAttestationCard
+                        account={account}
+                        onAddTrust={handleAddTrust}
+                      />
+                    </motion.div>
+                  )}
+
+                  {productSubTab === "stream" && (
+                    <motion.div
+                      key="stream-tab"
+                      initial={{ opacity: 0, y: 15 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -15 }}
+                      transition={{ duration: 0.3 }}
+                    >
+                      <TrustStream
+                        records={records}
+                        isLoading={isLoading}
+                        onRefresh={fetchData}
+                      />
+                    </motion.div>
+                  )}
+
+                  {productSubTab === "architecture" && (
+                    <motion.div
+                      key="arch-tab"
+                      initial={{ opacity: 0, y: 15 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -15 }}
+                      transition={{ duration: 0.3 }}
+                      className="glass-panel-glow rounded-3xl p-6 sm:p-8 border border-monad-500/30 space-y-6"
+                    >
+                      <div className="flex items-center justify-between border-b border-monad-500/20 pb-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-xl bg-monad-500/20 border border-monad-500/40 flex items-center justify-center text-monad-300">
+                            <Server className="w-5 h-5" />
+                          </div>
+                          <div>
+                            <h4 className="font-bold text-white text-base">Full-Stack Architecture &amp; Go Backend</h4>
+                            <p className="text-xs text-monad-200/70 font-mono">
+                              Zero-Config Vercel + Monad Testnet + Go High-Speed Indexer
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className={`w-2.5 h-2.5 rounded-full ${backendHealthy ? "bg-emerald-400" : "bg-monad-500/50"}`} />
+                          <span className="text-xs font-mono text-monad-300">
+                            {backendHealthy ? "Go Service Online" : "Direct RPC Mode"}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="p-4 rounded-2xl bg-monad-950/60 border border-monad-500/20 space-y-2">
+                          <div className="flex items-center gap-2 text-monad-300 text-xs font-bold font-mono">
+                            <Terminal className="w-4 h-4 text-cyber-accent" />
+                            <span>SMART CONTRACT (HARDHAT)</span>
+                          </div>
+                          <p className="text-xs text-monad-200/70 leading-relaxed">
+                            Pre-configured for Monad Testnet (Chain ID 10143) in <code className="text-white">contracts/</code>.
+                            Supports single-slot execution, automated Ignition deployments, and Solidity 0.8.31.
+                          </p>
+                          <div className="text-[11px] font-mono text-monad-400 bg-black/40 p-2 rounded-lg">
+                            npx hardhat ignition deploy ignition/modules/Koliance.ts --network monadTestnet
+                          </div>
+                        </div>
+
+                        <div className="p-4 rounded-2xl bg-monad-950/60 border border-monad-500/20 space-y-2">
+                          <div className="flex items-center gap-2 text-monad-300 text-xs font-bold font-mono">
+                            <Cpu className="w-4 h-4 text-emerald-400" />
+                            <span>GO BACKEND READY</span>
+                          </div>
+                          <p className="text-xs text-monad-200/70 leading-relaxed">
+                            Standard Go Clean Architecture in <code className="text-white">backend/</code>. Ready to index
+                            identity events, cache trust graphs, and serve REST endpoints at microsecond latency.
+                          </p>
+                          <div className="text-[11px] font-mono text-monad-400 bg-black/40 p-2 rounded-lg">
+                            cd backend &amp;&amp; go run cmd/api/main.go
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="p-4 rounded-2xl bg-monad-950/40 border border-monad-500/20 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs font-mono">
+                        <div className="text-monad-300">
+                          <span className="text-emerald-400 font-bold">Vercel Production Deployment: </span>
+                          Live on Edge Network with instant global distribution.
+                        </div>
+                        <a
+                          href="https://koliance.vercel.app"
+                          target="_blank"
+                          rel="noreferrer"
+                          className="px-3.5 py-1.5 rounded-lg bg-white text-black font-bold hover:bg-neutral-200 transition shrink-0 flex items-center gap-1.5"
+                        >
+                          <span>Open Live dApp</span>
+                          <ExternalLink className="w-3.5 h-3.5" />
+                        </a>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </main>
 
-      {/* Footer */}
+      {/* Global Footer */}
       <footer className="border-t border-monad-500/20 py-8 px-4 sm:px-8 mt-20 glass-panel">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-xs font-mono text-monad-400/80">
-          <div className="flex items-center gap-2">
-            <span className="font-bold text-white">KOLIANCE</span>
-            <span>&copy; {new Date().getFullYear()} Monad Ecosystem.</span>
+          <div className="flex items-center gap-3">
+            <span className="font-extrabold text-white tracking-wider">KOLIANCE</span>
+            <span className="text-monad-500/50">|</span>
+            <span>&copy; {new Date().getFullYear()} Monad Ecosystem Trust Protocol.</span>
           </div>
 
           <div className="flex items-center gap-6">
+            <button
+              onClick={() => setCurrentView("INDEX")}
+              className="hover:text-white transition"
+            >
+              INDEX
+            </button>
+            <button
+              onClick={() => setCurrentView("DETAIL")}
+              className="hover:text-white transition"
+            >
+              DETAIL
+            </button>
+            <button
+              onClick={() => setCurrentView("PRODUCT")}
+              className="hover:text-white transition"
+            >
+              PRODUCT
+            </button>
             <a
               href="https://docs.monad.xyz"
               target="_blank"
@@ -562,7 +753,7 @@ export default function Home() {
               rel="noreferrer"
               className="hover:text-white transition flex items-center gap-1"
             >
-              <span>Monad Explorer</span>
+              <span>Explorer</span>
               <ExternalLink className="w-3 h-3" />
             </a>
             <a
@@ -572,7 +763,7 @@ export default function Home() {
               className="hover:text-white transition flex items-center gap-1"
             >
               <Github className="w-3.5 h-3.5" />
-              <span>Hardhat Monad</span>
+              <span>Hardhat</span>
             </a>
           </div>
         </div>
