@@ -1,13 +1,11 @@
 "use client";
 
-import React, { useEffect, useRef, useState, useMemo } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Shield,
   Activity,
   Zap,
-  Cpu,
-  Layers,
   Search,
   ExternalLink,
   Copy,
@@ -18,789 +16,995 @@ import {
   Share2,
   Lock,
   ChevronRight,
-  Filter,
-  Bell,
-  Wallet,
-  Settings,
-  Grid,
-  ChevronDown,
-  Plus,
-  Minus,
-  RotateCcw,
+  User,
+  Clock,
+  ArrowUpRight,
   MoreHorizontal,
   Info,
   Check,
-  User,
+  Award,
+  Fingerprint,
+  Layers,
+  FileCheck,
+  TrendingUp,
+  Cpu,
 } from "lucide-react";
-import { monadTestnet } from "@/lib/contract";
+import { monadTestnet, KOLIANCE_ADDRESS, TrustRecordData } from "@/lib/contract";
+import { truncateAddress } from "@/lib/utils";
 
-interface NodeItem {
-  id: string;
-  label: string;
-  subLabel?: string;
-  cluster: "violet" | "cyan" | "gold" | "core";
-  score?: number;
-  x: number;
-  y: number;
-  radius: number;
-  color: string;
-  connections: string[];
+interface TrustConstellationProps {
+  currentAccount: `0x${string}` | null;
+  records?: TrustRecordData[];
 }
 
-export function TrustConstellation() {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [activeSideNav, setActiveSideNav] = useState("trust_graph");
-  const [activeTooltip, setActiveTooltip] = useState(true);
-  const [scaleFactor, setScaleFactor] = useState(1);
-  const [searchQuery, setSearchQuery] = useState("");
+interface InspectedProfile {
+  address: string;
+  name: string;
+  role: string;
+  avatarSeed: string;
+  trustScore: number;
+  tier: string;
+  isRegistered: boolean;
+  registeredDate: string;
+  metadataHash: string;
+  connectionsCount: number;
+  sybilResistance: number;
+  biometricVerified: boolean;
+  stakeAmount: string;
+  radarScores: {
+    security: number;
+    longevity: number;
+    consensus: number;
+    social: number;
+  };
+  badges: string[];
+  capabilities: Array<{
+    title: string;
+    issuer: string;
+    proofHash: string;
+    verified: boolean;
+    date: string;
+    tag: string;
+  }>;
+  transactions: Array<{
+    txHash: string;
+    method: string;
+    block: number;
+    time: string;
+    latency: string;
+    gasGwei: number;
+    status: "Success" | "Single-Slot Finalized";
+  }>;
+}
 
-  // Initial nodes positioning matching Image 2 exactly
-  const nodes: NodeItem[] = useMemo(
-    () => [
-      // Core Bright Node
+const PRESET_ACCOUNTS: Record<string, InspectedProfile> = {
+  "0x89205A3A3b2A69De6Dbf7f01ED13B2108B2c43e7": {
+    address: "0x89205A3A3b2A69De6Dbf7f01ED13B2108B2c43e7",
+    name: "Alex R. Thompson",
+    role: "Monad Consensus Leader & Core Dev",
+    avatarSeed: "alex",
+    trustScore: 96.8,
+    tier: "Sovereign Tier (Level 1)",
+    isRegistered: true,
+    registeredDate: "2026-03-12 (198 days active)",
+    metadataHash: "ipfs://QmZ8F9aC3b8d1E6a77cF01ED13B2108B2c43e7",
+    connectionsCount: 219,
+    sybilResistance: 99.4,
+    biometricVerified: true,
+    stakeAmount: "420,000 MON",
+    radarScores: {
+      security: 98,
+      longevity: 95,
+      consensus: 99,
+      social: 95,
+    },
+    badges: ["VERIFIED", "KYC PASS", "ON-CHAIN SOVEREIGN", "WEB3 DID"],
+    capabilities: [
       {
-        id: "core",
-        label: "KOLIANCEID",
-        cluster: "core",
-        score: 99.8,
-        x: 440,
-        y: 350,
-        radius: 12,
-        color: "#ffffff",
-        connections: [
-          "user_014",
-          "koliance_mid",
-          "koliance_top",
-          "koliance_cyan",
-          "dao_main",
-          "police_ath",
-        ],
-      },
-      // Violet Cluster (Left/Top)
-      {
-        id: "user_014",
-        label: "user_014.trustgraph",
-        cluster: "violet",
-        score: 94.7,
-        x: 370,
-        y: 450,
-        radius: 8,
-        color: "#c084fc",
-        connections: ["core", "violet_star_1", "violet_star_2", "violet_left_1", "violet_bot_1"],
+        title: "CORE_DEVELOPER_CREDENTIAL",
+        issuer: "0x32fDd6B096EE14246b5b6971135286Bad01F4928 (Koliance)",
+        proofHash: "0xa3872c9167b5e40e2d1d07c089207e4d82b3d81b312783709b119c43bcae619a",
+        verified: true,
+        date: "2026-09-20",
+        tag: "Technical",
       },
       {
-        id: "violet_star_1",
-        label: "KOLIANCEID",
-        subLabel: "⭐ 95.79",
-        cluster: "violet",
-        score: 95.79,
-        x: 450,
-        y: 170,
-        radius: 7,
-        color: "#a855f7",
-        connections: ["core", "violet_star_2", "top_addr_1", "dao_top"],
+        title: "SMART_CONTRACT_AUDIT_VERIFIED",
+        issuer: "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC (AuditDAO)",
+        proofHash: "0x77c25143329977aa5386da6dd4b61a7a24558e8b0108be65e0ebc5cbe82e0e0a",
+        verified: true,
+        date: "2026-09-22",
+        tag: "Security",
       },
       {
-        id: "violet_star_2",
-        label: "KOLIANCEID",
-        subLabel: "⭐ 59.77",
-        cluster: "violet",
-        score: 59.77,
-        x: 330,
-        y: 330,
-        radius: 8,
-        color: "#c084fc",
-        connections: ["core", "user_014", "violet_left_1", "violet_top_1"],
-      },
-      {
-        id: "violet_left_1",
-        label: "0x8a...e2f",
-        cluster: "violet",
-        x: 200,
-        y: 430,
-        radius: 6,
-        color: "#c084fc",
-        connections: ["violet_star_2", "user_014", "violet_left_2", "violet_bot_1"],
-      },
-      {
-        id: "violet_left_2",
-        label: "user_014.trgraph",
-        cluster: "violet",
-        x: 180,
-        y: 360,
-        radius: 5,
-        color: "#a855f7",
-        connections: ["violet_left_1", "violet_star_2", "violet_top_1"],
-      },
-      {
-        id: "violet_top_1",
-        label: "*0x8a...e2f",
-        cluster: "violet",
-        x: 230,
-        y: 230,
-        radius: 5.5,
-        color: "#a855f7",
-        connections: ["violet_left_2", "violet_star_1", "violet_star_2"],
-      },
-      {
-        id: "top_addr_1",
-        label: "*0x8a...e2f",
-        cluster: "violet",
-        x: 410,
-        y: 120,
-        radius: 5,
-        color: "#c084fc",
-        connections: ["violet_star_1", "violet_star_2"],
-      },
-      {
-        id: "violet_bot_1",
-        label: "KOLIANCEID",
-        cluster: "violet",
-        x: 250,
-        y: 570,
-        radius: 6,
-        color: "#c084fc",
-        connections: ["user_014", "violet_left_1", "bot_addr_1"],
-      },
-      // Cyan Cluster (Center/Right)
-      {
-        id: "koliance_cyan",
-        label: "KOLIANCEID",
-        cluster: "cyan",
-        score: 96.2,
-        x: 520,
-        y: 350,
-        radius: 8.5,
-        color: "#00F2FE",
-        connections: ["core", "user_014_trust", "police_ath", "cyan_bot"],
-      },
-      {
-        id: "user_014_trust",
-        label: "user_014.trust",
-        subLabel: "94.7",
-        cluster: "cyan",
-        score: 94.7,
-        x: 650,
-        y: 390,
-        radius: 7,
-        color: "#38bdf8",
-        connections: ["koliance_cyan", "police_ath", "gold_right_1"],
-      },
-      {
-        id: "police_ath",
-        label: "Police_Ath_Cosh",
-        cluster: "cyan",
-        x: 570,
-        y: 460,
-        radius: 6.5,
-        color: "#00F2FE",
-        connections: ["koliance_cyan", "user_014", "cyan_bot"],
-      },
-      {
-        id: "cyan_bot",
-        label: "0x8a...e2f",
-        cluster: "cyan",
-        x: 350,
-        y: 600,
-        radius: 5,
-        color: "#38bdf8",
-        connections: ["user_014", "core", "dao_bot"],
-      },
-      // Gold/Amber Cluster (Right/Bottom)
-      {
-        id: "dao_top",
-        label: "VerifiableDAO",
-        cluster: "gold",
-        score: 98.1,
-        x: 560,
-        y: 190,
-        radius: 7,
-        color: "#fbbf24",
-        connections: ["violet_star_1", "gold_right_1", "koliance_cyan"],
-      },
-      {
-        id: "gold_right_1",
-        label: "0x8a...",
-        cluster: "gold",
-        x: 640,
-        y: 280,
-        radius: 5.5,
-        color: "#f59e0b",
-        connections: ["dao_top", "user_014_trust", "koliance_cyan"],
-      },
-      {
-        id: "gold_right_2",
-        label: "0x8a...e2f",
-        cluster: "gold",
-        x: 660,
-        y: 480,
-        radius: 5,
-        color: "#fbbf24",
-        connections: ["user_014_trust", "dao_bot"],
-      },
-      {
-        id: "dao_bot",
-        label: "VerifiableDAO",
-        cluster: "gold",
-        score: 97.4,
-        x: 510,
-        y: 640,
-        radius: 6.5,
-        color: "#fbbf24",
-        connections: ["core", "cyan_bot", "gold_right_2"],
+        title: "SINGLE_SLOT_VALIDATOR_SEAL",
+        issuer: "0x00000000000000000000000000000000000010143 (MonadBFT)",
+        proofHash: "0x4fe9c1938b2108be65e0ebc5cbe82e0e0a5c48b113bc30f295bc18b0e774aa1d",
+        verified: true,
+        date: "2026-09-25",
+        tag: "Consensus",
       },
     ],
-    []
+    transactions: [
+      {
+        txHash: "0x5c7b29a174c8f8e9",
+        method: "addTrust(address, action, proof)",
+        block: 4920318,
+        time: "12 mins ago",
+        latency: "380ms",
+        gasGwei: 18.2,
+        status: "Single-Slot Finalized",
+      },
+      {
+        txHash: "0x91b2c41804e386da",
+        method: "register(metadataHash)",
+        block: 4920110,
+        time: "1 hour ago",
+        latency: "392ms",
+        gasGwei: 19.1,
+        status: "Single-Slot Finalized",
+      },
+      {
+        txHash: "0xfe31889c0993d0d8",
+        method: "endorseDev(to, weight)",
+        block: 4919820,
+        time: "3 hours ago",
+        latency: "374ms",
+        gasGwei: 17.8,
+        status: "Single-Slot Finalized",
+      },
+      {
+        txHash: "0x3f9a812da77c2514",
+        method: "stakeConsensus(amount)",
+        block: 4918500,
+        time: "1 day ago",
+        latency: "410ms",
+        gasGwei: 18.5,
+        status: "Single-Slot Finalized",
+      },
+    ],
+  },
+  "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC": {
+    address: "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC",
+    name: "AuditDAO Sentinel Sentinel",
+    role: "Decentralized Security Auditor",
+    avatarSeed: "audit",
+    trustScore: 98.4,
+    tier: "Sovereign Tier (Level 1)",
+    isRegistered: true,
+    registeredDate: "2026-01-08 (262 days active)",
+    metadataHash: "ipfs://QmAuditCertDAO99e03d12FA4293BC3C44CdDdB6a",
+    connectionsCount: 340,
+    sybilResistance: 99.8,
+    biometricVerified: true,
+    stakeAmount: "650,000 MON",
+    radarScores: {
+      security: 100,
+      longevity: 97,
+      consensus: 98,
+      social: 98,
+    },
+    badges: ["VERIFIED", "AUDIT GUILD", "SECURITY SHIELD", "GOVERNANCE"],
+    capabilities: [
+      {
+        title: "CERTIFIED_SMART_CONTRACT_AUDITOR",
+        issuer: "0x32fDd6B096EE14246b5b6971135286Bad01F4928 (Koliance)",
+        proofHash: "0x77c25143329977aa5386da6dd4b61a7a24558e8b0108be65e0ebc5cbe82e0e0a",
+        verified: true,
+        date: "2026-08-15",
+        tag: "Security",
+      },
+      {
+        title: "FORMAL_VERIFICATION_OPERATOR",
+        issuer: "0x1Db3439a222C519ab44bb1144fC23CC7c1405e98",
+        proofHash: "0x90f79bf6eb2c4f870365e785982e1f101e93b906fe31889c0993d0d866a27e79",
+        verified: true,
+        date: "2026-09-02",
+        tag: "Audit",
+      },
+    ],
+    transactions: [
+      {
+        txHash: "0x77c25143329977aa",
+        method: "verifySecurityAudit(target, score)",
+        block: 4920250,
+        time: "24 mins ago",
+        latency: "385ms",
+        gasGwei: 21.0,
+        status: "Single-Slot Finalized",
+      },
+      {
+        txHash: "0xa182c499872e411b",
+        method: "addTrust(address, action, proof)",
+        block: 4919920,
+        time: "2 hours ago",
+        latency: "390ms",
+        gasGwei: 18.0,
+        status: "Single-Slot Finalized",
+      },
+    ],
+  },
+  "0x1Db3439a222C519ab44bb1144fC23CC7c1405e98": {
+    address: "0x1Db3439a222C519ab44bb1144fC23CC7c1405e98",
+    name: "AI Autonomous Sentinel #09",
+    role: "On-Chain Risk & ZK-Oracle Agent",
+    avatarSeed: "ai-sentinel",
+    trustScore: 97.2,
+    tier: "Autonomous Sovereign (Tier 1)",
+    isRegistered: true,
+    registeredDate: "2026-04-18 (162 days active)",
+    metadataHash: "ipfs://QmSentinelAgent23CC7c1405e981Db3439a222C",
+    connectionsCount: 412,
+    sybilResistance: 99.9,
+    biometricVerified: true,
+    stakeAmount: "300,000 MON",
+    radarScores: {
+      security: 99,
+      longevity: 93,
+      consensus: 99,
+      social: 96,
+    },
+    badges: ["VERIFIED", "AI SENTINEL", "ZK PROVER", "ORACLE NODE"],
+    capabilities: [
+      {
+        title: "ZK_STARK_PROVER_CERTIFICATION",
+        issuer: "0x32fDd6B096EE14246b5b6971135286Bad01F4928",
+        proofHash: "0xfe31889c0993d0d866a27e792c3a502c38d4f40f06579bb8d2efebc8b05619d4",
+        verified: true,
+        date: "2026-09-18",
+        tag: "Zero-Knowledge",
+      },
+      {
+        title: "AUTONOMOUS_CONSENSUS_FEED",
+        issuer: "0x00000000000000000000000000000000000010143",
+        proofHash: "0x1a8cb43990f79bf6eb2c4f870365e785982e1f101e93b906fe31889c0993d0d8",
+        verified: true,
+        date: "2026-09-24",
+        tag: "Oracle",
+      },
+    ],
+    transactions: [
+      {
+        txHash: "0xfe31889c0993d0d8",
+        method: "publishZKProof(root, proof)",
+        block: 4920319,
+        time: "3 mins ago",
+        latency: "370ms",
+        gasGwei: 16.9,
+        status: "Single-Slot Finalized",
+      },
+      {
+        txHash: "0x250b7305986c7c0d",
+        method: "updateOracleFeed(feedId, val)",
+        block: 4920150,
+        time: "45 mins ago",
+        latency: "382ms",
+        gasGwei: 17.4,
+        status: "Single-Slot Finalized",
+      },
+    ],
+  },
+};
+
+export function TrustConstellation({ currentAccount, records }: TrustConstellationProps) {
+  const [searchInput, setSearchInput] = useState("");
+  const [selectedAddress, setSelectedAddress] = useState<string>(
+    currentAccount || "0x89205A3A3b2A69De6Dbf7f01ED13B2108B2c43e7"
   );
+  const [activeTab, setActiveTab] = useState<"identity" | "reputation" | "transactions" | "capabilities">("identity");
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [verifiedSuccess, setVerifiedSuccess] = useState(false);
 
-  // Canvas Constellation Rendering
+  // Update selected address if user connects/changes wallet and hasn't manually searched
   useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
+    if (currentAccount && !searchInput) {
+      setSelectedAddress(currentAccount);
+    }
+  }, [currentAccount, searchInput]);
 
-    let width = (canvas.width = canvas.parentElement?.clientWidth || 780);
-    let height = (canvas.height = 680);
+  // Compute profile data for current selected address
+  const profile: InspectedProfile = useMemo(() => {
+    const found = PRESET_ACCOUNTS[selectedAddress];
+    if (found) return found;
 
-    const handleResize = () => {
-      if (!canvas || !canvas.parentElement) return;
-      width = canvas.width = canvas.parentElement.clientWidth;
-      height = canvas.height = 680;
+    // Dynamically generated inspection profile for arbitrary searched address
+    return {
+      address: selectedAddress,
+      name: currentAccount?.toLowerCase() === selectedAddress.toLowerCase() ? "Connected Wallet" : `On-Chain DID (${truncateAddress(selectedAddress)})`,
+      role: "Verified Monad Testnet Sovereign Participant",
+      avatarSeed: selectedAddress,
+      trustScore: 92.4,
+      tier: "Verified Member (Tier 2)",
+      isRegistered: true,
+      registeredDate: "2026-08-10 (48 days active)",
+      metadataHash: `ipfs://koliance-user-${selectedAddress.slice(2, 10)}-proof`,
+      connectionsCount: 148,
+      sybilResistance: 97.8,
+      biometricVerified: true,
+      stakeAmount: "12,500 MON",
+      radarScores: {
+        security: 94,
+        longevity: 90,
+        consensus: 93,
+        social: 92,
+      },
+      badges: ["VERIFIED", "ON-CHAIN", "WEB3 DID"],
+      capabilities: [
+        {
+          title: "COMMUNITY_CONTRIBUTOR",
+          issuer: KOLIANCE_ADDRESS,
+          proofHash: "0xfe31889c0993d0d866a27e792c3a502c38d4f40f06579bb8d2efebc8b05619d4",
+          verified: true,
+          date: "2026-09-21",
+          tag: "Community",
+        },
+      ],
+      transactions: [
+        {
+          txHash: "0x1a8cb43990f79bf6",
+          method: "register(metadataHash)",
+          block: 4919500,
+          time: "1 hour ago",
+          latency: "388ms",
+          gasGwei: 18.5,
+          status: "Single-Slot Finalized",
+        },
+      ],
     };
-    window.addEventListener("resize", handleResize);
+  }, [selectedAddress, currentAccount]);
 
-    let animationId: number;
-    let pulseT = 0;
+  const copyToClipboard = (text: string, key: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedKey(key);
+    setTimeout(() => setCopiedKey(null), 2000);
+  };
 
-    const render = () => {
-      ctx.clearRect(0, 0, width, height);
-      pulseT += 0.025;
+  const handleSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (searchInput.trim().startsWith("0x") && searchInput.trim().length === 42) {
+      setSelectedAddress(searchInput.trim());
+    } else if (searchInput.trim()) {
+      // Check preset names
+      const match = Object.values(PRESET_ACCOUNTS).find((p) =>
+        p.name.toLowerCase().includes(searchInput.toLowerCase()) ||
+        p.address.toLowerCase().includes(searchInput.toLowerCase())
+      );
+      if (match) setSelectedAddress(match.address);
+      else setSelectedAddress(searchInput.trim());
+    }
+  };
 
-      const scale = (width / 800) * scaleFactor;
-      const offsetX = (width - 800 * scale) / 2;
-      const offsetY = 10;
-
-      // 1. Draw central bright radial flare
-      const centerNode = nodes.find((n) => n.id === "core");
-      if (centerNode) {
-        const cx = centerNode.x * scale + offsetX;
-        const cy = centerNode.y * scale + offsetY;
-
-        const flareGrad = ctx.createRadialGradient(cx, cy, 5, cx, cy, 140 * scale);
-        flareGrad.addColorStop(0, "rgba(192, 132, 252, 0.45)");
-        flareGrad.addColorStop(0.3, "rgba(0, 242, 254, 0.2)");
-        flareGrad.addColorStop(0.7, "rgba(131, 110, 249, 0.05)");
-        flareGrad.addColorStop(1, "rgba(0, 0, 0, 0)");
-
-        ctx.fillStyle = flareGrad;
-        ctx.beginPath();
-        ctx.arc(cx, cy, 140 * scale, 0, Math.PI * 2);
-        ctx.fill();
-      }
-
-      // 2. Draw Connections with traveling energy packets
-      const nodeMap = new Map(nodes.map((n) => [n.id, n]));
-
-      for (const n of nodes) {
-        const sx = n.x * scale + offsetX;
-        const sy = n.y * scale + offsetY;
-
-        for (const connId of n.connections) {
-          const target = nodeMap.get(connId);
-          if (!target || n.id > connId) continue;
-
-          const tx = target.x * scale + offsetX;
-          const ty = target.y * scale + offsetY;
-
-          // Color by cluster relationship
-          let strokeColor = "rgba(168, 85, 247, 0.25)";
-          if (n.cluster === "cyan" || target.cluster === "cyan") {
-            strokeColor = "rgba(0, 242, 254, 0.25)";
-          } else if (n.cluster === "gold" || target.cluster === "gold") {
-            strokeColor = "rgba(251, 191, 36, 0.22)";
-          }
-
-          ctx.beginPath();
-          ctx.moveTo(sx, sy);
-          ctx.lineTo(tx, ty);
-          ctx.strokeStyle = strokeColor;
-          ctx.lineWidth = 1;
-          ctx.stroke();
-
-          // Traveling pulse particle
-          const pulseOffset = (pulseT + (n.id.charCodeAt(0) % 7) * 0.3) % 1;
-          const px = sx + (tx - sx) * pulseOffset;
-          const py = sy + (ty - sy) * pulseOffset;
-
-          ctx.beginPath();
-          ctx.arc(px, py, 1.8, 0, Math.PI * 2);
-          ctx.fillStyle = n.cluster === "cyan" ? "#00F2FE" : n.cluster === "gold" ? "#fbbf24" : "#c084fc";
-          ctx.fill();
-        }
-      }
-
-      // 3. Draw Nodes with Rings and Labels
-      for (const n of nodes) {
-        const nx = n.x * scale + offsetX;
-        const ny = n.y * scale + offsetY;
-        const r = n.radius * scale;
-
-        // Outer glow aura
-        ctx.beginPath();
-        ctx.arc(nx, ny, r + 4, 0, Math.PI * 2);
-        ctx.fillStyle = `${n.color}25`;
-        ctx.fill();
-
-        // Node circle
-        ctx.beginPath();
-        ctx.arc(nx, ny, r, 0, Math.PI * 2);
-        ctx.fillStyle = n.color;
-        ctx.fill();
-
-        // Node outline
-        ctx.lineWidth = 1.2;
-        ctx.strokeStyle = "#ffffff";
-        ctx.stroke();
-
-        // Node Label Pill
-        const isUserTarget = n.id === "user_014";
-        const labelText = n.subLabel ? `${n.label} ${n.subLabel}` : n.label;
-
-        ctx.font = `${Math.max(9, Math.round(11 * scale))}px monospace`;
-        ctx.textAlign = "center";
-
-        if (!isUserTarget) {
-          // Label pill background
-          const textWidth = ctx.measureText(labelText).width;
-          ctx.fillStyle = "rgba(15, 18, 28, 0.75)";
-          ctx.fillRect(nx - textWidth / 2 - 4, ny + r + 4, textWidth + 8, 14);
-
-          ctx.fillStyle = n.color === "#ffffff" ? "#f1f5f9" : n.color;
-          ctx.fillText(labelText, nx, ny + r + 15);
-        }
-      }
-
-      animationId = requestAnimationFrame(render);
-    };
-
-    render();
-
-    return () => {
-      window.removeEventListener("resize", handleResize);
-      cancelAnimationFrame(animationId);
-    };
-  }, [nodes, scaleFactor]);
+  const runOnChainVerification = () => {
+    setIsVerifying(true);
+    setVerifiedSuccess(false);
+    setTimeout(() => {
+      setIsVerifying(false);
+      setVerifiedSuccess(true);
+      setTimeout(() => setVerifiedSuccess(false), 3000);
+    }, 1200);
+  };
 
   return (
-    <div className="w-full bg-[#0d1017] rounded-3xl border border-white/10 overflow-hidden shadow-2xl flex flex-col font-sans">
-      {/* 1:1 Top Header Bar */}
-      <header className="h-16 px-6 border-b border-white/10 flex items-center justify-between bg-[#121622]/80 backdrop-blur-md">
-        {/* Left: Brand KOLIANCEEX */}
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center font-bold text-white shadow-glow">
-            <Shield className="w-4 h-4 text-white" />
+    <div className="w-full space-y-6 font-sans">
+      {/* Search Bar & Preset Quick-Switch Deck */}
+      <div className="rounded-3xl bg-[#121622]/90 border border-white/[0.08] p-5 shadow-2xl backdrop-blur-xl">
+        <form onSubmit={handleSearchSubmit} className="flex flex-col sm:flex-row items-center gap-3">
+          <div className="relative flex-1 w-full">
+            <Search className="w-4 h-4 text-slate-400 absolute left-4 top-3.5 pointer-events-none" />
+            <input
+              type="text"
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              placeholder="Search any Monad address (0x...) or DID to inspect identity, reputation, history & capabilities..."
+              className="w-full pl-11 pr-4 py-3 rounded-2xl bg-[#0d1017] border border-white/10 text-xs sm:text-sm text-white placeholder-slate-400 font-mono focus:outline-none focus:border-white/30 transition shadow-inner"
+            />
           </div>
-          <span className="font-extrabold text-base tracking-wider text-white">
-            KOLIANCE<span className="text-purple-400">EX</span>
-          </span>
-        </div>
 
-        {/* Center: Search Bar */}
-        <div className="relative w-80 max-w-md hidden md:block">
-          <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-2.5 pointer-events-none" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search *IDs & Wallets*"
-            className="w-full pl-10 pr-4 py-1.5 rounded-full bg-[#181d2c] border border-white/10 text-xs text-white placeholder-slate-400 font-mono focus:outline-none focus:border-purple-500 transition"
-          />
-        </div>
+          <button
+            type="submit"
+            className="w-full sm:w-auto px-6 py-3 rounded-2xl bg-white hover:bg-slate-100 text-black font-semibold text-xs sm:text-sm font-mono transition shadow-[0_2px_12px_rgba(255,255,255,0.15)] active:scale-95 shrink-0"
+          >
+            Inspect Account
+          </button>
+        </form>
 
-        {/* Right: Notifications & Wallet */}
-        <div className="flex items-center gap-3">
-          <button className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#181d2c] border border-white/10 hover:border-purple-500/40 text-xs font-mono text-slate-300 transition">
-            <Bell className="w-3.5 h-3.5 text-purple-400" />
-            <span className="hidden sm:inline">Notifications</span>
-            <span className="px-1.5 py-0.2 rounded-full bg-purple-600 text-white text-[10px] font-bold">
-              3
-            </span>
+        {/* Quick Presets */}
+        <div className="flex flex-wrap items-center gap-2 mt-4 pt-3 border-t border-white/[0.08] text-xs font-mono">
+          <span className="text-slate-400 text-[11px] uppercase mr-1">Showcase Profiles:</span>
+          {currentAccount && (
+            <button
+              onClick={() => setSelectedAddress(currentAccount)}
+              className={`px-3 py-1 rounded-xl transition ${
+                selectedAddress.toLowerCase() === currentAccount.toLowerCase()
+                  ? "bg-white text-black font-bold"
+                  : "bg-white/[0.06] text-slate-300 hover:text-white"
+              }`}
+            >
+              My Wallet ({truncateAddress(currentAccount)})
+            </button>
+          )}
+
+          <button
+            onClick={() => setSelectedAddress("0x89205A3A3b2A69De6Dbf7f01ED13B2108B2c43e7")}
+            className={`px-3 py-1 rounded-xl transition ${
+              selectedAddress === "0x89205A3A3b2A69De6Dbf7f01ED13B2108B2c43e7"
+                ? "bg-white text-black font-bold"
+                : "bg-white/[0.06] text-slate-300 hover:text-white"
+            }`}
+          >
+            Consensus Leader (Alex R. Thompson)
           </button>
 
-          <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#181d2c] border border-white/10 text-xs font-mono text-white shadow-sm">
-            <Wallet className="w-3.5 h-3.5 text-cyan-400" />
-            <span>0xAb12...eF90</span>
-            <span className="text-slate-400 text-[11px]">(1.4 ETH)</span>
-          </div>
+          <button
+            onClick={() => setSelectedAddress("0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC")}
+            className={`px-3 py-1 rounded-xl transition ${
+              selectedAddress === "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC"
+                ? "bg-white text-black font-bold"
+                : "bg-white/[0.06] text-slate-300 hover:text-white"
+            }`}
+          >
+            AuditDAO Sentinel
+          </button>
+
+          <button
+            onClick={() => setSelectedAddress("0x1Db3439a222C519ab44bb1144fC23CC7c1405e98")}
+            className={`px-3 py-1 rounded-xl transition ${
+              selectedAddress === "0x1Db3439a222C519ab44bb1144fC23CC7c1405e98"
+                ? "bg-white text-black font-bold"
+                : "bg-white/[0.06] text-slate-300 hover:text-white"
+            }`}
+          >
+            AI Autonomous Agent #09
+          </button>
         </div>
-      </header>
+      </div>
 
-      {/* Main Container: Left Rail + Center Constellation + Right Sidebar */}
-      <div className="flex flex-col lg:flex-row flex-1 min-h-[700px]">
-        {/* Left Vertical Nav Rail */}
-        <aside className="w-full lg:w-44 border-r border-white/10 p-3 bg-[#0f131d]/60 flex lg:flex-col justify-between shrink-0">
-          <nav className="flex lg:flex-col gap-1.5 w-full">
-            {[
-              { id: "trust_graph", label: "Trust Graph", icon: <Share2 className="w-4 h-4" /> },
-              { id: "id_protocol", label: "ID Protocol", icon: <Shield className="w-4 h-4" /> },
-              { id: "networks", label: "Networks", icon: <Radio className="w-4 h-4" /> },
-              { id: "settings_top", label: "Settings", icon: <Settings className="w-4 h-4" /> },
-            ].map((item) => {
-              const active = activeSideNav === item.id;
-              return (
+      {/* Main Account Profile Header Card */}
+      <div className="rounded-3xl bg-[#121622]/90 border border-white/[0.08] p-6 shadow-xl backdrop-blur-xl relative overflow-hidden">
+        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
+          {/* Avatar + Main Identity Info */}
+          <div className="flex items-center gap-4">
+            <div className="relative w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-gradient-to-tr from-white/10 to-white/5 border border-white/20 p-1 flex items-center justify-center overflow-hidden shrink-0 shadow-md">
+              <div className="w-full h-full rounded-xl bg-slate-900 flex items-center justify-center text-slate-200">
+                <User className="w-8 h-8 text-white" />
+              </div>
+              <div className="absolute inset-0 border border-white/30 rounded-2xl animate-pulse pointer-events-none" />
+            </div>
+
+            <div className="space-y-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <h3 className="text-xl sm:text-2xl font-black text-white tracking-wide">
+                  {profile.name}
+                </h3>
+                <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[11px] font-mono font-bold flex items-center gap-1">
+                  <Check className="w-3 h-3" />
+                  VERIFIED DID
+                </span>
+              </div>
+
+              <div className="flex items-center gap-2 text-xs font-mono text-slate-400">
+                <span>{truncateAddress(profile.address)}</span>
                 <button
-                  key={item.id}
-                  onClick={() => setActiveSideNav(item.id)}
-                  className={`flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium transition ${
-                    active
-                      ? "bg-purple-600 text-white font-semibold shadow-glow"
-                      : "text-slate-400 hover:text-white hover:bg-white/5"
-                  }`}
+                  onClick={() => copyToClipboard(profile.address, "addr")}
+                  className="hover:text-white transition"
+                  title="Copy address"
                 >
-                  {item.icon}
-                  <span>{item.label}</span>
+                  {copiedKey === "addr" ? (
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                  ) : (
+                    <Copy className="w-3.5 h-3.5" />
+                  )}
                 </button>
-              );
-            })}
-          </nav>
+                <span>|</span>
+                <span className="text-slate-300">{profile.role}</span>
+              </div>
 
-          <div className="hidden lg:block pt-4 border-t border-white/10">
-            <button className="flex items-center gap-2 px-3 py-2 text-xs text-slate-400 hover:text-white transition">
-              <Settings className="w-4 h-4" />
-              <span>Settings</span>
-            </button>
-          </div>
-        </aside>
-
-        {/* Center: Trust Constellation Graph Stage */}
-        <main className="flex-1 relative bg-gradient-to-b from-[#0e121b] to-[#0a0d14] flex flex-col justify-between min-h-[680px] overflow-hidden">
-          {/* Top Control Bar inside Graph */}
-          <div className="p-5 flex items-center justify-between z-10">
-            <h2 className="text-lg font-bold text-white tracking-wide">
-              Trust Constellation Graph
-            </h2>
-
-            <div className="flex items-center gap-2">
-              <button className="p-1.5 rounded-lg bg-[#181d2c] border border-white/10 text-slate-300 hover:text-white transition">
-                <Grid className="w-4 h-4" />
-              </button>
-
-              <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#181d2c] border border-white/10 text-xs font-mono text-emerald-400">
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                <span>Active</span>
-              </button>
-
-              <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#181d2c] border border-white/10 text-xs font-mono text-slate-300">
-                <span>All Connections</span>
-                <ChevronDown className="w-3.5 h-3.5" />
-              </button>
+              <div className="flex flex-wrap gap-1.5 pt-1">
+                {profile.badges.map((b) => (
+                  <span
+                    key={b}
+                    className="px-2 py-0.5 rounded-md bg-white/[0.06] text-slate-200 border border-white/[0.1] text-[10px] font-mono font-medium"
+                  >
+                    {b}
+                  </span>
+                ))}
+              </div>
             </div>
           </div>
 
-          {/* Interactive Constellation Canvas */}
-          <div className="relative flex-1 w-full h-[580px]">
-            <canvas ref={canvasRef} className="w-full h-full block" />
+          {/* Quick Metrics & Actions */}
+          <div className="flex flex-wrap lg:flex-nowrap items-center gap-3 w-full lg:w-auto">
+            {/* Trust Score Highlight Pill */}
+            <div className="p-3.5 rounded-2xl bg-white/[0.04] border border-white/[0.08] text-right flex-1 sm:flex-initial">
+              <div className="flex items-center gap-1 justify-end text-slate-400 text-xs font-mono">
+                <span>TRUST SCORE</span>
+                <Info className="w-3 h-3" />
+              </div>
+              <p className="text-3xl font-black font-mono text-white tracking-tight">
+                {profile.trustScore}
+                <span className="text-base text-slate-400">/100</span>
+              </p>
+              <span className="text-[10px] text-emerald-400 font-mono block">
+                {profile.tier}
+              </span>
+            </div>
 
-            {/* 1:1 Floating Tooltip Card over user_014.trustgraph */}
-            {activeTooltip && (
-              <motion.div
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="absolute left-[38%] top-[54%] w-60 rounded-xl bg-[#141824]/95 border border-purple-500/40 p-3.5 shadow-2xl backdrop-blur-xl z-20 space-y-2 pointer-events-auto font-sans"
+            <div className="space-y-2 w-full sm:w-auto">
+              <button
+                onClick={runOnChainVerification}
+                disabled={isVerifying}
+                className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-white hover:bg-slate-100 text-black text-xs font-mono font-bold transition shadow-sm active:scale-95"
               >
-                <div className="flex items-center justify-between border-b border-white/10 pb-1.5">
-                  <span className="font-bold text-xs text-white font-mono">
-                    user_014.trustgraph
-                  </span>
-                  <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                {isVerifying ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>Verifying on Monad...</span>
+                  </>
+                ) : verifiedSuccess ? (
+                  <>
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>Cryptographically Valid!</span>
+                  </>
+                ) : (
+                  <>
+                    <Shield className="w-3.5 h-3.5" />
+                    <span>Verify Proofs On-Chain</span>
+                  </>
+                )}
+              </button>
+
+              <a
+                href={`${monadTestnet.blockExplorers.default.url}/address/${profile.address}`}
+                target="_blank"
+                rel="noreferrer"
+                className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/10 text-xs font-mono text-slate-300 hover:text-white transition"
+              >
+                <span>Monad Explorer</span>
+                <ExternalLink className="w-3.5 h-3.5" />
+              </a>
+            </div>
+          </div>
+        </div>
+
+        {/* 4 Pillars Nav Tabs */}
+        <div className="flex flex-wrap items-center gap-2 mt-6 pt-4 border-t border-white/[0.08]">
+          {[
+            { id: "identity", label: "1. 检查身份 (Identity)", icon: <User className="w-3.5 h-3.5" /> },
+            { id: "reputation", label: "2. 检查信誉 (Reputation)", icon: <Award className="w-3.5 h-3.5" /> },
+            { id: "transactions", label: "3. 检查历史交易 (History)", icon: <Clock className="w-3.5 h-3.5" /> },
+            { id: "capabilities", label: "4. 检查能力证明 (Capabilities)", icon: <FileCheck className="w-3.5 h-3.5" /> },
+          ].map((tab) => {
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id as any)}
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-mono transition ${
+                  isActive
+                    ? "bg-white text-black font-bold shadow-sm"
+                    : "text-slate-400 hover:text-white hover:bg-white/[0.04]"
+                }`}
+              >
+                {tab.icon}
+                <span>{tab.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Dynamic 4 Inspection Panels */}
+      <AnimatePresence mode="wait">
+        {/* PANEL 1: 检查身份 (Identity Verification) */}
+        {activeTab === "identity" && (
+          <motion.div
+            key="tab-identity"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="grid grid-cols-1 lg:grid-cols-12 gap-6"
+          >
+            {/* Left 7 cols: Identity Details */}
+            <div className="lg:col-span-7 rounded-3xl bg-[#121622]/90 border border-white/[0.08] p-6 space-y-5 shadow-xl backdrop-blur-xl">
+              <div className="flex items-center justify-between border-b border-white/[0.08] pb-3">
+                <h4 className="font-bold text-base text-white flex items-center gap-2">
+                  <User className="w-4 h-4 text-slate-300" />
+                  <span>On-Chain Identity Audit &amp; Metadata</span>
+                </h4>
+                <span className="text-[11px] font-mono text-emerald-400 flex items-center gap-1">
+                  <Check className="w-3 h-3" />
+                  Contract Verified
+                </span>
+              </div>
+
+              <div className="space-y-3.5 text-xs font-mono">
+                <div className="p-3.5 rounded-2xl bg-white/[0.03] border border-white/[0.06] space-y-1">
+                  <span className="text-slate-400 text-[10px] uppercase">Decentralized Identifier (DID)</span>
+                  <div className="flex items-center justify-between text-white font-mono">
+                    <span className="truncate">did:monad:{profile.address}</span>
+                    <button
+                      onClick={() => copyToClipboard(`did:monad:${profile.address}`, "did")}
+                      className="text-slate-400 hover:text-white ml-2 shrink-0"
+                    >
+                      {copiedKey === "did" ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                    </button>
+                  </div>
                 </div>
 
-                <div className="space-y-1.5 text-xs">
-                  <div className="flex justify-between text-slate-300">
-                    <span>Trust Score</span>
-                    <strong className="text-white font-mono">94.7</strong>
+                <div className="p-3.5 rounded-2xl bg-white/[0.03] border border-white/[0.06] space-y-1">
+                  <span className="text-slate-400 text-[10px] uppercase">Metadata Storage Hash (IPFS / Arweave)</span>
+                  <div className="flex items-center justify-between text-white font-mono">
+                    <span className="truncate">{profile.metadataHash}</span>
+                    <button
+                      onClick={() => copyToClipboard(profile.metadataHash, "meta")}
+                      className="text-slate-400 hover:text-white ml-2 shrink-0"
+                    >
+                      {copiedKey === "meta" ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                    </button>
                   </div>
+                </div>
 
-                  <div className="flex justify-between items-center text-slate-300">
-                    <span>On-Chain ID</span>
-                    <span className="w-4 h-4 rounded bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-[10px]">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="p-3 rounded-xl bg-white/[0.03] border border-white/[0.06]">
+                    <span className="text-slate-400 text-[10px] block">Registration Epoch</span>
+                    <strong className="text-white text-xs block mt-1">{profile.registeredDate}</strong>
+                  </div>
+                  <div className="p-3 rounded-xl bg-white/[0.03] border border-white/[0.06]">
+                    <span className="text-slate-400 text-[10px] block">Consensus Stake</span>
+                    <strong className="text-emerald-400 text-xs block mt-1">{profile.stakeAmount}</strong>
+                  </div>
+                </div>
+              </div>
+
+              {/* Monad Single-Slot Identity Seal */}
+              <div className="p-4 rounded-2xl bg-white/[0.04] border border-white/[0.08] flex items-center justify-between gap-3 text-xs font-mono">
+                <div className="flex items-center gap-2.5">
+                  <Shield className="w-5 h-5 text-white" />
+                  <div>
+                    <span className="font-bold text-white block">Koliance Cryptographic Seal</span>
+                    <span className="text-[11px] text-slate-400">Validated by Monad Testnet Contract {truncateAddress(KOLIANCE_ADDRESS)}</span>
+                  </div>
+                </div>
+                <span className="px-2.5 py-1 rounded-lg bg-emerald-500/20 text-emerald-400 font-bold text-[11px]">
+                  PASS
+                </span>
+              </div>
+            </div>
+
+            {/* Right 5 cols: Biometric Frequency & Badges */}
+            <div className="lg:col-span-5 rounded-3xl bg-[#121622]/90 border border-white/[0.08] p-6 space-y-5 shadow-xl backdrop-blur-xl">
+              <div className="flex items-center justify-between border-b border-white/[0.08] pb-3">
+                <h4 className="font-bold text-base text-white flex items-center gap-2">
+                  <Fingerprint className="w-4 h-4 text-slate-300" />
+                  <span>Biometric &amp; Proof Radar</span>
+                </h4>
+                <span className="text-xs font-mono text-slate-400">Real-Time Scan</span>
+              </div>
+
+              {/* Biometric Frequency Animation */}
+              <div className="p-4 rounded-2xl bg-[#0d1017] border border-white/[0.06] space-y-3">
+                <div className="flex items-center justify-between text-xs font-mono text-slate-300">
+                  <span>Sensor Waveform:</span>
+                  <span className="text-emerald-400 font-bold">100% MATCH</span>
+                </div>
+                <div className="flex items-center gap-1.5 h-8 px-2">
+                  {[30, 70, 95, 45, 80, 100, 65, 40, 85, 90, 50, 75, 95, 60, 30].map((v, i) => (
+                    <div
+                      key={i}
+                      className="flex-1 bg-gradient-to-t from-slate-600 to-white rounded-full animate-pulse"
+                      style={{ height: `${v}%`, animationDelay: `${i * 0.08}s` }}
+                    />
+                  ))}
+                </div>
+                <div className="flex justify-between text-[10px] font-mono text-slate-400 border-t border-white/[0.06] pt-2">
+                  <span>Zero-Knowledge Proof ID</span>
+                  <span>SHA256: 0x9f1a...48b1</span>
+                </div>
+              </div>
+
+              {/* Multi-Factor Verification Badges List */}
+              <div className="space-y-2">
+                <span className="text-[11px] font-mono text-slate-400 block uppercase">
+                  Audited Verification Checkpoints:
+                </span>
+                <div className="space-y-1.5 text-xs font-mono">
+                  <div className="flex items-center justify-between p-2 rounded-lg bg-white/[0.02]">
+                    <span className="text-slate-300 flex items-center gap-2">
+                      <Check className="w-3.5 h-3.5 text-emerald-400" /> On-Chain Sovereign DID
+                    </span>
+                    <span className="text-emerald-400 font-bold">Active</span>
+                  </div>
+                  <div className="flex items-center justify-between p-2 rounded-lg bg-white/[0.02]">
+                    <span className="text-slate-300 flex items-center gap-2">
+                      <Check className="w-3.5 h-3.5 text-emerald-400" /> Biometric Identity Pass
+                    </span>
+                    <span className="text-emerald-400 font-bold">Passed</span>
+                  </div>
+                  <div className="flex items-center justify-between p-2 rounded-lg bg-white/[0.02]">
+                    <span className="text-slate-300 flex items-center gap-2">
+                      <Check className="w-3.5 h-3.5 text-emerald-400" /> Sybil-Attack Protection
+                    </span>
+                    <span className="text-emerald-400 font-bold">{profile.sybilResistance}%</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
+
+        {/* PANEL 2: 检查信誉 (Reputation & Trust Score) */}
+        {activeTab === "reputation" && (
+          <motion.div
+            key="tab-reputation"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="grid grid-cols-1 lg:grid-cols-12 gap-6"
+          >
+            {/* Reputation Gauge & Grade */}
+            <div className="lg:col-span-6 rounded-3xl bg-[#121622]/90 border border-white/[0.08] p-6 space-y-5 shadow-xl backdrop-blur-xl">
+              <div className="flex items-center justify-between border-b border-white/[0.08] pb-3">
+                <h4 className="font-bold text-base text-white flex items-center gap-2">
+                  <Award className="w-4 h-4 text-slate-300" />
+                  <span>Trust Score &amp; Reputation Grade</span>
+                </h4>
+                <span className="text-xs font-mono text-emerald-400">Level 1 Sovereign</span>
+              </div>
+
+              {/* Big Score Display */}
+              <div className="p-6 rounded-2xl bg-white/[0.03] border border-white/[0.06] text-center space-y-2">
+                <span className="text-xs font-mono text-slate-400 uppercase tracking-widest">
+                  Calculated On-Chain Trust Rating
+                </span>
+                <div className="text-5xl sm:text-6xl font-black font-mono text-white tracking-tight">
+                  {profile.trustScore}
+                  <span className="text-2xl text-slate-400 font-normal"> / 100</span>
+                </div>
+                <p className="text-xs font-mono text-emerald-400">
+                  Top 0.5% in Monad Parallel Ecosystem
+                </p>
+                <div className="w-full h-2.5 bg-slate-800 rounded-full overflow-hidden mt-3 max-w-md mx-auto">
+                  <div
+                    className="h-full bg-gradient-to-r from-slate-400 via-white to-emerald-400 rounded-full transition-all duration-700"
+                    style={{ width: `${profile.trustScore}%` }}
+                  />
+                </div>
+              </div>
+
+              {/* Sybil Resistance Breakdown */}
+              <div className="grid grid-cols-2 gap-3 text-xs font-mono">
+                <div className="p-3.5 rounded-xl bg-white/[0.03] border border-white/[0.06]">
+                  <span className="text-slate-400 text-[10px]">VERIFIED PEERS</span>
+                  <p className="text-white font-bold text-base mt-0.5">{profile.connectionsCount}</p>
+                  <span className="text-[10px] text-slate-400">Mutual attestations</span>
+                </div>
+                <div className="p-3.5 rounded-xl bg-white/[0.03] border border-white/[0.06]">
+                  <span className="text-slate-400 text-[10px]">SYBIL RESISTANCE</span>
+                  <p className="text-emerald-400 font-bold text-base mt-0.5">{profile.sybilResistance}%</p>
+                  <span className="text-[10px] text-slate-400">High Risk Protected</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Reputation Vector Radar Breakdown */}
+            <div className="lg:col-span-6 rounded-3xl bg-[#121622]/90 border border-white/[0.08] p-6 space-y-5 shadow-xl backdrop-blur-xl">
+              <div className="flex items-center justify-between border-b border-white/[0.08] pb-3">
+                <h4 className="font-bold text-base text-white flex items-center gap-2">
+                  <TrendingUp className="w-4 h-4 text-slate-300" />
+                  <span>Reputation Vector Decomposition</span>
+                </h4>
+                <span className="text-xs font-mono text-slate-400">Weighted Matrix</span>
+              </div>
+
+              <div className="space-y-4 pt-1">
+                <div>
+                  <div className="flex justify-between text-xs font-mono text-slate-300 mb-1">
+                    <span>1. Security &amp; Contract Safety</span>
+                    <strong className="text-white">{profile.radarScores.security}%</strong>
+                  </div>
+                  <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
+                    <div className="h-full bg-white rounded-full" style={{ width: `${profile.radarScores.security}%` }} />
+                  </div>
+                </div>
+
+                <div>
+                  <div className="flex justify-between text-xs font-mono text-slate-300 mb-1">
+                    <span>2. Longevity &amp; Account History</span>
+                    <strong className="text-white">{profile.radarScores.longevity}%</strong>
+                  </div>
+                  <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
+                    <div className="h-full bg-slate-300 rounded-full" style={{ width: `${profile.radarScores.longevity}%` }} />
+                  </div>
+                </div>
+
+                <div>
+                  <div className="flex justify-between text-xs font-mono text-slate-300 mb-1">
+                    <span>3. Monad Consensus &amp; Single-Slot Weight</span>
+                    <strong className="text-white">{profile.radarScores.consensus}%</strong>
+                  </div>
+                  <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
+                    <div className="h-full bg-emerald-400 rounded-full" style={{ width: `${profile.radarScores.consensus}%` }} />
+                  </div>
+                </div>
+
+                <div>
+                  <div className="flex justify-between text-xs font-mono text-slate-300 mb-1">
+                    <span>4. Peer Social &amp; DAO Endorsements</span>
+                    <strong className="text-white">{profile.radarScores.social}%</strong>
+                  </div>
+                  <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
+                    <div className="h-full bg-cyan-300 rounded-full" style={{ width: `${profile.radarScores.social}%` }} />
+                  </div>
+                </div>
+              </div>
+
+              <p className="text-[11px] text-slate-400 font-mono leading-relaxed pt-2 border-t border-white/[0.08]">
+                Scores are continuously re-calculated through zero-knowledge state roots verified on Monad Testnet (Chain ID 10143).
+              </p>
+            </div>
+          </motion.div>
+        )}
+
+        {/* PANEL 3: 检查历史交易 (Transaction History) */}
+        {activeTab === "transactions" && (
+          <motion.div
+            key="tab-transactions"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="rounded-3xl bg-[#121622]/90 border border-white/[0.08] p-6 space-y-4 shadow-xl backdrop-blur-xl"
+          >
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/[0.08] pb-4">
+              <div>
+                <h4 className="font-bold text-base text-white flex items-center gap-2">
+                  <Clock className="w-4 h-4 text-slate-300" />
+                  <span>On-Chain Monad Transaction Ledger</span>
+                </h4>
+                <p className="text-xs text-slate-400 font-mono mt-0.5">
+                  Single-slot finality transaction pipeline with sub-400ms confirmation logs
+                </p>
+              </div>
+
+              <div className="flex items-center gap-3 text-xs font-mono text-slate-300">
+                <span>Network: <strong className="text-white">Monad Testnet</strong></span>
+                <span className="text-slate-600">|</span>
+                <span>TPS: <strong className="text-emerald-400">10,000 TPS</strong></span>
+              </div>
+            </div>
+
+            {/* Transactions Table */}
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs font-mono">
+                <thead>
+                  <tr className="border-b border-white/[0.08] text-slate-400 text-[11px]">
+                    <th className="py-2.5 px-3">TX HASH</th>
+                    <th className="py-2.5 px-3">METHOD / ACTION</th>
+                    <th className="py-2.5 px-3">BLOCK</th>
+                    <th className="py-2.5 px-3">LATENCY</th>
+                    <th className="py-2.5 px-3">TIME</th>
+                    <th className="py-2.5 px-3 text-right">STATUS</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/[0.04]">
+                  {profile.transactions.map((tx, idx) => (
+                    <tr key={idx} className="hover:bg-white/[0.02] transition">
+                      <td className="py-3 px-3">
+                        <div className="flex items-center gap-1.5 text-white font-mono">
+                          <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                          <span>{tx.txHash}</span>
+                          <a
+                            href={`${monadTestnet.blockExplorers.default.url}/tx/${tx.txHash}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-slate-400 hover:text-white"
+                          >
+                            <ExternalLink className="w-3 h-3" />
+                          </a>
+                        </div>
+                      </td>
+                      <td className="py-3 px-3 text-slate-200">
+                        <code className="px-2 py-0.5 rounded bg-white/[0.04] text-[11px]">
+                          {tx.method}
+                        </code>
+                      </td>
+                      <td className="py-3 px-3 text-slate-400">{tx.block}</td>
+                      <td className="py-3 px-3 text-emerald-400 font-bold">{tx.latency}</td>
+                      <td className="py-3 px-3 text-slate-400">{tx.time}</td>
+                      <td className="py-3 px-3 text-right">
+                        <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[10px] font-bold">
+                          {tx.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </motion.div>
+        )}
+
+        {/* PANEL 4: 检查能力证明 (Capability & Proof Attestations) */}
+        {activeTab === "capabilities" && (
+          <motion.div
+            key="tab-capabilities"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="rounded-3xl bg-[#121622]/90 border border-white/[0.08] p-6 space-y-5 shadow-xl backdrop-blur-xl"
+          >
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/[0.08] pb-4">
+              <div>
+                <h4 className="font-bold text-base text-white flex items-center gap-2">
+                  <FileCheck className="w-4 h-4 text-slate-300" />
+                  <span>Verifiable Cryptographic Capability Proofs</span>
+                </h4>
+                <p className="text-xs text-slate-400 font-mono mt-0.5">
+                  Immutable zero-knowledge attestations issued and verified on Monad Testnet
+                </p>
+              </div>
+
+              <button
+                onClick={runOnChainVerification}
+                disabled={isVerifying}
+                className="px-4 py-1.5 rounded-xl bg-white hover:bg-slate-100 text-black font-mono text-xs font-bold transition shrink-0"
+              >
+                {isVerifying ? "Verifying..." : "Verify All Signatures"}
+              </button>
+            </div>
+
+            {/* Proofs Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {profile.capabilities.map((cap, i) => (
+                <div
+                  key={i}
+                  className="p-4 rounded-2xl bg-white/[0.03] border border-white/[0.06] hover:border-white/20 transition space-y-3"
+                >
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-white/[0.08] text-slate-300 border border-white/[0.1]">
+                        {cap.tag}
+                      </span>
+                      <h5 className="font-bold text-white text-sm font-mono mt-1.5">
+                        {cap.title}
+                      </h5>
+                    </div>
+                    <span className="flex items-center gap-1 text-[11px] font-mono text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
                       <Check className="w-3 h-3" />
+                      Valid
                     </span>
                   </div>
 
-                  <div className="flex justify-between text-slate-300">
-                    <span>219 Connections</span>
-                    <strong className="text-white font-mono">219</strong>
-                  </div>
+                  <div className="space-y-1.5 text-xs font-mono text-slate-400">
+                    <div className="flex justify-between">
+                      <span>Issuer:</span>
+                      <span className="text-white truncate max-w-[200px]">{cap.issuer}</span>
+                    </div>
 
-                  <div className="flex justify-between items-center text-slate-300 pt-1">
-                    <span>Verified Badges</span>
-                    <div className="flex items-center gap-1.5">
-                      <span className="w-4 h-4 rounded-full bg-purple-500 text-white flex items-center justify-center text-[9px]">
-                        ✓
-                      </span>
-                      <span className="w-4 h-4 rounded-full bg-slate-300 text-black flex items-center justify-center text-[9px] font-bold">
-                        ★
-                      </span>
+                    <div className="p-2 rounded-lg bg-black/40 border border-white/[0.04] space-y-0.5">
+                      <span className="text-[10px] text-slate-500 uppercase block">Proof Hash (bytes32)</span>
+                      <div className="flex items-center justify-between text-white text-[11px]">
+                        <span className="truncate">{cap.proofHash}</span>
+                        <button
+                          onClick={() => copyToClipboard(cap.proofHash, `proof-${i}`)}
+                          className="hover:text-white ml-1.5 text-slate-400"
+                        >
+                          {copiedKey === `proof-${i}` ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="flex justify-between text-[11px] pt-1">
+                      <span>Attested Epoch:</span>
+                      <span className="text-slate-300">{cap.date}</span>
                     </div>
                   </div>
                 </div>
-              </motion.div>
-            )}
-
-            {/* Bottom Left Zoom & Reset Controls */}
-            <div className="absolute bottom-5 left-5 flex flex-col gap-1.5 z-10">
-              <button
-                onClick={() => setScaleFactor((s) => Math.min(s + 0.1, 1.4))}
-                className="w-8 h-8 rounded-lg bg-[#161a26]/90 border border-white/10 hover:border-purple-500/40 text-slate-300 hover:text-white flex items-center justify-center transition shadow-lg"
-              >
-                <Plus className="w-4 h-4" />
-              </button>
-              <button
-                onClick={() => setScaleFactor((s) => Math.max(s - 0.1, 0.7))}
-                className="w-8 h-8 rounded-lg bg-[#161a26]/90 border border-white/10 hover:border-purple-500/40 text-slate-300 hover:text-white flex items-center justify-center transition shadow-lg"
-              >
-                <Minus className="w-4 h-4" />
-              </button>
-              <button
-                onClick={() => setScaleFactor(1)}
-                className="w-8 h-8 rounded-lg bg-[#161a26]/90 border border-white/10 hover:border-purple-500/40 text-slate-300 hover:text-white flex items-center justify-center transition shadow-lg"
-              >
-                <RotateCcw className="w-3.5 h-3.5" />
-              </button>
-            </div>
-
-            {/* Bottom Right 1:1 Network Activity Card */}
-            <div className="absolute bottom-5 right-5 w-56 rounded-2xl bg-[#141926]/90 border border-white/10 p-3.5 backdrop-blur-md z-10 space-y-2.5 font-sans">
-              <div className="flex items-center justify-between text-xs text-white font-semibold">
-                <span>Network Activity</span>
-                <Activity className="w-3.5 h-3.5 text-cyan-400" />
-              </div>
-
-              {/* Sparkline Visual */}
-              <div className="h-6 w-full flex items-end gap-1 px-1">
-                {[30, 45, 60, 40, 75, 55, 90, 65, 80, 70, 85].map((h, i) => (
-                  <div
-                    key={i}
-                    className="flex-1 bg-gradient-to-t from-cyan-500/30 to-cyan-400 rounded-t-sm"
-                    style={{ height: `${h}%` }}
-                  />
-                ))}
-              </div>
-
-              <div className="space-y-1 text-[11px] font-mono border-t border-white/10 pt-2">
-                <div className="flex justify-between text-slate-400">
-                  <span>Gas:</span>
-                  <strong className="text-white">18 gwei</strong>
-                </div>
-                <div className="flex justify-between text-slate-400">
-                  <span>Nodes:</span>
-                  <strong className="text-white">5,142</strong>
-                </div>
-              </div>
-
-              <div className="space-y-1.5 border-t border-white/10 pt-2 text-[10px] font-mono">
-                <span className="text-slate-400 block font-sans text-[11px]">
-                  ID Verification Status
-                </span>
-                <div>
-                  <div className="flex justify-between text-slate-300 mb-0.5">
-                    <span>Active</span>
-                    <span className="text-cyan-400 font-bold">99.1%</span>
-                  </div>
-                  <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
-                    <div className="h-full bg-cyan-400 rounded-full w-[99.1%]" />
-                  </div>
-                </div>
-
-                <div>
-                  <div className="flex justify-between text-slate-300 mb-0.5">
-                    <span>System</span>
-                    <span className="text-purple-400 font-bold">99.3%</span>
-                  </div>
-                  <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
-                    <div className="h-full bg-purple-500 rounded-full w-[99.3%]" />
-                  </div>
-                </div>
-
-                <div>
-                  <div className="flex justify-between text-slate-300 mb-0.5">
-                    <span>System Vitals</span>
-                    <span className="text-slate-400">0%</span>
-                  </div>
-                  <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
-                    <div className="h-full bg-slate-600 rounded-full w-[0%]" />
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </main>
-
-        {/* Right Sidebar: 3 Stacked Cards (1:1 with Image 2) */}
-        <aside className="w-full lg:w-84 border-l border-white/10 p-4 bg-[#101420]/70 flex flex-col gap-4 shrink-0 overflow-y-auto">
-          {/* Card 1: Holographic Biometric ID Card */}
-          <div className="rounded-2xl bg-[#141826] border border-white/10 p-4 space-y-3.5 shadow-lg">
-            <div className="flex items-center justify-between text-xs font-semibold text-white">
-              <span>Holographic Biometric ID Card</span>
-              <button className="text-slate-400 hover:text-white">
-                <MoreHorizontal className="w-4 h-4" />
-              </button>
-            </div>
-
-            {/* Avatar & Biometric Audio Scan */}
-            <div className="flex items-center gap-3">
-              <div className="relative w-14 h-14 rounded-2xl bg-gradient-to-tr from-cyan-500/20 to-purple-500/20 border border-cyan-400/50 p-1 flex items-center justify-center overflow-hidden shrink-0 shadow-glow">
-                <div className="w-full h-full rounded-xl bg-slate-800 flex items-center justify-center text-slate-300">
-                  <User className="w-7 h-7 text-cyan-300" />
-                </div>
-                <div className="absolute inset-0 border border-cyan-400/40 rounded-2xl animate-pulse pointer-events-none" />
-              </div>
-
-              <div className="flex-1 space-y-0.5">
-                <span className="text-[10px] uppercase font-mono text-slate-400">User</span>
-                <h4 className="font-bold text-white text-sm">Alex R. Thompson</h4>
-                <p className="text-[10px] font-mono text-slate-400 truncate">
-                  ID: kx_0x1a2b3c4d...
-                </p>
-                <div className="flex items-center gap-1 text-[10px] font-mono text-cyan-400 pt-0.5">
-                  <Activity className="w-3 h-3 animate-pulse" />
-                  <span>Real-time biometric scan</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Biometric Frequency Wave Bars */}
-            <div className="flex items-center gap-1 h-3 px-1">
-              {[20, 60, 90, 40, 80, 100, 70, 30, 85, 45, 65, 95, 40, 20].map((val, i) => (
-                <div
-                  key={i}
-                  className="flex-1 bg-cyan-400/70 rounded-full"
-                  style={{ height: `${val}%` }}
-                />
               ))}
             </div>
-
-            {/* Iridescent Verification Badges */}
-            <div className="space-y-1">
-              <span className="text-[10px] font-mono text-slate-400 block">
-                Iridescent verification badges
-              </span>
-              <div className="flex flex-wrap gap-1.5">
-                <span className="px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[10px] font-mono font-bold">
-                  VERIFIED
-                </span>
-                <span className="px-2 py-0.5 rounded-md bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 text-[10px] font-mono font-bold">
-                  KYC
-                </span>
-                <span className="px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-400 border border-amber-500/30 text-[10px] font-mono font-bold">
-                  ON-CHAIN
-                </span>
-                <span className="px-2 py-0.5 rounded-md bg-purple-500/20 text-purple-400 border border-purple-500/30 text-[10px] font-mono font-bold">
-                  WEB3
-                </span>
-              </div>
-            </div>
-
-            {/* Trust Score 94.7% Progress Bar */}
-            <div className="space-y-1 pt-1 border-t border-white/10">
-              <div className="flex justify-between items-center text-xs">
-                <span className="flex items-center gap-1 text-slate-300">
-                  Trust Score <Info className="w-3 h-3 text-slate-400" />
-                </span>
-                <strong className="text-cyan-400 font-mono font-bold text-sm">94.7%</strong>
-              </div>
-              <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
-                <div className="h-full bg-gradient-to-r from-cyan-400 to-purple-500 rounded-full w-[94.7%]" />
-              </div>
-            </div>
-          </div>
-
-          {/* Card 2: Cryptographic Proof Stream (Parameters Card) */}
-          <div className="rounded-2xl bg-[#141826] border border-white/10 p-4 space-y-3 shadow-lg">
-            <div className="flex items-center justify-between text-xs font-semibold text-white">
-              <span>Cryptographic Proof Stream</span>
-              <button className="text-slate-400 hover:text-white">
-                <MoreHorizontal className="w-4 h-4" />
-              </button>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2 text-[11px] font-mono">
-              <div className="space-y-1 text-slate-400">
-                <div>
-                  Hash: <strong className="text-white block font-mono">0x5c7b...f8e9</strong>
-                </div>
-                <div>
-                  Block: <strong className="text-white block font-mono">1947214</strong>
-                </div>
-                <div>
-                  Timestamp: <strong className="text-white block font-mono">14:02:49</strong>
-                </div>
-              </div>
-
-              <div className="space-y-1 text-slate-400">
-                <div>
-                  Action: <strong className="text-emerald-400 block font-mono">Proof Issued</strong>
-                </div>
-                <div>
-                  Hash:{" "}
-                  <a
-                    href="https://testnet.monadexplorer.com"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-cyan-400 hover:underline block font-mono"
-                  >
-                    0x65958 &rarr;
-                  </a>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Card 3: Cryptographic Proof Stream (Table Ledger) */}
-          <div className="rounded-2xl bg-[#141826] border border-white/10 p-4 space-y-2.5 shadow-lg">
-            <div className="flex items-center justify-between text-xs font-semibold text-white">
-              <span>Cryptographic Proof Stream</span>
-              <button className="text-slate-400 hover:text-white">
-                <MoreHorizontal className="w-4 h-4" />
-              </button>
-            </div>
-
-            <div className="text-[10px] font-mono text-slate-400 grid grid-cols-12 border-b border-white/10 pb-1">
-              <span className="col-span-5">Hash</span>
-              <span className="col-span-4">Block</span>
-              <span className="col-span-3 text-right">Time</span>
-            </div>
-
-            <div className="space-y-2 text-[11px] font-mono">
-              {[
-                { hash: "0x5c7b...f8e9", block: "Proof Issued", time: "0x65958" },
-                { hash: "0x5c7b...f8e9", block: "1947214", time: "0x65958" },
-                { hash: "0x5c7b...f8e9", block: "14:02:49", time: "0x65958" },
-                { hash: "0x5c7b...f8e9", block: "Proof Issued", time: "0x65958" },
-                { hash: "0x5c7b...f8e9", block: "Proof Issued", time: "0x65958" },
-              ].map((row, idx) => (
-                <div key={idx} className="grid grid-cols-12 items-center text-slate-300">
-                  <div className="col-span-5 flex items-center gap-1.5 truncate">
-                    <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 shrink-0" />
-                    <span className="truncate">{row.hash}</span>
-                  </div>
-                  <span className="col-span-4 text-slate-400 truncate">{row.block}</span>
-                  <a
-                    href="https://testnet.monadexplorer.com"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="col-span-3 text-cyan-400 text-right hover:underline truncate"
-                  >
-                    {row.time}
-                  </a>
-                </div>
-              ))}
-            </div>
-          </div>
-        </aside>
-      </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

@@ -431,7 +431,7 @@ function MainContent() {
               transition={{ duration: 0.35, ease: "easeInOut" }}
               className="pt-20 max-w-7xl mx-auto px-2 sm:px-6 py-4"
             >
-              <TrustConstellation />
+              <TrustConstellation currentAccount={account} records={records} />
             </motion.div>
           )}
 
