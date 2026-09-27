@@ -15,11 +15,12 @@ import {
   Layers,
   Network,
   CreditCard,
+  TrendingUp,
 } from "lucide-react";
 import { truncateAddress } from "@/lib/utils";
 import { monadTestnet } from "@/lib/contract";
 
-export type NavView = "INDEX" | "DETAIL" | "PRODUCT" | "AGENTCARD";
+export type NavView = "INDEX" | "DETAIL" | "PRODUCT" | "MARKET" | "AGENTCARD";
 
 interface NavbarProps {
   currentView: NavView;
@@ -50,13 +51,14 @@ export function Navbar({
 
   const navItems: Array<{ id: NavView; label: string; icon: React.ReactNode; badge?: string }> = [
     { id: "INDEX", label: "INDEX", icon: <Zap className="w-3.5 h-3.5" /> },
-    { id: "DETAIL", label: "DETAIL", icon: <Network className="w-3.5 h-3.5" />, badge: "INSPECT" },
+    { id: "DETAIL", label: "DETAIL", icon: <Network className="w-3.5 h-3.5" />, badge: "AGENT" },
     { id: "PRODUCT", label: "PRODUCT", icon: <Shield className="w-3.5 h-3.5" /> },
+    { id: "MARKET", label: "MARKET", icon: <TrendingUp className="w-3.5 h-3.5" />, badge: "LIVE" },
     { id: "AGENTCARD", label: "AGENTCARD", icon: <CreditCard className="w-3.5 h-3.5" />, badge: "AI" },
   ];
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 px-3 sm:px-8 py-3 backdrop-blur-xl transition-all bg-[#0d1017]/85 border-b border-white/[0.08]">
+    <header className="fixed top-0 left-0 right-0 z-50 px-3 sm:px-8 py-2.5 backdrop-blur-xl transition-all bg-[#0d1017]/85 border-b border-white/[0.08]">
       <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
         {/* Brand / Logo (High-End White Aesthetic) */}
         <div
@@ -82,15 +84,15 @@ export function Navbar({
           </div>
         </div>
 
-        {/* 4-Tab Navigation Switcher (Luxury Frosted White Pill) */}
-        <nav className="flex items-center p-1 rounded-2xl bg-white/[0.04] border border-white/[0.08] backdrop-blur-md">
+        {/* 5-Tab Navigation Switcher (Luxury Frosted White Pill) */}
+        <nav className="flex items-center p-1 rounded-2xl bg-white/[0.04] border border-white/[0.08] backdrop-blur-md overflow-x-auto">
           {navItems.map((item) => {
             const isActive = currentView === item.id;
             return (
               <button
                 key={item.id}
                 onClick={() => onSelectView(item.id)}
-                className={`relative px-3 sm:px-4 py-1.5 rounded-xl text-xs font-mono font-medium tracking-wide transition-all duration-200 flex items-center gap-1.5 ${
+                className={`relative px-3 sm:px-3.5 py-1.5 rounded-xl text-xs font-mono font-medium tracking-wide transition-all duration-200 flex items-center gap-1.5 shrink-0 ${
                   isActive
                     ? "text-white font-semibold"
                     : "text-slate-400 hover:text-white hover:bg-white/[0.04]"
@@ -119,7 +121,7 @@ export function Navbar({
 
         {/* Network & High-End Contrast Wallet Button */}
         <div className="flex items-center gap-2.5 shrink-0">
-          {/* Monad Testnet Pill (Minimalist White/Slate) */}
+          {/* Monad Testnet Pill */}
           <div className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/[0.04] border border-white/[0.08] text-xs font-mono text-slate-300">
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
             <span className="w-2 h-2 -ml-4 rounded-full bg-emerald-400" />

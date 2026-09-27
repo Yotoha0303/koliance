@@ -34,6 +34,7 @@ import { CursorTrail } from "@/components/CursorTrail";
 import { EnergyCoreHero } from "@/components/EnergyCoreHero";
 import { TrustConstellation } from "@/components/TrustConstellation";
 import { ProductStudio } from "@/components/ProductStudio";
+import { MarketTerminal } from "@/components/MarketTerminal";
 import { IdentityCard } from "@/components/IdentityCard";
 import { TrustAttestationCard } from "@/components/TrustAttestationCard";
 import { TrustStream } from "@/components/TrustStream";
@@ -499,7 +500,21 @@ function MainContent() {
             </motion.div>
           )}
 
-          {/* TAB 4: AGENTCARD (Neural Asset Processor / AI Card Scanner) */}
+          {/* TAB 4: MARKET (Yahoo Finance Live Terminal & Gatekeeper) */}
+          {currentView === "MARKET" && (
+            <motion.div
+              key="view-market"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.35, ease: "easeInOut" }}
+              className="pt-20 max-w-7xl mx-auto px-4 sm:px-6 py-4"
+            >
+              <MarketTerminal onTradeAction={() => setCurrentView("DETAIL")} />
+            </motion.div>
+          )}
+
+          {/* TAB 5: AGENTCARD (Neural Asset Processor / AI Card Scanner) */}
           {currentView === "AGENTCARD" && (
             <motion.div
               key="view-agentcard"
@@ -519,7 +534,7 @@ function MainContent() {
         </AnimatePresence>
       </main>
 
-      {/* Global Footer (shown on INDEX, DETAIL, PRODUCT) */}
+      {/* Global Footer (shown on INDEX, DETAIL, PRODUCT, MARKET) */}
       {currentView !== "AGENTCARD" && (
         <footer className="border-t border-white/10 py-6 px-4 sm:px-8 mt-12 bg-[#0d1017]/80 backdrop-blur-md">
           <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-xs font-mono text-slate-400">
@@ -538,6 +553,9 @@ function MainContent() {
               </button>
               <button onClick={() => setCurrentView("PRODUCT")} className="hover:text-white transition">
                 PRODUCT
+              </button>
+              <button onClick={() => setCurrentView("MARKET")} className="hover:text-white transition">
+                MARKET
               </button>
               <button onClick={() => setCurrentView("AGENTCARD")} className="text-cyan-400 hover:text-cyan-300 transition">
                 AGENTCARD
