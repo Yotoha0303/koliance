@@ -434,6 +434,69 @@
       innerGem.scale.set(.75, 1.2, .75);
       crystal.add(innerGem);
       crystal.add(new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.IcosahedronGeometry(.71, 0)), new THREE.LineBasicMaterial({ color: 0xb6fff3, transparent: true, opacity: .7 })));
+      // Moving core network: points become edges, edges become translucent faces.
+      const coreNetwork = new THREE.Group();
+      crystal.add(coreNetwork);
+      const networkPoints = [
+        [-.72, .12, .34], [-.48, .54, -.18], [-.12, .78, .28], [.31, .56, .4],
+        [.7, .2, .15], [.52, -.33, .48], [.18, -.68, .24], [-.38, -.55, .18],
+        [-.66, -.24, -.38], [-.24, -.12, -.72], [.22, .04, -.62], [.58, .42, -.34],
+        [.03, .38, .62], [-.42, .3, .52], [.42, -.5, -.34], [-.06, -.46, .5],
+        [-.84, .05, -.02], [.84, -.03, .02], [.04, .88, -.12], [-.02, -.8, -.1]
+      ].map(([x, y, z]) => new THREE.Vector3(x, y, z).normalize().multiplyScalar(.78 + ((x + y + z + 3) % 3) * .08));
+      const networkLinePositions = [];
+      for (let i = 0; i < networkPoints.length; i++) {
+        for (let j = i + 1; j < networkPoints.length; j++) {
+          if (networkPoints[i].distanceTo(networkPoints[j]) < .72 || (i + j) % 11 === 0) {
+            networkLinePositions.push(
+              networkPoints[i].x, networkPoints[i].y, networkPoints[i].z,
+              networkPoints[j].x, networkPoints[j].y, networkPoints[j].z
+            );
+          }
+        }
+      }
+      const networkLineGeometry = new THREE.BufferGeometry();
+      networkLineGeometry.setAttribute("position", new THREE.Float32BufferAttribute(networkLinePositions, 3));
+      const networkLines = new THREE.LineSegments(networkLineGeometry, new THREE.LineBasicMaterial({
+        color: 0x8cefe4, transparent: true, opacity: .5, depthWrite: false, toneMapped: false
+      }));
+      coreNetwork.add(networkLines);
+      const networkPointGeometry = new THREE.BufferGeometry();
+      networkPointGeometry.setAttribute("position", new THREE.Float32BufferAttribute(networkPoints.flatMap(point => point.toArray()), 3));
+      const networkDots = new THREE.Points(networkPointGeometry, new THREE.PointsMaterial({
+        color: 0xd8fff6, size: .065, transparent: true, opacity: .95, depthWrite: false, toneMapped: false
+      }));
+      coreNetwork.add(networkDots);
+      const networkFaces = [];
+      for (let i = 0; i < networkPoints.length - 2; i += 2) {
+        const a = networkPoints[i], b = networkPoints[(i + 3) % networkPoints.length], c = networkPoints[(i + 8) % networkPoints.length];
+        const faceGeometry = new THREE.BufferGeometry();
+        faceGeometry.setAttribute("position", new THREE.Float32BufferAttribute([
+          a.x, a.y, a.z, b.x, b.y, b.z, c.x, c.y, c.z
+        ], 3));
+        faceGeometry.computeVertexNormals();
+        const face = new THREE.Mesh(faceGeometry, new THREE.MeshBasicMaterial({
+          color: i % 4 === 0 ? 0x9c78ef : 0x64d7d0, transparent: true, opacity: .12,
+          side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false
+        }));
+        coreNetwork.add(face);
+        networkFaces.push(face);
+      }
+      const coreArcs = [];
+      for (let i = 0; i < 3; i++) {
+        const points = [];
+        for (let j = 0; j <= 72; j++) {
+          const angle = j / 72 * Math.PI * 2;
+          points.push(new THREE.Vector3(
+            Math.cos(angle) * (.5 + i * .08),
+            Math.sin(angle) * (.2 + i * .08),
+            Math.sin(angle * 2 + i) * .62
+          ));
+        }
+        const arc = line(coreNetwork, points, i === 1 ? 0xb78fff : 0x8cf8e3, .55);
+        arc.rotation.set(i * .7, i * .45, i * .25);
+        coreArcs.push(arc);
+      }
       const nucleus = new THREE.Mesh(new THREE.OctahedronGeometry(.14), glowMaterial(0xddfff3, 3));
       crystal.add(nucleus);
       const kernelLight = new THREE.PointLight(0x7bf7e3, 4, 4, 2);
@@ -575,6 +638,7 @@
         const assert = (condition, message) => { if (!condition) throw new Error(message); };
         try {
           assert(rings.length === 6 && new Set(rings.map(ring => ring.pivot)).size === 6, "Six independent rings");
+          assert(networkPoints.length >= 18 && networkLinePositions.length >= 60 && networkFaces.length >= 8, "Core network geometry");
           const sample = document.createElement("canvas");
           sample.width = sample.height = 128;
           const context = sample.getContext("2d");
@@ -622,6 +686,18 @@
         root.scale.setScalar(scale);
         crystal.rotation.set(time * .07 + .25, time * .12 + .5, .12);
         innerGem.rotation.y = -time * .25;
+        coreNetwork.rotation.set(-time * .12, time * .18, time * .08);
+        networkLines.material.opacity = .38 + Math.sin(time * 2.8) * .12;
+        networkDots.material.size = .052 + (Math.sin(time * 3.2) + 1) * .009;
+        networkDots.material.opacity = .72 + (Math.sin(time * 3.2) + 1) * .1;
+        networkFaces.forEach((face, index) => {
+          face.material.opacity = .06 + (Math.sin(time * 1.8 + index * .7) + 1) * .045;
+          face.rotation.z = Math.sin(time * .55 + index) * .04;
+        });
+        coreArcs.forEach((arc, index) => {
+          arc.rotation.z += dt * (.3 + index * .09);
+          arc.material.opacity = .28 + (Math.sin(time * 2 + index * 1.4) + 1) * .12;
+        });
         rings.forEach((ring, index) => {
           ring.rotor.rotation.z = time * ring.speed;
           const focusScale = selected === index ? 1.055 : 1;
