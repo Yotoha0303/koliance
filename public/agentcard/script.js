@@ -9,48 +9,54 @@
   const FULL_SPEED = 34;
   const REDUCED_SPEED = 12;
 
-  // Replace these relative paths to use another card set. Set crop to null for a full-frame image.
+  // High-performance pre-cropped 800x500 WebP assets (96% bandwidth reduction)
   const CARD_DATA = [
     {
       id: "CARD_01",
       name: "GLM",
-      src: "./assets/cards/card-01-glm.png",
-      crop: { x: 34, y: 34, width: 1496, height: 911 },
+      src: "./assets/cards/card-01-glm.webp",
+      fallbackSrc: "./assets/cards/card-01-glm.png",
+      crop: null,
       seed: 1103,
     },
     {
       id: "CARD_02",
       name: "KIMI",
-      src: "./assets/cards/card-02-kimi.png",
-      crop: { x: 12, y: 14, width: 1563, height: 964 },
+      src: "./assets/cards/card-02-kimi.webp",
+      fallbackSrc: "./assets/cards/card-02-kimi.png",
+      crop: null,
       seed: 2207,
     },
     {
       id: "CARD_03",
       name: "CLAUDE",
-      src: "./assets/cards/card-03-claude.png",
-      crop: { x: 32, y: 40, width: 1498, height: 910 },
+      src: "./assets/cards/card-03-claude.webp",
+      fallbackSrc: "./assets/cards/card-03-claude.png",
+      crop: null,
       seed: 3301,
     },
     {
       id: "CARD_04",
       name: "GOOGLE",
-      src: "./assets/cards/card-04-google.png",
-      crop: { x: 33, y: 40, width: 1496, height: 908 },
+      src: "./assets/cards/card-04-google.webp",
+      fallbackSrc: "./assets/cards/card-04-google.png",
+      crop: null,
       seed: 4409,
     },
     {
       id: "CARD_05",
       name: "OPENAI",
-      src: "./assets/cards/card-05-openai.png",
-      crop: { x: 238, y: 161, width: 1570, height: 954 },
+      src: "./assets/cards/card-05-openai.webp",
+      fallbackSrc: "./assets/cards/card-05-openai.png",
+      crop: null,
       seed: 5501,
     },
     {
       id: "CARD_06",
       name: "DEEPSEEK",
-      src: "./assets/cards/card-06-deepseek.png",
-      crop: { x: 26, y: 30, width: 1519, height: 945 },
+      src: "./assets/cards/card-06-deepseek.webp",
+      fallbackSrc: "./assets/cards/card-06-deepseek.png",
+      crop: null,
       seed: 6607,
     },
   ];
@@ -331,12 +337,18 @@
     card.lastCodeTick = state.codeTick;
   }
 
-  function loadImage(src) {
-    return new Promise((resolve, reject) => {
+  function loadImage(src, fallbackSrc) {
+    return new Promise((resolve) => {
       const image = new Image();
       image.decoding = "async";
       image.onload = () => resolve(image);
-      image.onerror = () => reject(new Error(`Unable to load ${src}`));
+      image.onerror = () => {
+        if (fallbackSrc && image.src !== fallbackSrc) {
+          image.src = fallbackSrc;
+        } else {
+          resolve(null);
+        }
+      };
       image.src = src;
     });
   }
@@ -372,8 +384,12 @@
     };
 
     try {
-      card.image = await loadImage(data.src);
-      drawOriginalBuffer(card);
+      card.image = await loadImage(data.src, data.fallbackSrc);
+      if (card.image) {
+        drawOriginalBuffer(card);
+      } else {
+        drawFallbackCard(card, data.name);
+      }
       drawCodeBuffer(card, 0);
       renderCardSplit(card, 0, true);
       element.dataset.loadState = "ready";
@@ -618,6 +634,7 @@
 
   async function initialize() {
     resizeEffects();
+    window.requestAnimationFrame(animate);
     const cardPromises = CARD_DATA.map(async (data, index) => {
       const card = await createCard(data, index);
       const loaded = document.querySelectorAll(".card-wrapper[data-load-state]").length;
@@ -629,7 +646,6 @@
     app.dataset.ready = "true";
     app.dataset.cardCount = String(state.cards.length);
     loadingState.hidden = true;
-    window.requestAnimationFrame(animate);
   }
 
   pauseButton.addEventListener("click", () => togglePaused());

@@ -72,6 +72,34 @@ export function AgentCardTerminal({ currentAccount, records }: AgentCardTerminal
   const [activeTab, setActiveTab] = useState<"card_engine" | "identity" | "reputation" | "transactions" | "capabilities">("card_engine");
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
+  // 3D Dynamic Card Tilt based on real-time mouse angle & coordinates
+  const [cardTilt, setCardTilt] = useState({ rotateX: 0, rotateY: 0, glareX: 50, glareY: 50, active: false });
+
+  const handleCardMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    const centerX = rect.width / 2;
+    const centerY = rect.height / 2;
+
+    // Smooth continuous tilt in 360 degrees following cursor angle
+    const maxTilt = 22; // max tilt degrees
+    const rotX = -((y - centerY) / centerY) * maxTilt;
+    const rotY = ((x - centerX) / centerX) * maxTilt;
+
+    setCardTilt({
+      rotateX: rotX,
+      rotateY: rotY,
+      glareX: (x / rect.width) * 100,
+      glareY: (y / rect.height) * 100,
+      active: true,
+    });
+  };
+
+  const handleCardMouseLeave = () => {
+    setCardTilt({ rotateX: 0, rotateY: 0, glareX: 50, glareY: 50, active: false });
+  };
+
   // Micro-payments & gaming achievements stream
   const [totalMicroRewards, setTotalMicroRewards] = useState(0.0000142);
   const [achievements, setAchievements] = useState<AchievementEvent[]>([
@@ -197,21 +225,14 @@ export function AgentCardTerminal({ currentAccount, records }: AgentCardTerminal
       <div className="rounded-3xl bg-[#121622]/90 border border-white/[0.08] p-5 sm:p-6 shadow-2xl backdrop-blur-xl space-y-4">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div>
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.06] border border-white/[0.12] text-xs font-mono text-white mb-2">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              <span>MONAD HACKATHON // AI AGENT VISA PROTOCOL</span>
-              <span className="text-slate-400">|</span>
-              <span className="text-slate-300">10,000 TPS Parallel Execution</span>
-            </div>
             <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight flex items-center gap-3">
               <span>Koliance AgentCard</span>
-              <span className="text-xs px-2.5 py-1 rounded-lg bg-white/10 text-white border border-white/20 font-mono">
+              <span className="text-xs px-2.5 py-0.5 rounded-lg bg-white/10 text-white border border-white/20 font-mono">
                 VISA ISSUED
               </span>
             </h2>
-            <p className="text-xs sm:text-sm text-slate-400 font-mono mt-1 max-w-2xl">
-              The AI-Native Visa &amp; Credit Settlement Terminal on Monad. Facilitating high-frequency
-              sub-cent micropayments, game achievement rewards ($0.0000001), and cross-asset tokenized stock trading.
+            <p className="text-xs sm:text-sm text-slate-400 font-mono mt-1">
+              AI-Native Visa &amp; Sub-Cent Micro-Settlement on Monad 10,000 TPS.
             </p>
           </div>
 
@@ -277,7 +298,7 @@ export function AgentCardTerminal({ currentAccount, records }: AgentCardTerminal
       {/* Main Terminal Grid: 3 Cohesive Interactive Modules */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Col 1 (4 cols): 3D Physical Visa AgentCard & Controls */}
-        <div className="lg:col-span-4 rounded-3xl bg-[#121622]/90 border border-white/[0.08] p-6 space-y-6 shadow-xl backdrop-blur-xl flex flex-col justify-between">
+        <div className="lg:col-span-4 rounded-3xl bg-[#121622]/90 border border-white/[0.08] hover:border-white/20 p-6 space-y-6 shadow-xl hover:shadow-[0_20px_50px_rgba(0,0,0,0.8)] hover:-translate-y-2 hover:scale-[1.02] backdrop-blur-xl flex flex-col justify-between transition-all duration-300">
           <div>
             <div className="flex items-center justify-between border-b border-white/[0.08] pb-3 mb-4">
               <span className="text-xs font-mono text-slate-400 uppercase tracking-wider flex items-center gap-2">
@@ -290,53 +311,81 @@ export function AgentCardTerminal({ currentAccount, records }: AgentCardTerminal
               </span>
             </div>
 
-            {/* 3D Realistic Visa AgentCard Model */}
-            <motion.div
-              whileHover={{ rotateY: 8, rotateX: -6, scale: 1.02 }}
-              transition={{ type: "spring", stiffness: 300, damping: 20 }}
-              className={`relative w-full h-56 rounded-2xl p-5 flex flex-col justify-between shadow-2xl overflow-hidden cursor-pointer select-none transition-all ${
-                cardFrozen
-                  ? "bg-gradient-to-br from-slate-800 to-slate-950 border border-red-500/40 opacity-75"
-                  : "bg-gradient-to-br from-slate-900 via-[#1a2030] to-black border border-white/20 shadow-[0_10px_35px_rgba(0,0,0,0.6)]"
-              }`}
-            >
-              {/* EMV Holographic Chip & Wireless Indicator */}
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-7 rounded-md bg-gradient-to-r from-amber-200 via-amber-400 to-amber-100 border border-amber-500/40 shadow-sm flex items-center justify-center p-1">
-                    <div className="w-full h-full border border-black/20 rounded-[2px]" />
+            {/* 3D Realistic Visa AgentCard Model - 360 Dynamic Mouse Parallax Tilt */}
+            <div style={{ perspective: 1200 }}>
+              <motion.div
+                onMouseMove={handleCardMouseMove}
+                onMouseLeave={handleCardMouseLeave}
+                animate={{
+                  rotateX: cardTilt.active ? cardTilt.rotateX : 0,
+                  rotateY: cardTilt.active ? cardTilt.rotateY : 0,
+                  scale: cardTilt.active ? 1.08 : 1,
+                  y: cardTilt.active ? -10 : 0,
+                }}
+                transition={{
+                  type: "spring",
+                  stiffness: 380,
+                  damping: 24,
+                  mass: 0.5,
+                }}
+                style={{ transformStyle: "preserve-3d" }}
+                className={`group relative w-full h-56 rounded-2xl p-5 flex flex-col justify-between shadow-2xl overflow-hidden cursor-pointer select-none transition-shadow duration-300 ${
+                  cardFrozen
+                    ? "bg-gradient-to-br from-slate-800 to-slate-950 border border-red-500/40 opacity-75"
+                    : "bg-gradient-to-br from-slate-900 via-[#182033] to-black border border-white/20 hover:border-cyan-400/80 shadow-[0_12px_35px_rgba(0,0,0,0.7)] hover:shadow-[0_25px_60px_rgba(0,242,254,0.35),0_0_35px_rgba(131,110,249,0.35)]"
+                }`}
+              >
+                {/* Dynamic Holographic Glare - Spotlights directly beneath mouse cursor */}
+                <div
+                  className="absolute inset-0 pointer-events-none transition-opacity duration-200"
+                  style={{
+                    opacity: cardTilt.active ? 1 : 0,
+                    background: `radial-gradient(circle at ${cardTilt.glareX}% ${cardTilt.glareY}%, rgba(255,255,255,0.28) 0%, rgba(0,242,254,0.15) 35%, transparent 70%)`,
+                  }}
+                />
+
+                {/* EMV Holographic Chip & Wireless Indicator (3D Pop-out) */}
+                <div className="relative z-10 flex items-center justify-between" style={{ transform: "translateZ(25px)" }}>
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-7 rounded-md bg-gradient-to-r from-amber-200 via-amber-400 to-amber-100 border border-amber-500/40 shadow-sm flex items-center justify-center p-1 group-hover:shadow-[0_0_15px_rgba(251,191,36,0.8)] transition-all">
+                      <div className="w-full h-full border border-black/20 rounded-[2px]" />
+                    </div>
+                    <Radio className="w-4 h-4 text-slate-400 transform rotate-90" />
                   </div>
-                  <Radio className="w-4 h-4 text-slate-400 transform rotate-90" />
-                </div>
-                <span className="text-xs font-mono text-slate-400 font-bold">KOLIANCE AGENT</span>
-              </div>
-
-              {/* Embossed Card Number */}
-              <div className="space-y-1 my-auto">
-                <span className="text-lg sm:text-xl font-mono text-white tracking-widest font-black drop-shadow-md">
-                  4219 &bull;&bull;&bull;&bull; &bull;&bull;&bull;&bull; {targetAddress.slice(2, 6).toUpperCase()}
-                </span>
-                <div className="flex items-center gap-4 text-[10px] font-mono text-slate-400">
-                  <span>EXP: 10/29</span>
-                  <span>CVV: &bull;&bull;&bull;</span>
-                  <span>CREDIT: ${creditLimit.toLocaleString()}</span>
-                </div>
-              </div>
-
-              {/* Cardholder DID & Visa Hologram */}
-              <div className="flex items-center justify-between pt-2 border-t border-white/[0.08]">
-                <div>
-                  <span className="text-[9px] font-mono text-slate-400 uppercase block">AUTHORIZED AGENT DID</span>
-                  <span className="text-xs font-mono text-white font-bold truncate block max-w-[170px]">
-                    did:monad:{targetAddress.slice(0, 10)}...
+                  <span className="text-xs font-mono text-slate-400 font-bold group-hover:text-cyan-300 transition-colors">
+                    KOLIANCE AGENT
                   </span>
                 </div>
-                <div className="flex flex-col items-end">
-                  <span className="text-xl font-black italic tracking-tighter text-white">VISA</span>
-                  <span className="text-[8px] font-mono text-slate-400 uppercase">PLATINUM AGENT</span>
+
+                {/* Embossed Card Number (3D Pop-out) */}
+                <div className="relative z-10 space-y-1 my-auto" style={{ transform: "translateZ(30px)" }}>
+                  <span className="text-lg sm:text-xl font-mono text-white tracking-widest font-black drop-shadow-md group-hover:text-cyan-100 transition-colors">
+                    4219 &bull;&bull;&bull;&bull; &bull;&bull;&bull;&bull; {targetAddress.slice(2, 6).toUpperCase()}
+                  </span>
+                  <div className="flex items-center gap-4 text-[10px] font-mono text-slate-400">
+                    <span>EXP: 10/29</span>
+                    <span>CVV: &bull;&bull;&bull;</span>
+                    <span>CREDIT: ${creditLimit.toLocaleString()}</span>
+                  </div>
                 </div>
-              </div>
-            </motion.div>
+
+                {/* Cardholder DID & Visa Hologram (3D Pop-out) */}
+                <div className="relative z-10 flex items-center justify-between pt-2 border-t border-white/[0.08]" style={{ transform: "translateZ(25px)" }}>
+                  <div>
+                    <span className="text-[9px] font-mono text-slate-400 uppercase block">AUTHORIZED AGENT DID</span>
+                    <span className="text-xs font-mono text-white font-bold truncate block max-w-[170px]">
+                      did:monad:{targetAddress.slice(0, 10)}...
+                    </span>
+                  </div>
+                  <div className="flex flex-col items-end">
+                    <span className="text-xl font-black italic tracking-tighter text-white group-hover:drop-shadow-[0_0_10px_rgba(255,255,255,0.9)] transition-all">
+                      VISA
+                    </span>
+                    <span className="text-[8px] font-mono text-slate-400 uppercase">PLATINUM AGENT</span>
+                  </div>
+                </div>
+              </motion.div>
+            </div>
           </div>
 
           {/* Card Management Controls */}
@@ -378,7 +427,7 @@ export function AgentCardTerminal({ currentAccount, records }: AgentCardTerminal
         </div>
 
         {/* Col 2 (5 cols): High-Frequency Gaming Achievement Micro-Rewards ($0.0000001) */}
-        <div className="lg:col-span-5 rounded-3xl bg-[#121622]/90 border border-white/[0.08] p-6 space-y-5 shadow-xl backdrop-blur-xl flex flex-col justify-between">
+        <div className="lg:col-span-5 rounded-3xl bg-[#121622]/90 border border-white/[0.08] hover:border-emerald-500/40 p-6 space-y-5 shadow-xl hover:shadow-[0_20px_50px_rgba(52,211,153,0.16)] hover:-translate-y-2 hover:scale-[1.02] backdrop-blur-xl flex flex-col justify-between transition-all duration-300">
           <div>
             <div className="flex items-center justify-between border-b border-white/[0.08] pb-3">
               <div className="flex items-center gap-2">
@@ -389,11 +438,6 @@ export function AgentCardTerminal({ currentAccount, records }: AgentCardTerminal
                 $0.0000001 / ACH
               </span>
             </div>
-
-            <p className="text-xs text-slate-400 font-mono mt-3 leading-relaxed">
-              Every time a player unlocks a gaming milestone, the AI Agent executes an instantaneous
-              micro-payment of <strong>$0.0000001</strong> directly to the player&apos;s address via Monad&apos;s 10,000 TPS single-slot pipeline.
-            </p>
 
             {/* Total Stream Metric */}
             <div className="p-4 rounded-2xl bg-[#0d1017] border border-white/[0.06] mt-4 flex items-center justify-between">
@@ -466,7 +510,7 @@ export function AgentCardTerminal({ currentAccount, records }: AgentCardTerminal
         </div>
 
         {/* Col 3 (3 cols): Cross-Asset Tokenized US Stocks & Crypto Matching */}
-        <div className="lg:col-span-3 rounded-3xl bg-[#121622]/90 border border-white/[0.08] p-6 space-y-4 shadow-xl backdrop-blur-xl flex flex-col justify-between">
+        <div className="lg:col-span-3 rounded-3xl bg-[#121622]/90 border border-white/[0.08] hover:border-cyan-500/40 p-6 space-y-4 shadow-xl hover:shadow-[0_20px_50px_rgba(0,242,254,0.16)] hover:-translate-y-2 hover:scale-[1.02] backdrop-blur-xl flex flex-col justify-between transition-all duration-300">
           <div>
             <div className="flex items-center justify-between border-b border-white/[0.08] pb-3">
               <div className="flex items-center gap-2">
@@ -477,10 +521,6 @@ export function AgentCardTerminal({ currentAccount, records }: AgentCardTerminal
                 US STOCKS &amp; MON
               </span>
             </div>
-
-            <p className="text-[11px] text-slate-400 font-mono mt-2 leading-relaxed">
-              AI Agents autonomously balance liquidity between crypto assets and tokenized equities.
-            </p>
 
             {/* Orderbook List */}
             <div className="space-y-2 mt-4 text-xs font-mono">

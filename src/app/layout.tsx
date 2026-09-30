@@ -15,7 +15,11 @@ export const metadata: Metadata = {
     "Next-generation verifiable on-chain identity and cryptographic trust attestations powered by Monad 10,000 TPS parallel EVM.",
   manifest: "/manifest.json",
   icons: {
-    icon: "/favicon.ico",
+    icon: [
+      { url: "/favicon.ico" },
+      { url: "/brand-icon.png", type: "image/png" },
+    ],
+    apple: "/brand-icon.png",
   },
   openGraph: {
     title: "Koliance | Decentralized Identity & Trust Infrastructure",

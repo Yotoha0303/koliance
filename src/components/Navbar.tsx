@@ -18,6 +18,7 @@ import {
   TrendingUp,
 } from "lucide-react";
 import { truncateAddress } from "@/lib/utils";
+import { BrandIcon } from "@/components/BrandIcon";
 import { monadTestnet } from "@/lib/contract";
 
 export type NavView = "INDEX" | "DETAIL" | "PRODUCT" | "MARKET" | "AGENTCARD";
@@ -65,8 +66,8 @@ export function Navbar({
           onClick={() => onSelectView("INDEX")}
           className="flex items-center gap-3 cursor-pointer group shrink-0"
         >
-          <div className="relative flex items-center justify-center w-9 h-9 rounded-xl bg-gradient-to-b from-white via-slate-200 to-slate-400 text-black shadow-[0_2px_12px_rgba(255,255,255,0.15)] group-hover:scale-105 transition-transform duration-300">
-            <Shield className="w-4 h-4 text-black fill-black/20" />
+          <div className="relative group-hover:scale-105 transition-transform duration-300">
+            <BrandIcon size={36} glow />
             <div className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-400 rounded-full border-2 border-[#0d1017] animate-pulse" />
           </div>
           <div>
@@ -84,8 +85,8 @@ export function Navbar({
           </div>
         </div>
 
-        {/* 5-Tab Navigation Switcher (Luxury Frosted White Pill) */}
-        <nav className="flex items-center p-1 rounded-2xl bg-white/[0.04] border border-white/[0.08] backdrop-blur-md overflow-x-auto">
+        {/* 5-Tab Navigation Switcher (Luxury Frosted White Pill, zero scrollbar) */}
+        <nav className="flex items-center p-1 rounded-2xl bg-white/[0.04] border border-white/[0.08] backdrop-blur-md overflow-x-auto no-scrollbar [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
           {navItems.map((item) => {
             const isActive = currentView === item.id;
             return (

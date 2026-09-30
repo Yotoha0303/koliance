@@ -29,6 +29,7 @@ import {
   Lock,
   CreditCard,
 } from "lucide-react";
+import { BrandIcon } from "@/components/BrandIcon";
 import { Navbar, NavView } from "@/components/Navbar";
 import { CursorTrail } from "@/components/CursorTrail";
 import { EnergyCoreHero } from "@/components/EnergyCoreHero";
@@ -59,6 +60,13 @@ function MainContent() {
 
   // Top Nav View: INDEX | DETAIL | PRODUCT | AGENTCARD
   const [currentView, setCurrentView] = useState<NavView>(initialView);
+  const [hasVisitedAgentCard, setHasVisitedAgentCard] = useState(initialView === "AGENTCARD");
+
+  useEffect(() => {
+    if (currentView === "AGENTCARD") {
+      setHasVisitedAgentCard(true);
+    }
+  }, [currentView]);
 
   // Sub-tab under Product Studio (for direct contract transactions)
   const [contractStudioOpen, setContractStudioOpen] = useState(false);
@@ -330,26 +338,18 @@ function MainContent() {
               />
 
               {/* Protocol Architecture Bento Highlights */}
-              <div className="max-w-7xl mx-auto px-4 sm:px-8 py-16 space-y-8">
-                <div className="text-center max-w-3xl mx-auto space-y-3">
-                  <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-purple-500/10 border border-purple-500/30 text-xs font-mono text-purple-300">
-                    <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
-                    <span>NEXT-GENERATION DECENTRALIZED TRUST LAYER</span>
-                  </div>
-                  <h2 className="text-3xl sm:text-4xl font-black text-white tracking-tight">
-                    Engineered for Monad 10,000 TPS Parallel EVM
+              <div className="max-w-7xl mx-auto px-4 sm:px-8 py-12 space-y-6">
+                <div className="text-center max-w-2xl mx-auto space-y-2">
+                  <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
+                    Monad 10,000 TPS Parallel Trust Architecture
                   </h2>
-                  <p className="text-sm text-slate-400 font-mono">
-                    Koliance combines single-slot consensus with holographic trust topology to deliver
-                    instantaneous identity attestations for decentralized communities, validators, and AI agents.
-                  </p>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-2">
                   {/* Card 1 */}
                   <div
                     onClick={() => setCurrentView("DETAIL")}
-                    className="rounded-3xl p-6 bg-[#131722]/80 border border-white/10 hover:border-purple-500/60 transition-all cursor-pointer group space-y-4 relative overflow-hidden shadow-lg"
+                    className="rounded-3xl p-6 bg-[#131722]/80 border border-white/10 hover:border-purple-500/70 hover:scale-[1.05] hover:-translate-y-2.5 hover:shadow-[0_20px_45px_rgba(168,85,247,0.25)] transition-all duration-300 cursor-pointer group space-y-4 relative overflow-hidden shadow-lg"
                   >
                     <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-purple-600 to-indigo-600 flex items-center justify-center text-white shadow-glow group-hover:scale-110 transition-transform">
                       <Network className="w-6 h-6" />
@@ -359,9 +359,8 @@ function MainContent() {
                         <h3 className="font-bold text-lg text-white">Trust Constellation Graph</h3>
                         <ArrowRight className="w-4 h-4 text-cyan-400 group-hover:translate-x-1 transition-transform" />
                       </div>
-                      <p className="text-xs text-slate-400 leading-relaxed font-mono">
-                        1:1 Replicated force topology. Inspect real-time multi-cluster trust weights,
-                        AI audit agents, and consensus metrics.
+                      <p className="text-xs text-slate-400 font-mono">
+                        Multi-cluster trust weights, AI audit agents &amp; consensus metrics.
                       </p>
                     </div>
                     <div className="pt-2 flex items-center gap-2 text-[11px] font-mono text-cyan-400">
@@ -373,7 +372,7 @@ function MainContent() {
                   {/* Card 2 */}
                   <div
                     onClick={() => setCurrentView("PRODUCT")}
-                    className="rounded-3xl p-6 bg-[#131722]/80 border border-white/10 hover:border-cyan-400/60 transition-all cursor-pointer group space-y-4 relative overflow-hidden shadow-lg"
+                    className="rounded-3xl p-6 bg-[#131722]/80 border border-white/10 hover:border-cyan-400/70 hover:scale-[1.05] hover:-translate-y-2.5 hover:shadow-[0_20px_45px_rgba(0,242,254,0.25)] transition-all duration-300 cursor-pointer group space-y-4 relative overflow-hidden shadow-lg"
                   >
                     <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-cyan-400 to-teal-500 flex items-center justify-center text-black font-extrabold shadow-glow group-hover:scale-110 transition-transform">
                       <Shield className="w-6 h-6 text-black" />
@@ -383,9 +382,8 @@ function MainContent() {
                         <h3 className="font-bold text-lg text-white">Holographic Verification</h3>
                         <ArrowRight className="w-4 h-4 text-cyan-400 group-hover:translate-x-1 transition-transform" />
                       </div>
-                      <p className="text-xs text-slate-400 leading-relaxed font-mono">
-                        1:1 Replicated 3D identity badge, digital assets staking dashboard, and biometric
-                        fingerprint protocol.
+                      <p className="text-xs text-slate-400 font-mono">
+                        3D holographic identity badge, staking dashboard &amp; biometric protocol.
                       </p>
                     </div>
                     <div className="pt-2 flex items-center gap-2 text-[11px] font-mono text-cyan-400">
@@ -397,7 +395,7 @@ function MainContent() {
                   {/* Card 3 */}
                   <div
                     onClick={() => setCurrentView("AGENTCARD")}
-                    className="rounded-3xl p-6 bg-[#131722]/80 border border-white/10 hover:border-indigo-400/60 transition-all cursor-pointer group space-y-4 relative overflow-hidden shadow-lg"
+                    className="rounded-3xl p-6 bg-[#131722]/80 border border-white/10 hover:border-indigo-400/70 hover:scale-[1.05] hover:-translate-y-2.5 hover:shadow-[0_20px_45px_rgba(99,102,241,0.25)] transition-all duration-300 cursor-pointer group space-y-4 relative overflow-hidden shadow-lg"
                   >
                     <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white shadow-glow group-hover:scale-110 transition-transform">
                       <CreditCard className="w-6 h-6" />
@@ -407,9 +405,8 @@ function MainContent() {
                         <h3 className="font-bold text-lg text-white">AI Card Scanner</h3>
                         <ArrowRight className="w-4 h-4 text-purple-400 group-hover:translate-x-1 transition-transform" />
                       </div>
-                      <p className="text-xs text-slate-400 leading-relaxed font-mono">
-                        Full-stack Neural Asset Processor featuring 6-card circulating conveyor belt
-                        with matrix digitization.
+                      <p className="text-xs text-slate-400 font-mono">
+                        Full-stack Neural Asset Processor with 6-card circulating digitization.
                       </p>
                     </div>
                     <div className="pt-2 flex items-center gap-2 text-[11px] font-mono text-purple-400">
@@ -513,25 +510,22 @@ function MainContent() {
               <MarketTerminal onTradeAction={() => setCurrentView("DETAIL")} />
             </motion.div>
           )}
-
-          {/* TAB 5: AGENTCARD (Neural Asset Processor / AI Card Scanner) */}
-          {currentView === "AGENTCARD" && (
-            <motion.div
-              key="view-agentcard"
-              initial={{ opacity: 0, scale: 0.98 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.98 }}
-              transition={{ duration: 0.35, ease: "easeInOut" }}
-              className="pt-16 w-full h-[calc(100vh-64px)]"
-            >
-              <iframe
-                src="/agentcard/index.html"
-                className="w-full h-full border-0"
-                title="AI Card Scanner // Neural Asset Processor"
-              />
-            </motion.div>
-          )}
         </AnimatePresence>
+
+        {/* TAB 5: AGENTCARD (Neural Asset Processor / AI Card Scanner - Persistent Warm Canvas) */}
+        {hasVisitedAgentCard && (
+          <div
+            className={`pt-16 w-full h-[calc(100vh-64px)] ${
+              currentView === "AGENTCARD" ? "block" : "hidden"
+            }`}
+          >
+            <iframe
+              src="/agentcard/index.html"
+              className="w-full h-full border-0"
+              title="AI Card Scanner // Neural Asset Processor"
+            />
+          </div>
+        )}
       </main>
 
       {/* Global Footer (shown on INDEX, DETAIL, PRODUCT, MARKET) */}
@@ -539,6 +533,7 @@ function MainContent() {
         <footer className="border-t border-white/10 py-6 px-4 sm:px-8 mt-12 bg-[#0d1017]/80 backdrop-blur-md">
           <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-xs font-mono text-slate-400">
             <div className="flex items-center gap-3">
+              <BrandIcon size={24} />
               <span className="font-extrabold text-white tracking-wider">KOLIANCE</span>
               <span className="text-white/20">|</span>
               <span>&copy; {new Date().getFullYear()} Monad Ecosystem Trust Architecture.</span>
