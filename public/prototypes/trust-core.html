@@ -1,0 +1,659 @@
+<!doctype html>
+<!-- Throwaway homepage study: A / Observatory, B / Monument, C / Blueprint.
+     Open this HTML directly. Pinned Three.js modules load from the CDN.
+     Add ?check=1 to run the browser smoke check; read body.dataset.check or the console.
+     Network numbers are reference values, not live telemetry. No wallet or API calls. -->
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#080a0b">
+  <title>Koliance / Trust Core Study</title>
+  <link rel="icon" href="data:,">
+  <style>
+    :root { color-scheme: dark; --bg: #080a0b; --text: #eff3ef; --muted: #929b9b; --line: #ffffff1c; --mint: #a7eed9; }
+    * { box-sizing: border-box; letter-spacing: 0; }
+    html { scroll-behavior: smooth; }
+    body { margin: 0; background: var(--bg); color: var(--text); font-family: Arial, Helvetica, sans-serif; -webkit-font-smoothing: antialiased; }
+    button, a, input { -webkit-tap-highlight-color: transparent; }
+    button, a { touch-action: manipulation; }
+    button { color: inherit; font: inherit; cursor: pointer; }
+    a { color: inherit; text-decoration: none; }
+    button:focus-visible, a:focus-visible { outline: 2px solid var(--mint); outline-offset: 5px; }
+    button { border: 0; }
+    .mono { font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace; font-size: 10px; font-weight: 400; }
+    .site-header { height: 88px; margin: 0 48px; border-bottom: 1px solid var(--line); display: flex; align-items: center; justify-content: space-between; position: relative; z-index: 5; gap: 28px; }
+    .brand { display: flex; align-items: center; gap: 12px; font-size: 20px; font-weight: 700; }
+    .brand-mark { width: 29px; height: 29px; position: relative; border: 1px solid #bfdbd1; transform: rotate(45deg); border-radius: 4px; }
+    .brand-mark::before, .brand-mark::after { content: ""; position: absolute; inset: 5px; border: 1px solid #a7eed9; }
+    .brand-mark::after { inset: 10px; background: #a7eed9; border: 0; }
+    .brand-tag { padding-left: 20px; margin-left: 10px; border-left: 1px solid var(--line); color: var(--muted); line-height: 1.5; font-size: 9px; }
+    .navigation { display: flex; align-items: center; gap: 32px; font-size: 12px; color: #aeb6b6; }
+    .navigation a:hover, .footer a:hover { color: var(--mint); }
+    .launch { display: flex; align-items: center; justify-content: center; gap: 20px; padding: 13px 17px; border: 1px solid #a7eed954; border-radius: 4px; font-size: 11px; background: #a7eed907; white-space: nowrap; }
+    .launch:hover { background: #a7eed919; border-color: var(--mint); }
+    .icon { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
+    .hero { position: relative; height: calc(100svh - 248px); min-height: 470px; max-height: 940px; isolation: isolate; }
+    .scene { position: absolute; inset: 0; z-index: -1; overflow: hidden; }
+    canvas { display: block; width: 100%; height: 100%; }
+    .intro { position: absolute; top: 36px; left: 50%; transform: translateX(-50%); text-align: center; width: min(90%, 610px); pointer-events: none; }
+    .eyebrow { display: flex; justify-content: center; align-items: center; gap: 9px; color: var(--mint); font-size: 9px; }
+    .status-dot { display: inline-block; width: 5px; height: 5px; background: var(--mint); border-radius: 50%; }
+    h1 { margin: 13px 0 9px; font-size: 58px; line-height: 1; font-weight: 500; }
+    .intro p { color: #a2abaa; font-size: 13px; margin: 0; }
+    .intro p span { color: #e2e7e4; }
+    .side-note { position: absolute; top: 47%; left: 48px; width: 184px; }
+    .side-note .overline { color: var(--muted); font-size: 9px; margin-bottom: 17px; display: block; }
+    .side-note h2 { font-size: 17px; font-weight: 400; margin: 0 0 8px; }
+    .side-note p { color: var(--muted); font-size: 11px; line-height: 1.7; margin: 0; }
+    .tiny-rule { width: 37px; height: 1px; background: #a7eed960; margin-top: 22px; position: relative; }
+    .tiny-rule::after { content: ""; width: 3px; height: 3px; position: absolute; right: 0; top: -1px; background: var(--mint); }
+    .layer-panel { position: absolute; right: 48px; top: 25%; width: 161px; }
+    .layer-heading { color: var(--muted); display: flex; justify-content: space-between; margin-bottom: 17px; font-size: 9px; }
+    .layer-list { display: grid; gap: 2px; }
+    .layer { display: flex; align-items: center; gap: 12px; text-align: left; width: 100%; background: transparent; padding: 9px 0; color: #919b99; font-size: 10px; transition: color .2s; min-height: 33px; }
+    .layer .number { width: 19px; font-size: 9px; color: #7d8884; }
+    .layer .swatch { width: 13px; height: 1px; background: var(--color); transition: width .25s; flex-shrink: 0; }
+    .layer[aria-pressed="true"], .layer:hover { color: #fff; }
+    .layer[aria-pressed="true"] .swatch { width: 23px; box-shadow: 0 0 8px var(--color); }
+    .layer-detail { color: #a1aaa7; font-size: 10px; line-height: 1.6; min-height: 46px; margin: 13px 0 0; border-top: 1px solid var(--line); padding-top: 12px; }
+    .scene-caption { position: absolute; left: 48px; bottom: 30px; display: flex; align-items: center; gap: 14px; color: #adb7b3; }
+    .scene-caption .index { color: var(--mint); font-size: 11px; }
+    .scene-caption .caption-divider { height: 20px; width: 1px; background: var(--line); }
+    .scene-caption .caption-sub { display: block; color: #899591; font-size: 9px; margin-top: 5px; }
+    .scene-controls { position: absolute; right: 48px; bottom: 26px; display: flex; gap: 6px; }
+    .icon-button { display: grid; place-items: center; width: 35px; height: 35px; border: 1px solid var(--line); border-radius: 50%; background: #0c100f; position: relative; color: #aab9b2; }
+    .icon-button:hover, .icon-button[aria-pressed="true"] { color: var(--mint); border-color: #a7eed96b; }
+    .icon-button::after { content: attr(aria-label); pointer-events: none; position: absolute; bottom: calc(100% + 10px); right: 0; width: max-content; max-width: 180px; font: 10px Arial, sans-serif; color: var(--text); background: #1b2420; padding: 7px 9px; border: 1px solid var(--line); border-radius: 3px; opacity: 0; }
+    .icon-button:hover::after, .icon-button:focus-visible::after { opacity: 1; }
+    .telemetry { margin: 0 48px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); min-height: 111px; display: grid; grid-template-columns: 1.2fr repeat(4, 1fr); align-items: center; }
+    .network-heading { display: flex; flex-direction: column; gap: 10px; }
+    .network-heading strong { font-size: 12px; font-weight: 400; }
+    .network-heading span { color: #94a39b; font-size: 8px; }
+    .network-heading strong::before { content: ""; display: inline-block; width: 5px; height: 5px; background: var(--mint); margin-right: 8px; vertical-align: middle; border-radius: 50%; }
+    .metric { border-left: 1px solid var(--line); padding-left: 34px; display: flex; flex-direction: column; gap: 9px; }
+    .metric-label { color: #97a29d; font-size: 9px; }
+    .metric-value { font-size: 27px; font-weight: 400; font-variant-numeric: tabular-nums; line-height: 1; }
+    .metric-value small { font-size: 10px; color: #a0aba5; padding-left: 5px; }
+    .next-section { display: flex; justify-content: space-between; align-items: center; margin: 0 48px; padding: 29px 0 33px; gap: 24px; }
+    .next-section h2 { font-weight: 400; font-size: 18px; margin: 0; }
+    .next-section .section-label { color: #87958c; font-size: 9px; margin-bottom: 9px; display: block; }
+    .protocol-links { display: flex; gap: 28px; align-items: center; }
+    .protocol-links a { display: flex; gap: 10px; align-items: center; font-size: 11px; color: #bbc5bf; }
+    .protocol-links a:hover { color: var(--mint); }
+    .footer { margin: 0 48px; padding: 20px 0 75px; border-top: 1px solid var(--line); display: flex; justify-content: space-between; gap: 12px; color: #839088; font-size: 9px; }
+    .prototype-switcher { position: fixed; z-index: 10; bottom: 16px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; justify-content: space-between; gap: 10px; background: #19211deb; border: 1px solid #d2e4d432; padding: 4px; border-radius: 5px; box-shadow: 0 4px 28px #0008; backdrop-filter: blur(16px); }
+    .prototype-switcher button { width: 30px; height: 28px; background: transparent; display: grid; place-items: center; color: #bdcbc2; border-radius: 3px; }
+    .prototype-switcher button:hover { background: #ffffff12; color: white; }
+    .variant-name { font-size: 9px; min-width: 128px; text-align: center; }
+    .variant-name span { color: #8a9c90; margin-right: 7px; }
+    .loading { position: absolute; top: 57%; left: 50%; transform: translate(-50%, -50%); width: 270px; text-align: center; font-size: 11px; line-height: 1.7; color: #a7c1b3; }
+    .loading[hidden] { display: none; }
+    .blueprint-heading { display: none; }
+    body[data-variant="B"] .intro { top: auto; bottom: 36px; left: 48px; transform: none; text-align: left; width: 460px; }
+    body[data-variant="B"] .intro .eyebrow { justify-content: flex-start; }
+    body[data-variant="B"] h1 { font-size: 80px; margin-top: 14px; }
+    body[data-variant="B"] .side-note { top: 38px; }
+    body[data-variant="B"] .scene-caption { display: none; }
+    body[data-variant="B"] .layer-panel { top: 40px; }
+    body[data-variant="B"] .telemetry { grid-template-columns: 1.2fr repeat(2, 1fr); }
+    body[data-variant="B"] .metric:nth-last-child(-n+2) { display: none; }
+    body[data-variant="C"] .intro { top: 35px; left: 48px; transform: none; text-align: left; width: 290px; }
+    body[data-variant="C"] .intro .eyebrow { justify-content: flex-start; font-size: 8px; }
+    body[data-variant="C"] h1 { font-size: 40px; }
+    body[data-variant="C"] .intro p { font-size: 11px; }
+    body[data-variant="C"] .side-note { top: 230px; }
+    body[data-variant="C"] .layer-panel { top: 33%; }
+    body[data-variant="C"] .blueprint-heading { display: block; position: absolute; top: 35px; right: 48px; text-align: right; color: #9db3a5; line-height: 1.8; }
+    body[data-variant="C"] .hero { background-image: linear-gradient(#a7eed904 1px, transparent 1px), linear-gradient(90deg, #a7eed904 1px, transparent 1px); background-size: 40px 40px; }
+    @media (min-width: 1800px) {
+      .site-header, .telemetry, .next-section, .footer { margin-left: 72px; margin-right: 72px; }
+      .side-note, .scene-caption { left: 72px; }
+      .layer-panel, .scene-controls { right: 72px; }
+      .intro { top: 47px; }
+      h1 { font-size: 68px; }
+    }
+    @media (max-width: 1100px) {
+      .brand-tag { display: none; }
+      .side-note { width: 138px; left: 28px; }
+      .side-note h2 { font-size: 14px; }
+      .side-note p { font-size: 10px; }
+      .layer-panel { right: 28px; width: 142px; }
+      .site-header, .telemetry, .next-section, .footer { margin-left: 28px; margin-right: 28px; }
+      .scene-caption { left: 28px; }
+      .scene-controls { right: 28px; }
+      .metric { padding-left: 22px; }
+    }
+    @media (max-width: 760px) {
+      .site-header { height: 72px; margin: 0 22px; gap: 12px; }
+      .brand { font-size: 16px; gap: 10px; }
+      .brand-mark { width: 23px; height: 23px; border-radius: 2px; }
+      .brand-mark::before { inset: 4px; }
+      .brand-mark::after { inset: 8px; }
+      .navigation { display: none; }
+      .launch { padding: 10px 12px; gap: 12px; font-size: 10px; }
+      .hero { height: 590px; min-height: 0; max-height: none; }
+      .intro { top: 32px; width: calc(100% - 40px); }
+      h1 { font-size: 46px; margin-top: 15px; }
+      .intro p { font-size: 11px; }
+      .eyebrow { font-size: 8px; }
+      .side-note { display: none; }
+      .layer-panel { top: auto; bottom: 67px; left: 22px; right: 22px; width: auto; }
+      .layer-heading { display: none; }
+      .layer-list { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; }
+      .layer { justify-content: center; padding: 8px 0; gap: 5px; border-bottom: 1px solid #ffffff19; }
+      .layer .name { display: none; }
+      .layer .number { width: auto; }
+      .layer .swatch { width: 8px; }
+      .layer[aria-pressed="true"] .swatch { width: 14px; }
+      .layer-detail { border: 0; margin: 8px 0 0; padding: 0; min-height: 16px; text-align: center; font-size: 9px; }
+      .scene-caption { left: 22px; bottom: 20px; }
+      .scene-caption .mono { font-size: 9px; }
+      .scene-controls { right: 22px; bottom: 18px; gap: 5px; }
+      .icon-button { width: 30px; height: 30px; }
+      .telemetry { margin: 0 22px; grid-template-columns: 1fr 1fr; padding: 19px 0; row-gap: 26px; }
+      .network-heading { grid-column: 1 / -1; flex-direction: row; justify-content: space-between; align-items: center; gap: 6px; }
+      .network-heading strong { font-size: 11px; }
+      .network-heading span { font-size: 7px; }
+      .metric { padding-left: 20px; }
+      .metric:nth-child(even) { border-left: 0; padding-left: 0; }
+      .metric-value { font-size: 26px; }
+      .metric-label { font-size: 8px; }
+      .next-section { margin: 0 22px; padding: 28px 0; flex-direction: column; align-items: flex-start; }
+      .next-section h2 { font-size: 17px; }
+      .protocol-links { gap: 20px; flex-wrap: wrap; }
+      .protocol-links a { font-size: 10px; }
+      .footer { margin: 0 22px; font-size: 8px; padding-bottom: 88px; flex-wrap: wrap; }
+      body[data-variant="B"] .intro { left: 22px; bottom: 158px; width: calc(100% - 44px); }
+      body[data-variant="B"] h1 { font-size: 44px; }
+      body[data-variant="B"] .layer-panel { top: auto; }
+      body[data-variant="B"] .telemetry { grid-template-columns: 1fr 1fr; }
+      body[data-variant="C"] .intro { top: 30px; left: 22px; width: 240px; }
+      body[data-variant="C"] h1 { font-size: 36px; }
+      body[data-variant="C"] .blueprint-heading { top: 140px; right: 22px; font-size: 8px; }
+      body[data-variant="C"] .layer-panel { top: auto; }
+      .prototype-switcher { bottom: 12px; }
+    }
+    @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } * { transition: none !important; } }
+  </style>
+  <script type="importmap">
+    { "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"
+    } }
+  </script>
+</head>
+<body data-variant="A">
+  <header class="site-header">
+    <a class="brand" href="https://koliance.vercel.app/" aria-label="Koliance home"><span class="brand-mark" aria-hidden="true"></span>KOLIANCE<span class="brand-tag mono">TRUST<br>ARCHITECTURE</span></a>
+    <nav class="navigation" aria-label="Main navigation">
+      <a href="#network">Network</a>
+      <a href="#ecosystem">Ecosystem</a>
+      <a href="https://koliance.vercel.app/?view=DETAIL">Technology</a>
+      <a href="https://docs.monad.xyz" target="_blank" rel="noopener noreferrer">Docs</a>
+    </nav>
+    <a class="launch" href="https://koliance.vercel.app/?view=PRODUCT">Launch app<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17 17 7M7 7h10v10"/></svg></a>
+  </header>
+
+  <main>
+    <section class="hero" aria-label="Koliance six-layer trust core">
+      <div class="scene" id="scene"><canvas id="core" aria-label="Animated crystalline core with six individually selectable orbital rings"></canvas></div>
+      <div class="loading" id="loading" role="status">Initializing trust core&hellip;</div>
+      <div class="intro">
+        <div class="eyebrow mono"><span class="status-dot"></span>DECENTRALIZED TRUST INFRASTRUCTURE</div>
+        <h1>KOLIANCE</h1>
+        <p>Trust, by architecture. <span>Connected by design.</span></p>
+      </div>
+      <aside class="side-note">
+        <span class="overline mono">THE KOLIANCE CORE / 001</span>
+        <h2>One core.<br>Infinite connections.</h2>
+        <p>Identity, verification and trust.<br>A shared foundation on Monad.</p>
+        <div class="tiny-rule" aria-hidden="true"></div>
+      </aside>
+      <div class="blueprint-heading mono">K / SYSTEM ARCHITECTURE<br>ASSEMBLY 001 &nbsp; / &nbsp; SIX LAYERS</div>
+      <aside class="layer-panel" aria-label="Core layers">
+        <div class="layer-heading mono"><span>CORE ANATOMY</span><span>06</span></div>
+        <div class="layer-list">
+          <button class="layer" data-layer="0" aria-pressed="false" style="--color:#d6fff1"><span class="number mono">01</span><span class="swatch"></span><span class="name">Titanium shield</span></button>
+          <button class="layer" data-layer="1" aria-pressed="false" style="--color:#e6ddb8"><span class="number mono">02</span><span class="swatch"></span><span class="name">Precision halo</span></button>
+          <button class="layer" data-layer="2" aria-pressed="false" style="--color:#c0a4ed"><span class="number mono">03</span><span class="swatch"></span><span class="name">Crystal array</span></button>
+          <button class="layer" data-layer="3" aria-pressed="false" style="--color:#77e7e8"><span class="number mono">04</span><span class="swatch"></span><span class="name">Energy conduit</span></button>
+          <button class="layer" data-layer="4" aria-pressed="false" style="--color:#e3a0b7"><span class="number mono">05</span><span class="swatch"></span><span class="name">Data stream</span></button>
+          <button class="layer" data-layer="5" aria-pressed="false" style="--color:#aecfc7"><span class="number mono">06</span><span class="swatch"></span><span class="name">Orbital network</span></button>
+        </div>
+        <p class="layer-detail" id="layer-detail" aria-live="polite">Six independent layers.<br>One connected system.</p>
+      </aside>
+      <div class="scene-caption"><span class="index mono">K / 06</span><span class="caption-divider"></span><span class="mono">TRUST ENGINE<span class="caption-sub">CONCEPT ASSEMBLY &middot; 001</span></span></div>
+      <div class="scene-controls">
+        <button class="icon-button" id="explode" aria-label="Separate the six layers" aria-pressed="false"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 9 5-9 5-9-5 9-5Zm-9 9 9 5 9-5M3 16l9 5 9-5"/></svg></button>
+        <button class="icon-button" id="pause" aria-label="Pause rotation" aria-pressed="false"><svg class="icon" id="pause-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5v14M15 5v14"/></svg></button>
+        <button class="icon-button" id="reset" aria-label="Reset view"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10a9 9 0 1 1 2.6 8.4M3 4v6h6"/></svg></button>
+      </div>
+    </section>
+
+    <section class="telemetry" id="network" aria-label="Reference network metrics">
+      <div class="network-heading"><strong>Built on Monad</strong><span class="mono">REFERENCE METRICS / NOT LIVE</span></div>
+      <div class="metric"><span class="metric-label mono">PARALLEL EXECUTION</span><span class="metric-value">10,000<small>TPS</small></span></div>
+      <div class="metric"><span class="metric-label mono">BLOCK LATENCY</span><span class="metric-value">0.8<small>sec</small></span></div>
+      <div class="metric"><span class="metric-label mono">VALIDATORS</span><span class="metric-value">412<small>nodes</small></span></div>
+      <div class="metric"><span class="metric-label mono">NETWORK REACH</span><span class="metric-value">5.3K<small>global</small></span></div>
+    </section>
+    <section class="next-section" id="ecosystem">
+      <div><span class="section-label mono">THE CONNECTED ECOSYSTEM</span><h2>From identity to possibility.</h2></div>
+      <div class="protocol-links">
+        <a href="https://koliance.vercel.app/?view=PRODUCT">Identity<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17 17 7M7 7h10v10"/></svg></a>
+        <a href="https://koliance.vercel.app/?view=DETAIL">Attestations<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17 17 7M7 7h10v10"/></svg></a>
+        <a href="https://koliance.vercel.app/?view=AGENTCARD">AgentCard<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17 17 7M7 7h10v10"/></svg></a>
+      </div>
+    </section>
+  </main>
+  <footer class="footer mono"><span>&copy; 2026 KOLIANCE</span><span>DECENTRALIZED BY NATURE. CONNECTED BY TRUST.</span><a href="https://koliance.vercel.app/">MAIN SITE &nearr;</a></footer>
+  <div class="prototype-switcher" id="switcher" aria-label="Design studies" hidden>
+    <button id="previous" aria-label="Previous design"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m14 7-5 5 5 5"/></svg></button>
+    <div class="variant-name" id="variant-name" aria-live="polite"><span>A /</span> OBSERVATORY</div>
+    <button id="next" aria-label="Next design"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m10 7 5 5-5 5"/></svg></button>
+  </div>
+  <noscript><p style="text-align:center">JavaScript is required to display the interactive trust core.</p></noscript>
+
+  <script type="module">
+    const $ = (selector) => document.querySelector(selector);
+    const params = new URLSearchParams(location.search);
+    const variants = ["A", "B", "C"];
+    const variantNames = ["OBSERVATORY", "MONUMENT", "BLUEPRINT"];
+    let variant = variants.includes(params.get("variant")) ? params.get("variant") : "A";
+    let paused = matchMedia("(prefers-reduced-motion: reduce)").matches;
+    let expanded = false;
+    let selected = -1;
+    let applyVariant = () => {};
+    const details = [
+      "01 / Titanium shield. Segmented protective shell.",
+      "02 / Precision halo. Calibrated radial markers.",
+      "03 / Crystal array. Refractive optical facets.",
+      "04 / Energy conduit. Dual-track plasma orbit.",
+      "05 / Data stream. Thousands of discrete signals.",
+      "06 / Orbital network. Connected satellite nodes."
+    ];
+    function setVariant(next) {
+      variant = next;
+      document.body.dataset.variant = variant;
+      $("#variant-name").innerHTML = `<span>${variant} /</span> ${variantNames[variants.indexOf(variant)]}`;
+      const url = new URL(location.href);
+      url.searchParams.set("variant", variant);
+      try { history.replaceState(null, "", url); } catch { /* Some file viewers disallow history changes. */ }
+      applyVariant();
+    }
+    function cycle(direction) { setVariant(variants[(variants.indexOf(variant) + direction + 3) % 3]); }
+    $("#previous").onclick = () => cycle(-1);
+    $("#next").onclick = () => cycle(1);
+    const preview = location.protocol === "file:" || ["localhost", "127.0.0.1", "[::1]"].includes(location.hostname);
+    $("#switcher").hidden = !preview;
+    if (!preview) $("#switcher").style.display = "none";
+    document.addEventListener("keydown", (event) => {
+      if (!preview || event.target.closest("input, textarea, select, [contenteditable]")) return;
+      if (event.key === "ArrowRight" || event.key === "ArrowLeft") {
+        event.preventDefault();
+        cycle(event.key === "ArrowRight" ? 1 : -1);
+      }
+    });
+    function updatePause() {
+      $("#pause").setAttribute("aria-pressed", String(paused));
+      $("#pause").setAttribute("aria-label", paused ? "Resume rotation" : "Pause rotation");
+      $("#pause-icon").innerHTML = paused ? '<path d="m9 5 11 7-11 7V5Z"/>' : '<path d="M9 5v14M15 5v14"/>';
+    }
+    $("#pause").onclick = () => { paused = !paused; updatePause(); };
+    $("#explode").onclick = () => {
+      expanded = !expanded;
+      $("#explode").setAttribute("aria-pressed", String(expanded));
+      $("#explode").setAttribute("aria-label", expanded ? "Assemble the six layers" : "Separate the six layers");
+    };
+    document.querySelectorAll(".layer").forEach(button => {
+      button.onclick = () => {
+        selected = selected === Number(button.dataset.layer) ? -1 : Number(button.dataset.layer);
+        document.querySelectorAll(".layer").forEach(item => item.setAttribute("aria-pressed", String(Number(item.dataset.layer) === selected)));
+        $("#layer-detail").textContent = selected < 0 ? "Six independent layers. One connected system." : details[selected];
+      };
+    });
+    setVariant(variant);
+    updatePause();
+    try {
+      const THREE = await import("three");
+      const { EffectComposer } = await import("three/addons/postprocessing/EffectComposer.js");
+      const { RenderPass } = await import("three/addons/postprocessing/RenderPass.js");
+      const { UnrealBloomPass } = await import("three/addons/postprocessing/UnrealBloomPass.js");
+      const { OutputPass } = await import("three/addons/postprocessing/OutputPass.js");
+      const { RoomEnvironment } = await import("three/addons/environments/RoomEnvironment.js");
+      const host = $("#scene"), canvas = $("#core");
+      const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false, powerPreference: "high-performance" });
+      renderer.setPixelRatio(Math.min(devicePixelRatio, 1.75));
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = .95;
+      renderer.setClearColor(0x080a0b, 1);
+      const scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x080a0b);
+      const camera = new THREE.PerspectiveCamera(34, 1, .1, 100);
+      camera.position.set(0, 0, 14.5);
+      const room = new RoomEnvironment();
+      const pmrem = new THREE.PMREMGenerator(renderer);
+      const environment = pmrem.fromScene(room, .04);
+      scene.environment = environment.texture;
+      room.dispose();
+      pmrem.dispose();
+      scene.add(new THREE.AmbientLight(0xc8e4dc, .25));
+      for (const [color, intensity, position] of [
+        [0xf4ffff, 2.5, [2, 5, 6]], [0x72e9e7, 1.8, [-4, 1, 3]], [0xb19af6, 2.2, [3, -1, 2]]
+      ]) {
+        const light = new THREE.DirectionalLight(color, intensity);
+        light.position.set(...position);
+        scene.add(light);
+      }
+      const composer = new EffectComposer(renderer);
+      composer.addPass(new RenderPass(scene, camera));
+      const bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), .32, .32, 1.15);
+      composer.addPass(bloom);
+      composer.addPass(new OutputPass());
+      const root = new THREE.Group();
+      root.position.y = -.73;
+      scene.add(root);
+      const assembly = new THREE.Group();
+      assembly.rotation.set(.12, -.16, -.23);
+      root.add(assembly);
+      const glowMaterial = (color, intensity = 1) => new THREE.MeshBasicMaterial({ color: new THREE.Color(color).multiplyScalar(intensity), toneMapped: false });
+      const metal = new THREE.MeshPhysicalMaterial({ color: 0x567875, metalness: .96, roughness: .2, clearcoat: 1, envMapIntensity: 1.3 });
+      const paleMetal = new THREE.MeshPhysicalMaterial({ color: 0xa3b6ad, metalness: .92, roughness: .16, clearcoat: 1, envMapIntensity: 1.4 });
+      const warmMetal = new THREE.MeshPhysicalMaterial({ color: 0x978c6e, metalness: .94, roughness: .2, envMapIntensity: 1.3 });
+      function torus(group, radius, tube, material, arc = Math.PI * 2, start = 0) {
+        const object = new THREE.Mesh(new THREE.TorusGeometry(radius, tube, 8, Math.max(18, Math.floor(190 * arc / (Math.PI * 2))), arc), material);
+        object.rotation.z = start;
+        group.add(object);
+        return object;
+      }
+      function line(group, points, color, opacity = 1) {
+        const geometry = new THREE.BufferGeometry().setFromPoints(points);
+        const object = new THREE.Line(geometry, new THREE.LineBasicMaterial({ color, transparent: opacity < 1, opacity, toneMapped: false }));
+        group.add(object);
+        return object;
+      }
+      function circle(group, radius, color, opacity = .5, z = 0) {
+        const points = Array.from({ length: 257 }, (_, i) => {
+          const a = i / 256 * Math.PI * 2;
+          return new THREE.Vector3(Math.cos(a) * radius, Math.sin(a) * radius, z);
+        });
+        return line(group, points, color, opacity);
+      }
+      function segment(group, radius, width, depth, start, length, material) {
+        const shape = new THREE.Shape();
+        shape.absarc(0, 0, radius + width / 2, start, start + length, false);
+        shape.absarc(0, 0, radius - width / 2, start + length, start, true);
+        shape.closePath();
+        const geometry = new THREE.ExtrudeGeometry(shape, { depth, bevelEnabled: true, bevelSegments: 1, steps: 1, bevelSize: .012, bevelThickness: .012, curveSegments: 32 });
+        geometry.translate(0, 0, -depth / 2);
+        const mesh = new THREE.Mesh(geometry, material);
+        group.add(mesh);
+        return mesh;
+      }
+      function ticks(group, radius, count, color, length = .055) {
+        const positions = [];
+        for (let i = 0; i < count; i++) {
+          const angle = i / count * Math.PI * 2, r2 = radius + (i % 5 === 0 ? length * 2.4 : length);
+          positions.push(Math.cos(angle) * radius, Math.sin(angle) * radius, 0, Math.cos(angle) * r2, Math.sin(angle) * r2, 0);
+        }
+        const geometry = new THREE.BufferGeometry();
+        geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+        group.add(new THREE.LineSegments(geometry, new THREE.LineBasicMaterial({ color, transparent: true, opacity: .65 })));
+      }
+      // The crystal is actual faceted geometry, with a refractive shell and a lit inner lattice.
+      const crystal = new THREE.Group();
+      assembly.add(crystal);
+      const crystalMaterial = new THREE.MeshPhysicalMaterial({
+        color: 0x8272bc, metalness: .52, roughness: .065, transparent: true, opacity: .48,
+        depthWrite: false, side: THREE.DoubleSide, clearcoat: 1, envMapIntensity: 1.5,
+        flatShading: true
+      });
+      const crystalGeometry = new THREE.IcosahedronGeometry(1.06, 1);
+      const facetPositions = crystalGeometry.attributes.position;
+      const facetCenter = new THREE.Vector3(), facetVertex = new THREE.Vector3();
+      for (let i = 0; i < facetPositions.count; i += 3) {
+        facetCenter.set(0, 0, 0);
+        for (let j = 0; j < 3; j++) facetCenter.add(facetVertex.fromBufferAttribute(facetPositions, i + j));
+        facetCenter.divideScalar(3);
+        for (let j = 0; j < 3; j++) {
+          facetVertex.fromBufferAttribute(facetPositions, i + j).sub(facetCenter).multiplyScalar(.945).add(facetCenter);
+          facetPositions.setXYZ(i + j, facetVertex.x, facetVertex.y, facetVertex.z);
+        }
+      }
+      const gem = new THREE.Mesh(crystalGeometry, crystalMaterial);
+      crystal.add(gem);
+      const crystalEdges = new THREE.LineSegments(
+        new THREE.EdgesGeometry(gem.geometry),
+        new THREE.LineBasicMaterial({ color: 0xd6caff, transparent: true, opacity: .5 })
+      );
+      crystal.add(crystalEdges);
+      const innerGem = new THREE.Mesh(new THREE.OctahedronGeometry(.54), new THREE.MeshPhysicalMaterial({
+        color: 0x72b5ab, metalness: .7, roughness: .08, emissive: 0x438a8a, emissiveIntensity: .7, envMapIntensity: 1.8
+      }));
+      innerGem.scale.set(.75, 1.2, .75);
+      crystal.add(innerGem);
+      crystal.add(new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.IcosahedronGeometry(.71, 0)), new THREE.LineBasicMaterial({ color: 0xb6fff3, transparent: true, opacity: .7 })));
+      const nucleus = new THREE.Mesh(new THREE.OctahedronGeometry(.14), glowMaterial(0xddfff3, 3));
+      crystal.add(nucleus);
+      const kernelLight = new THREE.PointLight(0x7bf7e3, 4, 4, 2);
+      crystal.add(kernelLight);
+
+      const rings = [], satellites = [];
+      const ringDefinitions = [
+        { r: 1.37, tilt: [.23, -.33, .2], speed: .105 },
+        { r: 1.75, tilt: [-.48, .31, -.2], speed: -.048 },
+        { r: 2.17, tilt: [.56, -.54, .23], speed: .038 },
+        { r: 2.77, tilt: [1.13, .16, -.27], speed: .075 },
+        { r: 3.31, tilt: [1.00, .27, -.30], speed: -.031 },
+        { r: 3.91, tilt: [.86, .27, -.30], speed: .02 }
+      ];
+      ringDefinitions.forEach((definition, index) => {
+        const pivot = new THREE.Group();
+        pivot.rotation.set(...definition.tilt);
+        const rotor = new THREE.Group();
+        pivot.add(rotor);
+        assembly.add(pivot);
+        rings.push({ pivot, rotor, ...definition });
+        const r = definition.r;
+        if (index === 0) {
+          for (let j = 0; j < 10; j++) {
+            const start = j * Math.PI * 2 / 10;
+            segment(rotor, r, .17, .13, start, .49, j % 3 === 0 ? paleMetal : metal);
+            torus(rotor, r - .12, .009, glowMaterial(0xb4f4e0, 1.5), .33, start + .05);
+            torus(rotor, r + .065, .007, glowMaterial(0xd9fff5, .65), .38, start + .06);
+          }
+        } else if (index === 1) {
+          torus(rotor, r, .027, warmMetal);
+          circle(rotor, r + .13, 0xbaa985, .32);
+          ticks(rotor, r + .04, 160, 0xe2d6b9, .036);
+          for (let j = 0; j < 4; j++) segment(rotor, r, .055, .045, j * Math.PI / 2, .34, paleMetal);
+        } else if (index === 2) {
+          const glass = new THREE.MeshPhysicalMaterial({
+            color: 0x746293, metalness: .65, roughness: .08, transmission: .35, thickness: .4, ior: 1.7, clearcoat: 1, envMapIntensity: 1.7
+          });
+          circle(rotor, r - .09, 0x8c79b2, .5);
+          circle(rotor, r + .11, 0xcec0ee, .5);
+          for (let j = 0; j < 28; j++) {
+            const start = j / 28 * Math.PI * 2;
+            const blade = segment(rotor, r, .16, .065, start, .12, glass);
+            blade.position.z = j % 2 ? .028 : -.028;
+            torus(rotor, r + .1, .006, glowMaterial(0xd8c0f4, 1.15), .075, start);
+          }
+        } else if (index === 3) {
+          torus(rotor, r, .016, glowMaterial(0x8af1ef, 1.9));
+          torus(rotor, r + .08, .007, glowMaterial(0x71b7c0, .75));
+          circle(rotor, r - .07, 0x54989e, .5);
+          for (let j = 0; j < 3; j++) torus(rotor, r, .024, glowMaterial(0xc6fff5, 2), .16, j * Math.PI * 2 / 3);
+        } else if (index === 4) {
+          circle(rotor, r - .075, 0xcd8fa8, .36);
+          circle(rotor, r + .075, 0xac7a92, .3);
+          const points = [], colors = [];
+          const color = new THREE.Color();
+          for (let j = 0; j < 2800; j++) {
+            const angle = j * 2.39996323, radial = r + Math.sin(j * 13.7) * .065;
+            points.push(Math.cos(angle) * radial, Math.sin(angle) * radial, Math.sin(j * 7.9) * .028);
+            color.setHex(j % 8 === 0 ? 0xf4d4e3 : 0x997187);
+            colors.push(color.r, color.g, color.b);
+          }
+          const geometry = new THREE.BufferGeometry();
+          geometry.setAttribute("position", new THREE.Float32BufferAttribute(points, 3));
+          geometry.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3));
+          rotor.add(new THREE.Points(geometry, new THREE.PointsMaterial({ size: .015, vertexColors: true, transparent: true, opacity: .85, depthWrite: false })));
+          for (let j = 0; j < 4; j++) torus(rotor, r, .01, glowMaterial(0xf6b6cc, 1.2), .19, j * Math.PI / 2);
+        } else {
+          circle(rotor, r, 0xa7c6bc, .5);
+          circle(rotor, r + .035, 0xa7c6bc, .12);
+          ticks(rotor, r + .035, 120, 0xadc7be, .025);
+          for (let j = 0; j < 8; j++) {
+            const a = j / 8 * Math.PI * 2;
+            const node = new THREE.Mesh(new THREE.OctahedronGeometry(.042), paleMetal);
+            node.position.set(Math.cos(a) * r, Math.sin(a) * r, 0);
+            rotor.add(node);
+            const light = new THREE.Mesh(new THREE.SphereGeometry(.016, 8, 6), glowMaterial(0xd4fff4, 2.2));
+            light.position.copy(node.position);
+            light.position.z += .045;
+            rotor.add(light);
+          }
+        }
+        if (index >= 3) {
+          const satellite = new THREE.Mesh(new THREE.SphereGeometry(index === 3 ? .035 : .027, 12, 8), glowMaterial(index === 4 ? 0xffd5e4 : 0xc4fff9, 3));
+          rotor.add(satellite);
+          satellites.push({ satellite, radius: r, index });
+        }
+      });
+      // Sparse reference points belong to the scene, not a decorative starfield.
+      const spacePoints = [];
+      for (let i = 0; i < 120; i++) {
+        spacePoints.push(Math.sin(i * 127.1) * 13, Math.cos(i * 311.7) * 7, -3 - (i % 9));
+      }
+      const spaceGeometry = new THREE.BufferGeometry();
+      spaceGeometry.setAttribute("position", new THREE.Float32BufferAttribute(spacePoints, 3));
+      scene.add(new THREE.Points(spaceGeometry, new THREE.PointsMaterial({ color: 0x829b8e, size: .016, transparent: true, opacity: .38 })));
+
+      const pointer = { x: 0, y: 0 };
+      host.parentElement.addEventListener("pointermove", (event) => {
+        if (event.pointerType === "touch") return;
+        const box = host.getBoundingClientRect();
+        pointer.x = ((event.clientX - box.left) / box.width - .5) * .2;
+        pointer.y = ((event.clientY - box.top) / box.height - .5) * .13;
+      });
+      host.parentElement.addEventListener("pointerleave", () => { pointer.x = 0; pointer.y = 0; });
+      let time = 0, lastTime = 0, currentExpansion = 0, frame = 0;
+      function resize() {
+        const { width, height } = host.getBoundingClientRect();
+        renderer.setSize(width, height, false);
+        composer.setSize(width, height);
+        camera.aspect = width / height;
+        const mobile = width <= 760;
+        camera.position.z = mobile ? 28.8 : 12.5;
+        if (width > 760 && width < 1100) camera.position.z = 18.5;
+        camera.updateProjectionMatrix();
+        root.position.y = mobile ? -.05 : -.85;
+        if (variant === "B") root.position.y = mobile ? 1.45 : -.1;
+        if (variant === "C") root.position.y = mobile ? -.35 : -.3;
+      }
+      applyVariant = () => {
+        crystalMaterial.wireframe = variant === "C";
+        crystalMaterial.opacity = variant === "C" ? .85 : .48;
+        bloom.strength = variant === "C" ? .18 : .32;
+        resize();
+      };
+      new ResizeObserver(resize).observe(host);
+      applyVariant();
+      $("#reset").onclick = () => {
+        selected = -1; expanded = false; time = 0;
+        pointer.x = 0; pointer.y = 0;
+        document.querySelectorAll(".layer").forEach(button => button.setAttribute("aria-pressed", "false"));
+        $("#explode").setAttribute("aria-pressed", "false");
+        $("#explode").setAttribute("aria-label", "Separate the six layers");
+        $("#layer-detail").textContent = "Six independent layers. One connected system.";
+      };
+      const motionPreference = matchMedia("(prefers-reduced-motion: reduce)");
+      motionPreference.addEventListener("change", event => { paused = event.matches; updatePause(); });
+      function selfCheck() {
+        const assert = (condition, message) => { if (!condition) throw new Error(message); };
+        try {
+          assert(rings.length === 6 && new Set(rings.map(ring => ring.pivot)).size === 6, "Six independent rings");
+          const sample = document.createElement("canvas");
+          sample.width = sample.height = 128;
+          const context = sample.getContext("2d");
+          context.drawImage(canvas, 0, 0, 128, 128);
+          const pixels = context.getImageData(0, 0, 128, 128).data;
+          let visiblePixels = 0;
+          for (let i = 0; i < pixels.length; i += 4) if (Math.max(pixels[i], pixels[i + 1], pixels[i + 2]) > 60) visiblePixels++;
+          assert(visiblePixels > 80, "Core renders visible pixels");
+          document.querySelectorAll(".layer").forEach((button, index) => {
+            button.click();
+            assert(selected === index && button.getAttribute("aria-pressed") === "true", `Select layer ${index + 1}`);
+          });
+          $("#explode").click();
+          assert(expanded && $("#explode").getAttribute("aria-pressed") === "true", "Separate layers");
+          $("#reset").click();
+          assert(selected === -1 && !expanded, "Reset layer controls");
+          const wasPaused = paused;
+          $("#pause").click();
+          assert(paused !== wasPaused, "Toggle rotation");
+          $("#pause").click();
+          assert(paused === wasPaused, "Restore rotation");
+          const originalVariant = variant;
+          cycle(1); cycle(-1);
+          assert(variant === originalVariant, "Cycle design and restore");
+          assert(document.documentElement.scrollWidth <= innerWidth, "No horizontal overflow");
+          document.body.dataset.check = "passed";
+          console.info(`Trust core smoke check passed: 6 rings; ${visiblePixels} visible sample pixels; controls; layout.`);
+        } catch (error) {
+          document.body.dataset.check = "failed";
+          console.error("Trust core smoke check failed:", error);
+        }
+      }
+      function render(now) {
+        const dt = Math.min((now - lastTime) / 1000, .04);
+        lastTime = now;
+        if (document.hidden) return;
+        if (!paused) time += dt;
+        currentExpansion = THREE.MathUtils.damp(currentExpansion, expanded ? 1 : 0, 4, dt);
+        const isBlueprint = variant === "C", mobile = host.clientWidth <= 760;
+        root.rotation.y = THREE.MathUtils.damp(root.rotation.y, paused ? 0 : pointer.x, 3, dt);
+        root.rotation.x = THREE.MathUtils.damp(root.rotation.x, paused ? 0 : pointer.y, 3, dt);
+        assembly.rotation.z = isBlueprint ? -.06 : -.23;
+        assembly.rotation.y = isBlueprint ? -.35 : -.16;
+        const scale = variant === "B" ? (mobile ? 1.07 : 1.13) : 1;
+        root.scale.setScalar(scale);
+        crystal.rotation.set(time * .07 + .25, time * .12 + .5, .12);
+        innerGem.rotation.y = -time * .25;
+        rings.forEach((ring, index) => {
+          ring.rotor.rotation.z = time * ring.speed;
+          const focusScale = selected === index ? 1.055 : 1;
+          ring.pivot.scale.setScalar(THREE.MathUtils.damp(ring.pivot.scale.x, focusScale, 5, dt));
+          ring.pivot.position.z = currentExpansion * (index - 2.5) * .37;
+          ring.pivot.position.y = currentExpansion * (index - 2.5) * .12;
+          ring.pivot.rotation.x = ring.tilt[0] + (isBlueprint ? .24 : 0);
+        });
+        satellites.forEach(({ satellite, radius, index }) => {
+          const angle = time * (.24 + index * .017) + index * 1.6;
+          satellite.position.set(Math.cos(angle) * radius, Math.sin(angle) * radius, .018);
+        });
+        composer.render();
+        if (frame++ === 0) {
+          $("#loading").hidden = true;
+          canvas.dataset.ready = "true";
+          if (params.get("check") === "1") selfCheck();
+        }
+        canvas.dataset.frame = String(frame);
+      }
+      renderer.setAnimationLoop(render);
+      canvas.addEventListener("webglcontextlost", event => {
+        event.preventDefault();
+        renderer.setAnimationLoop(null);
+        $("#loading").hidden = false;
+        $("#loading").textContent = "Graphics connection lost. Reload to restore the core.";
+      });
+    } catch (error) {
+      $("#loading").textContent = "The core could not initialize. Check your connection and enable WebGL, then reload.";
+      $("#loading").dataset.error = "true";
+      console.error(error);
+    }
+  </script>
+</body>
+</html>
