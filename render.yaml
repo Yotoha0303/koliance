@@ -1,0 +1,37 @@
+services:
+  - type: web
+    name: koliance-backend
+    runtime: go
+    rootDir: backend
+    buildCommand: go build -o api cmd/api/main.go
+    startCommand: ./api
+    plan: free
+    region: singapore
+    autoDeploy: true
+    envVars:
+      - key: PORT
+        value: 8080
+      - key: ENVIRONMENT
+        value: production
+      - key: STEAM_API_KEY
+        value: 745B577BC3554647B4FA40BE9635E838
+      - key: STEAM_DOMAIN
+        value: koliance.oodai.space
+      - key: ALPACA_API_KEY
+        value: PK2SMWLLV64SKRMOJJCQUHUANB
+      - key: ALPACA_API_SECRET
+        value: Eh8yhX5FKFUKhKt3L5dQY7e6MGsJs7XZaCrw6PtcMtgU
+      - key: ALPACA_BASE_URL
+        value: https://paper-api.alpaca.markets/v2
+      - key: STRIPE_PUBLISHABLE_KEY
+        value: pk_test_51UMQCbEP5h4ijOX4RfqfeOsj5flpshzH2814PRH1FIvK8kPn79Goucx9sAfzvnkVIzdU30f60ozxkD0FC9vejNM300uNY0C82o
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: MONAD_RPC_URL
+        value: https://testnet-rpc.monad.xyz
+      - key: MONAD_CHAIN_ID
+        value: "10143"
+      - key: KOLIANCE_CONTRACT_ADDRESS
+        value: "0x32fDd6B096EE14246b5b6971135286Bad01F4928"
