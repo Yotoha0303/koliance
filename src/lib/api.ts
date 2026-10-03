@@ -1,6 +1,6 @@
-// Koliance API Bridge: Connects to future Go backend service (or falls back to direct RPC)
+// Koliance API Bridge: Connects to Go high-concurrency backend service
 
-const GO_BACKEND_URL = process.env.NEXT_PUBLIC_GO_BACKEND_URL || "";
+const GO_BACKEND_URL = process.env.NEXT_PUBLIC_GO_BACKEND_URL || "http://localhost:8080";
 
 export interface StatsResponse {
   chainId: number;
@@ -11,8 +11,73 @@ export interface StatsResponse {
   status: string;
 }
 
+export interface GameStats {
+  steamId: string;
+  personaName: string;
+  avatar: string;
+  totalPlayHours: number;
+  totalGames: number;
+  topGames: Array<{
+    appId: number;
+    name: string;
+    hoursPlayed: number;
+    iconUrl: string;
+  }>;
+}
+
+export interface GameplayProof {
+  proofHash: string;
+  steamId: string;
+  targetWallet: string;
+  appId: number;
+  gameName: string;
+  playtimeHours: number;
+  achievementsUnlocked: number;
+  trustScoreTier: string;
+  creditUnlockUSD: number;
+  generatedAt: string;
+}
+
+export interface VisaCardData {
+  cardId: string;
+  cardNumber: string;
+  formattedNumber: string;
+  expiry: string;
+  cvv: string;
+  cardholderName: string;
+  walletAddress: string;
+  balanceUSD: number;
+  status: string;
+  createdAt: string;
+}
+
+export interface MarketOverviewData {
+  account: {
+    id: string;
+    account_number: string;
+    buying_power: string;
+    cash: string;
+    portfolio_value: string;
+    multiplier: string;
+    shorting_enabled: boolean;
+  };
+  positions: Array<{
+    symbol: string;
+    qty: string;
+    side: string;
+    current_price: string;
+    unrealized_pl: string;
+  }>;
+  realtimePrices: Array<{
+    symbol: string;
+    feedId: string;
+    price: number;
+    confidence: number;
+    updatedAt: string;
+  }>;
+}
+
 export async function fetchBackendStats(): Promise<StatsResponse | null> {
-  if (!GO_BACKEND_URL) return null;
   try {
     const res = await fetch(`${GO_BACKEND_URL}/api/v1/stats`, {
       next: { revalidate: 10 },
@@ -25,7 +90,6 @@ export async function fetchBackendStats(): Promise<StatsResponse | null> {
 }
 
 export async function checkBackendHealth(): Promise<boolean> {
-  if (!GO_BACKEND_URL) return false;
   try {
     const res = await fetch(`${GO_BACKEND_URL}/api/v1/health`, {
       cache: "no-store",
@@ -33,5 +97,96 @@ export async function checkBackendHealth(): Promise<boolean> {
     return res.ok;
   } catch {
     return false;
+  }
+}
+
+// ==================== GAME / STEAM ====================
+export async function fetchGameStats(steamId: string): Promise<GameStats | null> {
+  try {
+    const res = await fetch(`${GO_BACKEND_URL}/api/v1/game/steam/profile?id=${encodeURIComponent(steamId)}`);
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
+
+export async function generateGameplayProof(steamId: string, walletAddress: string, appId: number = 730): Promise<GameplayProof | null> {
+  try {
+    const res = await fetch(`${GO_BACKEND_URL}/api/v1/game/proof`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ steamId, walletAddress, appId }),
+    });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
+
+// ==================== AGENTCARD ====================
+export async function generateAgentCard(walletAddress: string, cardholderName: string = "KOLIANCE AGENT", initialDeposit: number = 2500): Promise<VisaCardData | null> {
+  try {
+    const res = await fetch(`${GO_BACKEND_URL}/api/v1/agentcard/generate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ walletAddress, cardholderName, initialDeposit }),
+    });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
+
+export async function authorizeMicropayment(cardId: string, sessionKey: string, amountUSD: number, merchantName: string, mcc: string = "7999") {
+  try {
+    const res = await fetch(`${GO_BACKEND_URL}/api/v1/agentcard/authorize`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ cardId, sessionKey, amountUSD, merchantName, mcc }),
+    });
+    return await res.json();
+  } catch (err) {
+    return { success: false, message: String(err) };
+  }
+}
+
+// ==================== MARKET ====================
+export async function fetchMarketOverview(): Promise<MarketOverviewData | null> {
+  try {
+    const res = await fetch(`${GO_BACKEND_URL}/api/v1/market/overview`);
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
+
+export async function executeMarketTrade(symbol: string, side: "buy" | "sell", notionalUSD: number, leverage: number = 4) {
+  try {
+    const res = await fetch(`${GO_BACKEND_URL}/api/v1/market/trade`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ symbol, side, notionalUSD, leverage }),
+    });
+    return await res.json();
+  } catch (err) {
+    return { success: false, message: String(err) };
+  }
+}
+
+// ==================== STRIPE ====================
+export async function createStripeCheckout(amountCents: number, description: string) {
+  try {
+    const res = await fetch(`${GO_BACKEND_URL}/api/v1/stripe/checkout-session`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ amountCents, description }),
+    });
+    return await res.json();
+  } catch (err) {
+    return { error: String(err) };
   }
 }
