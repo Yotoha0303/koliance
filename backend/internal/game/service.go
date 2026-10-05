@@ -37,6 +37,7 @@ type GamePlayRank struct {
 	Name        string  `json:"name"`
 	HoursPlayed float64 `json:"hoursPlayed"`
 	IconURL     string  `json:"iconUrl"`
+	HeaderURL   string  `json:"headerUrl"`
 }
 
 type GameplayProofResponse struct {
@@ -133,11 +134,13 @@ func (s *Service) GetUserGameStats(rawIdentifier string) (*GameStatsResponse, er
 
 	for _, g := range games {
 		totalMinutes += g.PlaytimeForever
+		headerURL := fmt.Sprintf("https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/%d/header.jpg", g.AppID)
 		ranks = append(ranks, GamePlayRank{
 			AppID:       g.AppID,
 			Name:        g.Name,
 			HoursPlayed: float64(g.PlaytimeForever) / 60.0,
 			IconURL:     fmt.Sprintf("https://media.steampowered.com/steamcommunity/public/images/apps/%d/%s.jpg", g.AppID, g.ImgIconURL),
+			HeaderURL:   headerURL,
 		})
 	}
 
@@ -146,7 +149,7 @@ func (s *Service) GetUserGameStats(rawIdentifier string) (*GameStatsResponse, er
 		return ranks[i].HoursPlayed > ranks[j].HoursPlayed
 	})
 
-	topLimit := 10
+	topLimit := 60
 	if len(ranks) < topLimit {
 		topLimit = len(ranks)
 	}

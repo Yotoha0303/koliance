@@ -31,6 +31,7 @@ import {
   GameStats,
   GameplayProof,
 } from "@/lib/api";
+import { SteamGameWall, SteamGameItem } from "@/components/SteamGameWall";
 
 interface AgentCardTerminalProps {
   currentAccount: `0x${string}` | null;
@@ -168,11 +169,14 @@ export function AgentCardTerminal({ currentAccount }: AgentCardTerminalProps) {
     loadSteamProfile(customSteamInput.trim());
   };
 
-  const handleMintGameplayProof = async () => {
+  const [selectedGameId, setSelectedGameId] = useState<number | null>(null);
+
+  const handleMintGameplayProof = async (chosenAppId?: number) => {
     if (!steamData) return;
+    const targetAppId = chosenAppId || selectedGameId || (steamData.topGames[0]?.appId || 730);
     setProofLoading(true);
     try {
-      const proof = await generateGameplayProof(steamData.steamId, targetAddress, 730);
+      const proof = await generateGameplayProof(steamData.steamId, targetAddress, targetAppId);
       if (proof) {
         setGameProof(proof);
         setCreditLimit((prev) => prev + proof.creditUnlockUSD);
@@ -325,184 +329,115 @@ export function AgentCardTerminal({ currentAccount }: AgentCardTerminalProps) {
 
   return (
     <div className="w-full space-y-6 font-sans">
-      {/* ==================== 1. STEAM 1-CLICK CONNECT BANNER (KISS) ==================== */}
-      <div className="rounded-3xl bg-gradient-to-r from-[#171b28] via-[#1a233a] to-[#141b2d] border border-cyan-500/30 p-5 sm:p-6 shadow-2xl relative overflow-hidden">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 relative z-10">
-          <div className="space-y-1.5">
-            <div className="flex items-center gap-2.5">
-              <span className="w-8 h-8 rounded-xl bg-cyan-500/20 border border-cyan-400/40 flex items-center justify-center text-cyan-400">
-                <Gamepad2 className="w-4 h-4" />
-              </span>
-              <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">
-                Steam 游戏时长与成就认证 (Proof of Gameplay)
-              </h2>
-              <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-400/30">
-                支持官方 OpenID / 自定义账号
-              </span>
-            </div>
-            <p className="text-xs sm:text-sm text-slate-300 font-mono">
-              连接您的真实 Steam 账号或自定义绑定，实时拉取全量游戏库与总时长，生成 Keccak256 链上信用背书。
-            </p>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-3">
-            {!steamConnected ? (
-              <>
-                {/* 1. Official Steam OpenID Button */}
-                <button
-                  onClick={handleSteamOpenIDLogin}
-                  className="px-5 py-3 rounded-2xl bg-cyan-400 hover:bg-cyan-300 text-black font-extrabold text-xs sm:text-sm font-mono transition shadow-[0_0_25px_rgba(34,211,238,0.4)] flex items-center gap-2 active:scale-95"
-                >
-                  <Zap className="w-4 h-4 text-black fill-current" />
-                  <span>🔑 登录我的 Steam 账号 (官方认证)</span>
-                </button>
-
-                {/* 2. Custom Input Toggle */}
-                <button
-                  onClick={() => setShowCustomInput(!showCustomInput)}
-                  className="px-4 py-3 rounded-2xl bg-white/[0.06] hover:bg-white/10 text-slate-200 border border-white/10 text-xs font-mono transition"
-                >
-                  {showCustomInput ? "收起输入框" : "输入 Steam 昵称 / 链接"}
-                </button>
-              </>
-            ) : (
-              <div className="flex flex-wrap items-center gap-3">
-                <span className="px-3 py-1.5 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 text-xs font-mono flex items-center gap-1.5">
-                  <Check className="w-3.5 h-3.5" />
-                  <span>已绑定：{steamData?.personaName}</span>
+      {/* ==================== 1. STEAM GAMING VAULT / INFINITE GAME WALL ==================== */}
+      {steamConnected && steamData ? (
+        <SteamGameWall
+          steamId={steamData.steamId}
+          personaName={steamData.personaName}
+          avatar={steamData.avatar}
+          totalPlayHours={steamData.totalPlayHours}
+          totalGames={steamData.totalGames}
+          games={steamData.topGames}
+          selectedGameId={selectedGameId}
+          onSelectGame={(game) => setSelectedGameId(game.appId)}
+          onMintProof={(game) => handleMintGameplayProof(game.appId)}
+          proofLoading={proofLoading}
+          gameProof={gameProof}
+          onSwitchAccount={() => {
+            setSteamConnected(false);
+            setSteamData(null);
+            localStorage.removeItem("koliance_steam_id");
+          }}
+        />
+      ) : (
+        <div className="rounded-3xl bg-gradient-to-r from-[#171b28] via-[#1a233a] to-[#141b2d] border border-cyan-500/30 p-5 sm:p-6 shadow-2xl relative overflow-hidden">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 relative z-10">
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-2.5">
+                <span className="w-8 h-8 rounded-xl bg-cyan-500/20 border border-cyan-400/40 flex items-center justify-center text-cyan-400">
+                  <Gamepad2 className="w-4 h-4" />
                 </span>
+                <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">
+                  Steam 游戏时长与成就认证 (Proof of Gameplay)
+                </h2>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-400/30">
+                  支持官方 OpenID / 自定义账号
+                </span>
+              </div>
+              <p className="text-xs sm:text-sm text-slate-300 font-mono">
+                连接您的真实 Steam 账号或自定义绑定，实时拉取全量游戏库与总时长，生成 Keccak256 链上信用背书。
+              </p>
+            </div>
 
+            <div className="flex flex-wrap items-center gap-3">
+              {/* 1. Official Steam OpenID Button */}
+              <button
+                onClick={handleSteamOpenIDLogin}
+                className="px-5 py-3 rounded-2xl bg-cyan-400 hover:bg-cyan-300 text-black font-extrabold text-xs sm:text-sm font-mono transition shadow-[0_0_25px_rgba(34,211,238,0.4)] flex items-center gap-2 active:scale-95"
+              >
+                <Zap className="w-4 h-4 text-black fill-current" />
+                <span>🔑 登录我的 Steam 账号 (官方认证)</span>
+              </button>
+
+              {/* 2. Custom Input Toggle */}
+              <button
+                onClick={() => setShowCustomInput(!showCustomInput)}
+                className="px-4 py-3 rounded-2xl bg-white/[0.06] hover:bg-white/10 text-slate-200 border border-white/10 text-xs font-mono transition"
+              >
+                {showCustomInput ? "收起输入框" : "输入 Steam 昵称 / 链接"}
+              </button>
+            </div>
+          </div>
+
+          {/* Custom Steam Input & Presets Bar */}
+          {showCustomInput && (
+            <div className="mt-4 pt-4 border-t border-white/10 space-y-3 font-mono">
+              <form onSubmit={handleCustomSteamSubmit} className="flex gap-2">
+                <input
+                  type="text"
+                  value={customSteamInput}
+                  onChange={(e) => setCustomSteamInput(e.target.value)}
+                  placeholder="输入你的 Steam 自定义昵称 / 主页链接 / 17位ID (如 gabelogannewell 或 https://steamcommunity.com/id/...)"
+                  className="flex-1 px-4 py-2.5 rounded-xl bg-black/50 border border-white/10 text-white text-xs focus:outline-none focus:border-cyan-400"
+                />
                 <button
-                  onClick={() => {
-                    setSteamConnected(false);
-                    setSteamData(null);
-                    localStorage.removeItem("koliance_steam_id");
-                  }}
-                  className="px-3 py-1.5 rounded-xl bg-white/[0.06] hover:bg-white/10 text-slate-400 hover:text-white text-xs font-mono transition"
+                  type="submit"
+                  disabled={steamLoading || !customSteamInput.trim()}
+                  className="px-5 py-2.5 rounded-xl bg-cyan-400 hover:bg-cyan-300 text-black font-bold text-xs transition"
                 >
-                  切换账号
+                  {steamLoading ? "查询中..." : "绑定此账号"}
                 </button>
+              </form>
 
+              <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-400">
+                <span>快速体验公开账号：</span>
                 <button
-                  onClick={handleMintGameplayProof}
-                  disabled={proofLoading || !!gameProof}
-                  className="px-4 py-2 rounded-xl bg-purple-500 hover:bg-purple-400 text-white font-bold text-xs font-mono transition shadow-md flex items-center gap-1.5"
+                  type="button"
+                  onClick={() => loadSteamProfile("76561197960287930")}
+                  className="px-2.5 py-1 rounded-lg bg-white/[0.06] hover:bg-white/10 text-cyan-300 transition"
                 >
-                  {proofLoading ? (
-                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                  ) : gameProof ? (
-                    <>
-                      <ShieldCheck className="w-3.5 h-3.5 text-emerald-300" />
-                      <span>已铸造链上证明 ({gameProof.trustScoreTier})</span>
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles className="w-3.5 h-3.5" />
-                      <span>⚡ 铸造链上信用证明 (+500 额度)</span>
-                    </>
-                  )}
+                  👑 Gabe Newell (Valve CEO)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => loadSteamProfile("76561198034202275")}
+                  className="px-2.5 py-1 rounded-lg bg-white/[0.06] hover:bg-white/10 text-emerald-300 transition"
+                >
+                  ⚡ CS2 5000h 高玩
                 </button>
               </div>
-            )}
-          </div>
+            </div>
+          )}
+
+          {/* Privacy Notice or Warning */}
+          {steamNotice && (
+            <div className="mt-3 p-3 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-300 text-xs font-mono flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              <span>{steamNotice}</span>
+            </div>
+          )}
         </div>
-
-        {/* Custom Steam Input & Presets Bar */}
-        {(!steamConnected && showCustomInput) && (
-          <div className="mt-4 pt-4 border-t border-white/10 space-y-3 font-mono">
-            <form onSubmit={handleCustomSteamSubmit} className="flex gap-2">
-              <input
-                type="text"
-                value={customSteamInput}
-                onChange={(e) => setCustomSteamInput(e.target.value)}
-                placeholder="输入你的 Steam 自定义昵称 / 主页链接 / 17位ID (如 gabelogannewell 或 https://steamcommunity.com/id/...)"
-                className="flex-1 px-4 py-2.5 rounded-xl bg-black/50 border border-white/10 text-white text-xs focus:outline-none focus:border-cyan-400"
-              />
-              <button
-                type="submit"
-                disabled={steamLoading || !customSteamInput.trim()}
-                className="px-5 py-2.5 rounded-xl bg-cyan-400 hover:bg-cyan-300 text-black font-bold text-xs transition"
-              >
-                {steamLoading ? "查询中..." : "绑定此账号"}
-              </button>
-            </form>
-
-            <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-400">
-              <span>快速体验公开账号：</span>
-              <button
-                type="button"
-                onClick={() => loadSteamProfile("76561197960287930")}
-                className="px-2.5 py-1 rounded-lg bg-white/[0.06] hover:bg-white/10 text-cyan-300 transition"
-              >
-                👑 Gabe Newell (Valve CEO)
-              </button>
-              <button
-                type="button"
-                onClick={() => loadSteamProfile("76561198034202275")}
-                className="px-2.5 py-1 rounded-lg bg-white/[0.06] hover:bg-white/10 text-emerald-300 transition"
-              >
-                ⚡ CS2 5000h 高玩
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Privacy Notice or Warning */}
-        {steamNotice && (
-          <div className="mt-3 p-3 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-300 text-xs font-mono flex items-center gap-2">
-            <AlertCircle className="w-4 h-4 shrink-0" />
-            <span>{steamNotice}</span>
-          </div>
-        )}
-
-        {/* Display Connected Games & Live Playtime */}
-        {steamConnected && steamData && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: "auto" }}
-            className="pt-5 mt-4 border-t border-white/10 grid grid-cols-1 md:grid-cols-4 gap-4 text-xs font-mono"
-          >
-            <div className="p-3.5 rounded-2xl bg-black/40 border border-white/10 flex items-center gap-3">
-              <img
-                src={steamData.avatar}
-                alt="Avatar"
-                className="w-10 h-10 rounded-xl border border-white/20"
-              />
-              <div className="overflow-hidden">
-                <span className="text-white font-bold block truncate">{steamData.personaName}</span>
-                <span className="text-slate-400 text-[10px]">SteamID: {steamData.steamId.slice(0, 10)}...</span>
-              </div>
-            </div>
-
-            <div className="p-3.5 rounded-2xl bg-black/40 border border-white/10">
-              <span className="text-slate-400 text-[10px] block">总游戏时长 / 库内游戏</span>
-              <strong className="text-cyan-300 text-base font-bold">
-                {steamData.totalPlayHours.toFixed(1)} 小时 ({steamData.totalGames} 款游戏)
-              </strong>
-            </div>
-
-            <div className="p-3.5 rounded-2xl bg-black/40 border border-white/10 col-span-1 md:col-span-2 flex items-center justify-between overflow-x-auto">
-              <div className="space-y-1">
-                <span className="text-slate-400 text-[10px] block">前三热门时长标的</span>
-                <div className="flex items-center gap-2">
-                  {steamData.topGames.length > 0 ? (
-                    steamData.topGames.slice(0, 3).map((g) => (
-                      <span key={g.appId} className="px-2 py-0.5 rounded bg-white/10 text-white text-[11px] font-bold">
-                        {g.name}: {g.hoursPlayed.toFixed(0)}h
-                      </span>
-                    ))
-                  ) : (
-                    <span className="text-slate-500 text-[11px]">隐私设置为非公开或暂无公开记录</span>
-                  )}
-                </div>
-              </div>
-              <span className="px-2.5 py-1 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 font-bold text-[11px] shrink-0">
-                {gameProof ? `评级: ${gameProof.trustScoreTier}` : "待铸造信用"}
-              </span>
-            </div>
-          </motion.div>
-        )}
-      </div>
+      )}
 
       {/* ==================== 2. MAIN TERMINAL GRID (CARD + PAYMENTS) ==================== */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">

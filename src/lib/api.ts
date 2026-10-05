@@ -22,6 +22,7 @@ export interface GameStats {
     name: string;
     hoursPlayed: number;
     iconUrl: string;
+    headerUrl?: string;
   }>;
 }
 
