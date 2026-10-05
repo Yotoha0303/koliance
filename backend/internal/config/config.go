@@ -3,6 +3,7 @@ package config
 import (
 	"log"
 	"os"
+	"strings"
 
 	"github.com/joho/godotenv"
 )
@@ -53,7 +54,7 @@ func Load() *Config {
 
 func getEnv(key, defaultVal string) string {
 	if val := os.Getenv(key); val != "" {
-		return val
+		return strings.TrimSpace(val)
 	}
-	return defaultVal
+	return strings.TrimSpace(defaultVal)
 }

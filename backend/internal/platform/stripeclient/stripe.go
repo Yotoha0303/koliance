@@ -2,6 +2,7 @@ package stripeclient
 
 import (
 	"log"
+	"strings"
 
 	"github.com/stripe/stripe-go/v78"
 	"github.com/stripe/stripe-go/v78/client"
@@ -13,6 +14,7 @@ type Client struct {
 }
 
 func New(secretKey string) *Client {
+	secretKey = strings.TrimSpace(secretKey)
 	if secretKey == "" {
 		log.Println("[Stripe] Warning: STRIPE_SECRET_KEY not set.")
 	}
