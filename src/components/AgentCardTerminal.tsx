@@ -375,7 +375,46 @@ export function AgentCardTerminal({ currentAccount }: AgentCardTerminalProps) {
   };
 
   return (
-    <div className="w-full space-y-6 font-sans">
+    <div className="w-full space-y-8 font-sans">
+      {/* ==================== 0. 6-CARD CIRCULATING SCANNER (NEURAL ASSET PROCESSOR) ==================== */}
+      <div className="rounded-3xl bg-[#0e121d]/90 border border-purple-500/30 overflow-hidden shadow-2xl relative">
+        <div className="px-6 py-4 border-b border-white/[0.08] bg-black/40 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <span className="w-8 h-8 rounded-xl bg-purple-500/20 border border-purple-400/40 flex items-center justify-center text-purple-400">
+              <Sparkles className="w-4 h-4" />
+            </span>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="font-bold text-white text-base tracking-wide font-mono">
+                  AI CARD SCANNER // NEURAL ASSET PROCESSOR
+                </h3>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-bold">
+                  LIVE 6-CARD MATRIX
+                </span>
+              </div>
+              <p className="text-xs text-slate-400 font-mono mt-0.5">
+                6 张全景 AI 卡片（GLM / KIMI / CLAUDE / GOOGLE / OPENAI / DEEPSEEK）循环流转激光数字化扫描
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 text-xs font-mono">
+            <span className="text-slate-400">ENCRYPTION: <strong className="text-cyan-400">AES-256</strong></span>
+            <span className="text-slate-600">|</span>
+            <span className="text-slate-400">ASSET BUFFER: <strong className="text-purple-400">06 CARDS</strong></span>
+          </div>
+        </div>
+
+        {/* 6-Card Stream Scanner Frame */}
+        <div className="relative w-full h-[580px] bg-[#050510] border-b border-white/[0.08]">
+          <iframe
+            src="/agentcard/index.html"
+            className="w-full h-full border-0"
+            title="AI Card Scanner // 6-Card Circulating Neural Asset Processor"
+          />
+        </div>
+      </div>
+
       {/* ==================== 1. REPUTATION ATTESTATION (STEAM & GITHUB) ==================== */}
       <div className="space-y-4">
         {/* Tab Switcher */}
