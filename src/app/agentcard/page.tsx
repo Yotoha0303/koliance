@@ -3,7 +3,6 @@
 import React, { useState } from "react";
 import { Navbar, NavView } from "@/components/Navbar";
 import { CursorTrail } from "@/components/CursorTrail";
-import { AgentCardTerminal } from "@/components/AgentCardTerminal";
 import { useRouter } from "next/navigation";
 
 export default function AgentCardPage() {
@@ -30,9 +29,13 @@ export default function AgentCardPage() {
         onDisconnect={() => setAccount(null)}
       />
 
-      {/* Main Agent Card Scanner Container */}
-      <main className="flex-1 w-full pt-20 max-w-7xl mx-auto px-4 sm:px-6 py-6">
-        <AgentCardTerminal currentAccount={account} />
+      {/* Main Agent Card Scanner Container: 6-Card Circulating Neural Asset Processor */}
+      <main className="flex-1 w-full pt-16">
+        <iframe
+          src="/agentcard/index.html"
+          className="w-full h-[calc(100vh-64px)] border-0"
+          title="AI Card Scanner // 6-Card Circulating Neural Asset Processor"
+        />
       </main>
 
       {/* Global Footer */}
