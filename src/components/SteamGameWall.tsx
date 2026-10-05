@@ -255,30 +255,26 @@ export function SteamGameWall({
       {/* ==================== 1. INFINITE ROLLING GAME MARQUEE ==================== */}
       {viewMode === "marquee" ? (
         <div
-          className="relative w-full py-6 overflow-hidden rounded-2xl group perspective-stage"
+          className="relative w-full py-4 overflow-hidden rounded-2xl marquee-stage perspective-stage"
           style={{
             perspective: 1600,
             transformStyle: "preserve-3d",
             maskImage:
-              "linear-gradient(to right, transparent 0%, black 6%, black 94%, transparent 100%)",
+              "linear-gradient(to right, transparent 0%, black 5%, black 95%, transparent 100%)",
             WebkitMaskImage:
-              "linear-gradient(to right, transparent 0%, black 6%, black 94%, transparent 100%)",
+              "linear-gradient(to right, transparent 0%, black 5%, black 95%, transparent 100%)",
           }}
         >
-          {/* Subtle Top & Bottom Cinematic Shadow for Camera Depth */}
-          <div className="absolute inset-x-0 top-0 h-4 bg-gradient-to-b from-[#10131d] to-transparent z-10 pointer-events-none" />
-          <div className="absolute inset-x-0 bottom-0 h-4 bg-gradient-to-t from-[#0c0e15] to-transparent z-10 pointer-events-none" />
-
-          {/* 3D Stage tilted for realistic spatial camera perspective */}
+          {/* 3D Stage with smooth perspective */}
           <div
-            className="space-y-6"
+            className="space-y-5"
             style={{
-              transform: "rotateX(4deg)",
+              transform: "rotateX(2deg)",
               transformStyle: "preserve-3d",
             }}
           >
-            {/* Row 1: Foreground Layer (Crisp, High-Detail Depth) */}
-            <div className="animate-marquee-left flex gap-5 dof-foreground">
+            {/* Row 1: High-Clarity Marquee Track */}
+            <div className="animate-marquee-left flex gap-5 py-1">
               {seamlessRow1.map((game, idx) => {
                 const isSelected = activeGame.appId === game.appId;
                 const header =
@@ -288,14 +284,11 @@ export function SteamGameWall({
                   <div
                     key={`r1-${game.appId}-${idx}`}
                     onClick={() => onSelectGame(game)}
-                    className={`relative w-64 h-36 rounded-2xl overflow-hidden cursor-pointer shrink-0 transition-all duration-300 group/card select-none border shadow-[0_18px_38px_-10px_rgba(0,0,0,0.85)] ${
+                    className={`relative w-64 h-36 rounded-2xl overflow-hidden cursor-pointer shrink-0 transition-all duration-300 select-none border group/card shadow-[0_8px_22px_rgba(0,0,0,0.6)] ${
                       isSelected
-                        ? "border-cyan-400 ring-4 ring-cyan-400/40 z-30 shadow-[0_20px_50px_rgba(34,211,238,0.5)]"
-                        : "border-white/10 hover:border-cyan-400/80 hover:z-30 hover:shadow-[0_20px_40px_rgba(0,242,254,0.35)]"
+                        ? "border-cyan-400 ring-4 ring-cyan-400/40 z-30 shadow-[0_15px_35px_rgba(34,211,238,0.5)] scale-105"
+                        : "border-white/15 hover:border-cyan-400 hover:scale-105 hover:-translate-y-1 hover:z-30 hover:shadow-[0_15px_35px_rgba(34,211,238,0.4)]"
                     }`}
-                    style={{
-                      transformStyle: "preserve-3d",
-                    }}
                   >
                     <img
                       src={header}
@@ -304,18 +297,18 @@ export function SteamGameWall({
                         (e.target as HTMLImageElement).src =
                           "https://cdn.cloudflare.steamstatic.com/steam/apps/730/header.jpg";
                       }}
-                      className="w-full h-full object-cover group-hover/card:scale-108 transition-transform duration-500"
+                      className="w-full h-full object-cover brightness-105 contrast-105 group-hover/card:scale-108 transition-all duration-500"
                     />
-                    
-                    {/* Gloss Reflection Overlay */}
-                    <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/[0.06] to-transparent pointer-events-none" />
-                    
-                    {/* Dark gradient for text readability */}
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/35 to-transparent p-3 flex flex-col justify-between" />
-                    
+
+                    {/* Subtle Top-Edge Specular Sheen */}
+                    <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/[0.05] to-transparent pointer-events-none" />
+
+                    {/* Bottom Title Gradient Only (Keeps 70% of Cover Completely Bright) */}
+                    <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-black/95 via-black/45 to-transparent pointer-events-none" />
+
                     {/* Top Pill */}
-                    <div className="absolute top-2.5 left-2.5 right-2.5 flex items-center justify-between">
-                      <span className="px-2 py-0.5 rounded-md text-[10px] font-black bg-black/75 backdrop-blur-md text-cyan-300 border border-cyan-400/30 shadow-sm flex items-center gap-1">
+                    <div className="absolute top-2.5 left-2.5 right-2.5 flex items-center justify-between pointer-events-none">
+                      <span className="px-2 py-0.5 rounded-md text-[10px] font-black bg-black/80 backdrop-blur-md text-cyan-300 border border-cyan-400/30 shadow-sm flex items-center gap-1">
                         <Flame className="w-3 h-3 text-cyan-400" />
                         <span>{game.hoursPlayed.toFixed(0)}h 时长</span>
                       </span>
@@ -328,7 +321,7 @@ export function SteamGameWall({
                     </div>
 
                     {/* Bottom Title */}
-                    <div className="absolute bottom-2.5 left-2.5 right-2.5">
+                    <div className="absolute bottom-2.5 left-2.5 right-2.5 pointer-events-none">
                       <span className="text-xs font-bold text-white drop-shadow-md line-clamp-1 block">
                         {game.name}
                       </span>
@@ -339,8 +332,8 @@ export function SteamGameWall({
               })}
             </div>
 
-            {/* Row 2: Background Layer (Recessed Spatial Distance with Optical DOF) */}
-            <div className="animate-marquee-right flex gap-5 dof-background">
+            {/* Row 2: Reverse Track */}
+            <div className="animate-marquee-right flex gap-5 py-1">
               {seamlessRow2.map((game, idx) => {
                 const isSelected = activeGame.appId === game.appId;
                 const header =
@@ -350,14 +343,11 @@ export function SteamGameWall({
                   <div
                     key={`r2-${game.appId}-${idx}`}
                     onClick={() => onSelectGame(game)}
-                    className={`relative w-64 h-36 rounded-2xl overflow-hidden cursor-pointer shrink-0 transition-all duration-300 group/card select-none border shadow-[0_18px_38px_-10px_rgba(0,0,0,0.85)] ${
+                    className={`relative w-64 h-36 rounded-2xl overflow-hidden cursor-pointer shrink-0 transition-all duration-300 select-none border group/card shadow-[0_8px_22px_rgba(0,0,0,0.6)] ${
                       isSelected
-                        ? "border-cyan-400 ring-4 ring-cyan-400/40 z-30 shadow-[0_20px_50px_rgba(34,211,238,0.5)]"
-                        : "border-white/10 hover:border-cyan-400/80 hover:z-30 hover:shadow-[0_20px_40px_rgba(0,242,254,0.35)]"
+                        ? "border-cyan-400 ring-4 ring-cyan-400/40 z-30 shadow-[0_15px_35px_rgba(34,211,238,0.5)] scale-105"
+                        : "border-white/15 hover:border-cyan-400 hover:scale-105 hover:-translate-y-1 hover:z-30 hover:shadow-[0_15px_35px_rgba(34,211,238,0.4)]"
                     }`}
-                    style={{
-                      transformStyle: "preserve-3d",
-                    }}
                   >
                     <img
                       src={header}
@@ -366,18 +356,18 @@ export function SteamGameWall({
                         (e.target as HTMLImageElement).src =
                           "https://cdn.cloudflare.steamstatic.com/steam/apps/570/header.jpg";
                       }}
-                      className="w-full h-full object-cover group-hover/card:scale-108 transition-transform duration-500"
+                      className="w-full h-full object-cover brightness-105 contrast-105 group-hover/card:scale-108 transition-all duration-500"
                     />
 
-                    {/* Gloss Reflection Overlay */}
-                    <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/[0.06] to-transparent pointer-events-none" />
+                    {/* Subtle Top-Edge Specular Sheen */}
+                    <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/[0.05] to-transparent pointer-events-none" />
 
-                    {/* Dark gradient for text readability */}
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/35 to-transparent p-3 flex flex-col justify-between" />
-                    
+                    {/* Bottom Title Gradient Only */}
+                    <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-black/95 via-black/45 to-transparent pointer-events-none" />
+
                     {/* Top Pill */}
-                    <div className="absolute top-2.5 left-2.5 right-2.5 flex items-center justify-between">
-                      <span className="px-2 py-0.5 rounded-md text-[10px] font-black bg-black/75 backdrop-blur-md text-amber-300 border border-amber-400/30 shadow-sm flex items-center gap-1">
+                    <div className="absolute top-2.5 left-2.5 right-2.5 flex items-center justify-between pointer-events-none">
+                      <span className="px-2 py-0.5 rounded-md text-[10px] font-black bg-black/80 backdrop-blur-md text-amber-300 border border-amber-400/30 shadow-sm flex items-center gap-1">
                         <Flame className="w-3 h-3 text-amber-400" />
                         <span>{game.hoursPlayed.toFixed(0)}h 时长</span>
                       </span>
@@ -390,7 +380,7 @@ export function SteamGameWall({
                     </div>
 
                     {/* Bottom Title */}
-                    <div className="absolute bottom-2.5 left-2.5 right-2.5">
+                    <div className="absolute bottom-2.5 left-2.5 right-2.5 pointer-events-none">
                       <span className="text-xs font-bold text-white drop-shadow-md line-clamp-1 block">
                         {game.name}
                       </span>
