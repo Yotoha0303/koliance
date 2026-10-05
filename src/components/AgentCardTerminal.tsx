@@ -1,39 +1,36 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  Shield,
-  Activity,
-  Zap,
-  Search,
-  ExternalLink,
-  Copy,
-  CheckCircle2,
-  RefreshCw,
-  Sparkles,
-  Radio,
-  Lock,
-  Unlock,
   CreditCard,
   Gamepad2,
   TrendingUp,
-  ArrowRight,
-  Clock,
-  User,
-  Fingerprint,
-  Award,
-  FileCheck,
+  Lock,
+  Unlock,
+  Radio,
   Check,
-  Info,
+  Zap,
+  RefreshCw,
+  Search,
+  ExternalLink,
   DollarSign,
-  Send,
-  Sliders,
-  Flame,
-  ChevronDown,
+  ShieldCheck,
+  Sparkles,
+  AlertCircle,
+  Clock,
+  ArrowRight,
+  Layers,
 } from "lucide-react";
-import { monadTestnet, KOLIANCE_ADDRESS, TrustRecordData } from "@/lib/contract";
-import { truncateAddress } from "@/lib/utils";
+import { TrustRecordData } from "@/lib/contract";
+import {
+  fetchGameStats,
+  generateGameplayProof,
+  createStripeCheckout,
+  authorizeMicropayment,
+  GameStats,
+  GameplayProof,
+} from "@/lib/api";
 
 interface AgentCardTerminalProps {
   currentAccount: `0x${string}` | null;
@@ -50,18 +47,18 @@ interface AchievementEvent {
   timestamp: string;
 }
 
-interface OrderBookItem {
-  id: string;
-  asset: "MON/USDT" | "xNVDA/USDC" | "xBTC/MON" | "xAAPL/USDC";
-  type: "BUY" | "SELL";
-  price: string;
-  amount: string;
-  agentId: string;
-  status: "FILLED" | "MATCHING";
+interface MicroTxLog {
+  txId: string;
+  amountUSD: number;
+  merchant: string;
+  mcc: string;
+  authCode: string;
+  responseCode: string;
+  status: string;
   time: string;
 }
 
-export function AgentCardTerminal({ currentAccount, records }: AgentCardTerminalProps) {
+export function AgentCardTerminal({ currentAccount }: AgentCardTerminalProps) {
   const [targetAddress, setTargetAddress] = useState<string>(
     currentAccount || "0x89205A3A3b2A69De6Dbf7f01ED13B2108B2c43e7"
   );
@@ -69,10 +66,8 @@ export function AgentCardTerminal({ currentAccount, records }: AgentCardTerminal
   const [cardFrozen, setCardFrozen] = useState(false);
   const [creditLimit, setCreditLimit] = useState(10000);
   const [creditUsed, setCreditUsed] = useState(1248.52);
-  const [activeTab, setActiveTab] = useState<"card_engine" | "identity" | "reputation" | "transactions" | "capabilities">("card_engine");
-  const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
-  // 3D Dynamic Card Tilt based on real-time mouse angle & coordinates
+  // 3D Dynamic Card Tilt
   const [cardTilt, setCardTilt] = useState({ rotateX: 0, rotateY: 0, glareX: 50, glareY: 50, active: false });
 
   const handleCardMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -82,8 +77,7 @@ export function AgentCardTerminal({ currentAccount, records }: AgentCardTerminal
     const centerX = rect.width / 2;
     const centerY = rect.height / 2;
 
-    // Smooth continuous tilt in 360 degrees following cursor angle
-    const maxTilt = 22; // max tilt degrees
+    const maxTilt = 20;
     const rotX = -((y - centerY) / centerY) * maxTilt;
     const rotY = ((x - centerX) / centerX) * maxTilt;
 
@@ -100,218 +94,319 @@ export function AgentCardTerminal({ currentAccount, records }: AgentCardTerminal
     setCardTilt({ rotateX: 0, rotateY: 0, glareX: 50, glareY: 50, active: false });
   };
 
-  // Micro-payments & gaming achievements stream
+  // ==================== 1. STEAM 1-CLICK CONNECT & PROOFS ====================
+  const [steamConnected, setSteamConnected] = useState(false);
+  const [steamLoading, setSteamLoading] = useState(false);
+  const [steamData, setSteamData] = useState<GameStats | null>(null);
+  const [gameProof, setGameProof] = useState<GameplayProof | null>(null);
+  const [proofLoading, setProofLoading] = useState(false);
+
+  const handle1ClickSteamConnect = async () => {
+    setSteamLoading(true);
+    try {
+      // 1-Click zero typing: default active gaming operative account
+      const res = await fetchGameStats("76561198000000000");
+      if (res) {
+        setSteamData(res);
+        setSteamConnected(true);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setSteamLoading(false);
+    }
+  };
+
+  const handleMintGameplayProof = async () => {
+    if (!steamData) return;
+    setProofLoading(true);
+    try {
+      const proof = await generateGameplayProof(steamData.steamId, targetAddress, 730);
+      if (proof) {
+        setGameProof(proof);
+        // Automatically unlock extra credit limit
+        setCreditLimit((prev) => prev + proof.creditUnlockUSD);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setProofLoading(false);
+    }
+  };
+
+  // ==================== 2. STRIPE 1-CLICK TOP-UP ====================
+  const [stripeModalOpen, setStripeModalOpen] = useState(false);
+  const [topupAmount, setTopupAmount] = useState<number>(50);
+  const [stripeLoading, setStripeLoading] = useState(false);
+  const [stripeToast, setStripeToast] = useState<string | null>(null);
+
+  const handleExecuteStripeCheckout = async () => {
+    setStripeLoading(true);
+    try {
+      const res = await createStripeCheckout(topupAmount * 100, `AgentCard Deposit $${topupAmount} USD`);
+      if (res && res.url) {
+        // Open real Stripe Checkout URL in new window
+        window.open(res.url, "_blank");
+        setStripeToast(`Stripe 收银台已生成！充值 $${topupAmount} USD 已记账`);
+        setCreditLimit((prev) => prev + topupAmount);
+      } else {
+        // Fallback local instant simulation
+        setCreditLimit((prev) => prev + topupAmount);
+        setStripeToast(`已为卡片充值 $${topupAmount} USD！可用额度已刷新`);
+      }
+      setTimeout(() => setStripeModalOpen(false), 1200);
+    } catch {
+      setCreditLimit((prev) => prev + topupAmount);
+      setStripeToast(`模拟充值 $${topupAmount} USD 成功！`);
+      setTimeout(() => setStripeModalOpen(false), 1200);
+    } finally {
+      setStripeLoading(false);
+      setTimeout(() => setStripeToast(null), 4000);
+    }
+  };
+
+  // ==================== 3. VISA HIGH-FREQUENCY MICROPAYMENTS ====================
+  const [microTxList, setMicroTxList] = useState<MicroTxLog[]>([
+    {
+      txId: "tx_init_01",
+      amountUSD: 4.50,
+      merchant: "Steam Games / Valve",
+      mcc: "7999",
+      authCode: "AUTH_222000",
+      responseCode: "00",
+      status: "APPROVED",
+      time: "2分钟前",
+    },
+  ]);
+  const [micropayLoading, setMicropayLoading] = useState(false);
+  const [micropayNotice, setMicropayNotice] = useState<{ msg: string; type: "success" | "error" } | null>(null);
+
+  const handleSimulateMicropayment = async (amount: number, merchant: string, mcc: string) => {
+    setMicropayLoading(true);
+    setMicropayNotice(null);
+    try {
+      // Use active card session key
+      const res = await authorizeMicropayment("card_489049", "sk_sess_a1b1d073a99fdd2e432fe26f8d0a250da1c27e205bc39019", amount, merchant, mcc);
+      if (res.success) {
+        setCreditUsed((prev) => Number((prev + amount).toFixed(2)));
+        setMicroTxList((prev) => [
+          {
+            txId: res.transaction?.txId || `tx_${Date.now()}`,
+            amountUSD: amount,
+            merchant,
+            mcc,
+            authCode: res.authCode || "AUTH_OK",
+            responseCode: res.responseCode || "00",
+            status: "APPROVED",
+            time: "刚刚",
+          },
+          ...prev.slice(0, 5),
+        ]);
+        setMicropayNotice({
+          msg: `Visa 授权成功 [代码 00 - APPROVED]：已扣款 $${amount} USD (${merchant})`,
+          type: "success",
+        });
+      } else {
+        setMicroTxList((prev) => [
+          {
+            txId: `tx_declined_${Date.now()}`,
+            amountUSD: amount,
+            merchant,
+            mcc,
+            authCode: "DECLINED",
+            responseCode: res.responseCode || "57",
+            status: "DECLINED",
+            time: "刚刚",
+          },
+          ...prev.slice(0, 5),
+        ]);
+        setMicropayNotice({
+          msg: `Visa 拒付拦截 [代码 ${res.responseCode || "57"} - NOT PERMITTED]：${res.message}`,
+          type: "error",
+        });
+      }
+    } catch {
+      setCreditUsed((prev) => Number((prev + amount).toFixed(2)));
+      setMicropayNotice({
+        msg: `本地模拟微支付成功：已扣款 $${amount} USD (${merchant})`,
+        type: "success",
+      });
+    } finally {
+      setMicropayLoading(false);
+      setTimeout(() => setMicropayNotice(null), 5000);
+    }
+  };
+
+  // Micro-rewards stream
   const [totalMicroRewards, setTotalMicroRewards] = useState(0.0000142);
   const [achievements, setAchievements] = useState<AchievementEvent[]>([
     {
       id: "ach-1",
-      game: "CyberMonad Arena",
-      title: "FIRST_BLOOD_KILL",
+      game: "Counter-Strike 2",
+      title: "ACE_ROUND_CLUTCH",
       payout: "$0.0000001",
       slot: 1948320,
       txHash: "0x8a92...41ef",
-      timestamp: "Just now",
+      timestamp: "刚刚",
     },
     {
       id: "ach-2",
-      game: "Monad Racer 2026",
-      title: "DRIFT_KING_500M",
+      game: "Black Myth: Wukong",
+      title: "DEFEAT_YAOGUAI_KING",
       payout: "$0.0000001",
       slot: 1948319,
       txHash: "0x77c2...e0e0",
-      timestamp: "2s ago",
-    },
-    {
-      id: "ach-3",
-      game: "DeFi Dungeon",
-      title: "COLLECT_ZK_ORB",
-      payout: "$0.0000001",
-      slot: 1948318,
-      txHash: "0xfe31...19d4",
-      timestamp: "5s ago",
+      timestamp: "3秒前",
     },
   ]);
-
-  // Cross-Asset Orderbook (Crypto & Tokenized US Stocks)
-  const [orderbook, setOrderbook] = useState<OrderBookItem[]>([
-    {
-      id: "ord-1",
-      asset: "xNVDA/USDC",
-      type: "BUY",
-      price: "$142.80",
-      amount: "50.0 SHARES",
-      agentId: "Agent-Arbitrage-09",
-      status: "FILLED",
-      time: "1s ago",
-    },
-    {
-      id: "ord-2",
-      asset: "MON/USDT",
-      type: "SELL",
-      price: "$3.45",
-      amount: "15,000 MON",
-      agentId: "Consensus-Leader",
-      status: "FILLED",
-      time: "3s ago",
-    },
-    {
-      id: "ord-3",
-      asset: "xBTC/MON",
-      type: "BUY",
-      price: "18,420 MON",
-      amount: "1.25 BTC",
-      agentId: "AuditDAO-Agent",
-      status: "MATCHING",
-      time: "6s ago",
-    },
-    {
-      id: "ord-4",
-      asset: "xAAPL/USDC",
-      type: "BUY",
-      price: "$234.50",
-      amount: "20.0 SHARES",
-      agentId: "RiskShield-Sentinel",
-      status: "FILLED",
-      time: "9s ago",
-    },
-  ]);
-
-  // Interactive Micro-Reward Trigger (Gaming Achievement)
-  const [isSimulatingAchievement, setIsSimulatingAchievement] = useState(false);
 
   const triggerAchievementPayout = () => {
-    setIsSimulatingAchievement(true);
-    const gameTitles = [
-      { game: "CyberMonad Arena", title: "DEFEAT_RAID_BOSS" },
-      { game: "Monad Speedrun", title: "SUB_400MS_COMBO" },
-      { game: "Neural Quest", title: "UNLOCKED_HIDDEN_SHIELD" },
-      { game: "Starfire Tactics", title: "PERFECT_PARALLEL_DEFENSE" },
-    ];
-    const picked = gameTitles[Math.floor(Math.random() * gameTitles.length)];
-
-    setTimeout(() => {
-      const newEvent: AchievementEvent = {
-        id: `ach-${Date.now()}`,
-        game: picked.game,
-        title: picked.title,
-        payout: "$0.0000001",
-        slot: 1948325 + Math.floor(Math.random() * 50),
-        txHash: `0x${Math.random().toString(16).slice(2, 6)}...${Math.random().toString(16).slice(2, 6)}`,
-        timestamp: "Just now",
-      };
-
-      setAchievements((prev) => [newEvent, ...prev.slice(0, 5)]);
-      setTotalMicroRewards((t) => t + 0.0000001);
-      setIsSimulatingAchievement(false);
-    }, 450);
-  };
-
-  const copyToClipboard = (text: string, key: string) => {
-    navigator.clipboard.writeText(text);
-    setCopiedKey(key);
-    setTimeout(() => setCopiedKey(null), 2000);
-  };
-
-  const handleSearchSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (searchInput.trim().startsWith("0x")) {
-      setTargetAddress(searchInput.trim());
-    }
+    const newEvent: AchievementEvent = {
+      id: `ach-${Date.now()}`,
+      game: "Steam Ecosystem Agent",
+      title: "HIGH_FREQUENCY_MICROPAY_VERIFIED",
+      payout: "$0.0000001",
+      slot: 1948325 + Math.floor(Math.random() * 50),
+      txHash: `0x${Math.random().toString(16).slice(2, 6)}...${Math.random().toString(16).slice(2, 6)}`,
+      timestamp: "刚刚",
+    };
+    setAchievements((prev) => [newEvent, ...prev.slice(0, 4)]);
+    setTotalMicroRewards((t) => t + 0.0000001);
   };
 
   return (
     <div className="w-full space-y-6 font-sans">
-      {/* Top Banner: Monad Hackathon Focus & Search */}
-      <div className="rounded-3xl bg-[#121622]/90 border border-white/[0.08] p-5 sm:p-6 shadow-2xl backdrop-blur-xl space-y-4">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-          <div>
-            <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight flex items-center gap-3">
-              <span>Koliance AgentCard</span>
-              <span className="text-xs px-2.5 py-0.5 rounded-lg bg-white/10 text-white border border-white/20 font-mono">
-                VISA ISSUED
+      {/* ==================== 1. STEAM 1-CLICK CONNECT BANNER (KISS) ==================== */}
+      <div className="rounded-3xl bg-gradient-to-r from-[#171b28] via-[#1a233a] to-[#141b2d] border border-cyan-500/30 p-5 sm:p-6 shadow-2xl relative overflow-hidden">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 relative z-10">
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-2.5">
+              <span className="w-8 h-8 rounded-xl bg-cyan-500/20 border border-cyan-400/40 flex items-center justify-center text-cyan-400">
+                <Gamepad2 className="w-4 h-4" />
               </span>
-            </h2>
-            <p className="text-xs sm:text-sm text-slate-400 font-mono mt-1">
-              AI-Native Visa &amp; Sub-Cent Micro-Settlement on Monad 10,000 TPS.
+              <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">
+                Steam 游戏时长与成就认证 (Proof of Gameplay)
+              </h2>
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-400/30">
+                KISS · 免输长ID
+              </span>
+            </div>
+            <p className="text-xs sm:text-sm text-slate-300 font-mono">
+              点击即可秒级连接官方 Steam Web API，提取玩家全量游戏库与总时长，生成 Keccak256 链上信用背书。
             </p>
           </div>
 
-          {/* Quick Presets */}
-          <div className="flex flex-wrap items-center gap-2 text-xs font-mono">
-            <span className="text-slate-400 text-[11px] uppercase mr-1">Switch Entity:</span>
-            {currentAccount && (
+          <div className="flex flex-wrap items-center gap-3">
+            {!steamConnected ? (
               <button
-                onClick={() => setTargetAddress(currentAccount)}
-                className={`px-3 py-1.5 rounded-xl transition ${
-                  targetAddress.toLowerCase() === currentAccount.toLowerCase()
-                    ? "bg-white text-black font-bold"
-                    : "bg-white/[0.06] text-slate-300 hover:text-white"
-                }`}
+                onClick={handle1ClickSteamConnect}
+                disabled={steamLoading}
+                className="px-6 py-3 rounded-2xl bg-cyan-400 hover:bg-cyan-300 text-black font-extrabold text-xs sm:text-sm font-mono transition shadow-[0_0_25px_rgba(34,211,238,0.4)] flex items-center gap-2 active:scale-95"
               >
-                Connected Wallet
+                {steamLoading ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin text-black" />
+                    <span>正在连接 Steam API...</span>
+                  </>
+                ) : (
+                  <>
+                    <Zap className="w-4 h-4 text-black fill-current" />
+                    <span>🎮 一键连接并同步 Steam 游戏库</span>
+                  </>
+                )}
               </button>
+            ) : (
+              <div className="flex items-center gap-3">
+                <span className="px-3 py-1.5 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 text-xs font-mono flex items-center gap-1.5">
+                  <Check className="w-3.5 h-3.5" />
+                  <span>Steam 已连接：{steamData?.personaName}</span>
+                </span>
+                <button
+                  onClick={handleMintGameplayProof}
+                  disabled={proofLoading || !!gameProof}
+                  className="px-4 py-2 rounded-xl bg-purple-500 hover:bg-purple-400 text-white font-bold text-xs font-mono transition shadow-md flex items-center gap-1.5"
+                >
+                  {proofLoading ? (
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                  ) : gameProof ? (
+                    <>
+                      <ShieldCheck className="w-3.5 h-3.5 text-emerald-300" />
+                      <span>已铸造链上证明 ({gameProof.trustScoreTier})</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-3.5 h-3.5" />
+                      <span>⚡ 铸造链上信用证明 (+500 额度)</span>
+                    </>
+                  )}
+                </button>
+              </div>
             )}
-            <button
-              onClick={() => setTargetAddress("0x89205A3A3b2A69De6Dbf7f01ED13B2108B2c43e7")}
-              className={`px-3 py-1.5 rounded-xl transition ${
-                targetAddress === "0x89205A3A3b2A69De6Dbf7f01ED13B2108B2c43e7"
-                  ? "bg-white text-black font-bold"
-                  : "bg-white/[0.06] text-slate-300 hover:text-white"
-              }`}
-            >
-              Consensus Leader AI
-            </button>
-            <button
-              onClick={() => setTargetAddress("0x1Db3439a222C519ab44bb1144fC23CC7c1405e98")}
-              className={`px-3 py-1.5 rounded-xl transition ${
-                targetAddress === "0x1Db3439a222C519ab44bb1144fC23CC7c1405e98"
-                  ? "bg-white text-black font-bold"
-                  : "bg-white/[0.06] text-slate-300 hover:text-white"
-              }`}
-            >
-              Sentinel Prover Agent
-            </button>
           </div>
         </div>
 
-        {/* Search Bar */}
-        <form onSubmit={handleSearchSubmit} className="flex flex-col sm:flex-row items-center gap-3 pt-2">
-          <div className="relative flex-1 w-full">
-            <Search className="w-4 h-4 text-slate-400 absolute left-4 top-3.5 pointer-events-none" />
-            <input
-              type="text"
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-              placeholder="Search Monad address (0x...) or DID to inspect AgentCard credentials and micro-payment ledger..."
-              className="w-full pl-11 pr-4 py-2.5 rounded-2xl bg-[#0d1017] border border-white/10 text-xs sm:text-sm text-white placeholder-slate-400 font-mono focus:outline-none focus:border-white/30 transition shadow-inner"
-            />
-          </div>
-          <button
-            type="submit"
-            className="w-full sm:w-auto px-6 py-2.5 rounded-2xl bg-white hover:bg-slate-100 text-black font-semibold text-xs sm:text-sm font-mono transition shadow-sm active:scale-95 shrink-0"
+        {/* Display Connected Games & Live Playtime */}
+        {steamConnected && steamData && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            className="pt-5 mt-4 border-t border-white/10 grid grid-cols-1 md:grid-cols-4 gap-4 text-xs font-mono"
           >
-            Inspect Terminal
-          </button>
-        </form>
+            <div className="p-3.5 rounded-2xl bg-black/40 border border-white/10 flex items-center gap-3">
+              <img
+                src={steamData.avatar}
+                alt="Avatar"
+                className="w-10 h-10 rounded-xl border border-white/20"
+              />
+              <div>
+                <span className="text-white font-bold block">{steamData.personaName}</span>
+                <span className="text-slate-400 text-[10px]">SteamID: {steamData.steamId.slice(0, 10)}...</span>
+              </div>
+            </div>
+
+            <div className="p-3.5 rounded-2xl bg-black/40 border border-white/10">
+              <span className="text-slate-400 text-[10px] block">总游戏时长 / 库内游戏</span>
+              <strong className="text-cyan-300 text-base font-bold">
+                {steamData.totalPlayHours.toFixed(1)} 小时 ({steamData.totalGames} 款游戏)
+              </strong>
+            </div>
+
+            <div className="p-3.5 rounded-2xl bg-black/40 border border-white/10 col-span-1 md:col-span-2 flex items-center justify-between overflow-x-auto">
+              <div className="space-y-1">
+                <span className="text-slate-400 text-[10px] block">前三热门时长标的</span>
+                <div className="flex items-center gap-2">
+                  {steamData.topGames.slice(0, 3).map((g) => (
+                    <span key={g.appId} className="px-2 py-0.5 rounded bg-white/10 text-white text-[11px] font-bold">
+                      {g.name}: {g.hoursPlayed.toFixed(0)}h
+                    </span>
+                  ))}
+                </div>
+              </div>
+              <span className="px-2.5 py-1 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 font-bold text-[11px] shrink-0">
+                {gameProof ? `评级: ${gameProof.trustScoreTier}` : "待铸造信用"}
+              </span>
+            </div>
+          </motion.div>
+        )}
       </div>
 
-      {/* Main Terminal Grid: 3 Cohesive Interactive Modules */}
+      {/* ==================== 2. MAIN TERMINAL GRID (CARD + PAYMENTS) ==================== */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Col 1 (4 cols): 3D Physical Visa AgentCard & Controls */}
-        <div className="lg:col-span-4 rounded-3xl bg-[#121622]/90 border border-white/[0.08] hover:border-white/20 p-6 space-y-6 shadow-xl hover:shadow-[0_20px_50px_rgba(0,0,0,0.8)] hover:-translate-y-2 hover:scale-[1.02] backdrop-blur-xl flex flex-col justify-between transition-all duration-300">
+        {/* Col 1 (5 cols): 3D Physical Visa AgentCard */}
+        <div className="lg:col-span-5 rounded-3xl bg-[#121622]/90 border border-white/[0.08] p-6 space-y-6 shadow-xl backdrop-blur-xl flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between border-b border-white/[0.08] pb-3 mb-4">
-              <span className="text-xs font-mono text-slate-400 uppercase tracking-wider flex items-center gap-2">
-                <CreditCard className="w-4 h-4 text-slate-300" />
-                Physical AgentCard
+              <span className="text-xs font-mono text-slate-300 uppercase tracking-wider flex items-center gap-2">
+                <CreditCard className="w-4 h-4 text-cyan-400" />
+                Physical AgentCard // Visa 4928
               </span>
-              <span className="text-[11px] font-mono text-emerald-400 flex items-center gap-1">
-                <Check className="w-3 h-3" />
+              <span className="text-[11px] font-mono text-emerald-400 flex items-center gap-1 font-bold">
+                <Check className="w-3.5 h-3.5" />
                 ACTIVE
               </span>
             </div>
 
-            {/* 3D Realistic Visa AgentCard Model - 360 Dynamic Mouse Parallax Tilt */}
+            {/* 3D Realistic Visa AgentCard Model */}
             <div style={{ perspective: 1200 }}>
               <motion.div
                 onMouseMove={handleCardMouseMove}
@@ -319,57 +414,52 @@ export function AgentCardTerminal({ currentAccount, records }: AgentCardTerminal
                 animate={{
                   rotateX: cardTilt.active ? cardTilt.rotateX : 0,
                   rotateY: cardTilt.active ? cardTilt.rotateY : 0,
-                  scale: cardTilt.active ? 1.08 : 1,
-                  y: cardTilt.active ? -10 : 0,
+                  scale: cardTilt.active ? 1.05 : 1,
+                  y: cardTilt.active ? -8 : 0,
                 }}
-                transition={{
-                  type: "spring",
-                  stiffness: 380,
-                  damping: 24,
-                  mass: 0.5,
-                }}
+                transition={{ type: "spring", stiffness: 350, damping: 25 }}
                 style={{ transformStyle: "preserve-3d" }}
                 className={`group relative w-full h-56 rounded-2xl p-5 flex flex-col justify-between shadow-2xl overflow-hidden cursor-pointer select-none transition-shadow duration-300 ${
                   cardFrozen
                     ? "bg-gradient-to-br from-slate-800 to-slate-950 border border-red-500/40 opacity-75"
-                    : "bg-gradient-to-br from-slate-900 via-[#182033] to-black border border-white/20 hover:border-cyan-400/80 shadow-[0_12px_35px_rgba(0,0,0,0.7)] hover:shadow-[0_25px_60px_rgba(0,242,254,0.35),0_0_35px_rgba(131,110,249,0.35)]"
+                    : "bg-gradient-to-br from-slate-900 via-[#182033] to-black border border-white/20 hover:border-cyan-400/80 shadow-[0_12px_35px_rgba(0,0,0,0.7)] hover:shadow-[0_20px_50px_rgba(0,242,254,0.3)]"
                 }`}
               >
-                {/* Dynamic Holographic Glare - Spotlights directly beneath mouse cursor */}
+                {/* Dynamic Holographic Glare */}
                 <div
                   className="absolute inset-0 pointer-events-none transition-opacity duration-200"
                   style={{
                     opacity: cardTilt.active ? 1 : 0,
-                    background: `radial-gradient(circle at ${cardTilt.glareX}% ${cardTilt.glareY}%, rgba(255,255,255,0.28) 0%, rgba(0,242,254,0.15) 35%, transparent 70%)`,
+                    background: `radial-gradient(circle at ${cardTilt.glareX}% ${cardTilt.glareY}%, rgba(255,255,255,0.25) 0%, rgba(0,242,254,0.12) 35%, transparent 70%)`,
                   }}
                 />
 
-                {/* EMV Holographic Chip & Wireless Indicator (3D Pop-out) */}
+                {/* EMV Chip & Contactless */}
                 <div className="relative z-10 flex items-center justify-between" style={{ transform: "translateZ(25px)" }}>
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-7 rounded-md bg-gradient-to-r from-amber-200 via-amber-400 to-amber-100 border border-amber-500/40 shadow-sm flex items-center justify-center p-1 group-hover:shadow-[0_0_15px_rgba(251,191,36,0.8)] transition-all">
+                    <div className="w-10 h-7 rounded-md bg-gradient-to-r from-amber-200 via-amber-400 to-amber-100 border border-amber-500/40 shadow-sm flex items-center justify-center p-1">
                       <div className="w-full h-full border border-black/20 rounded-[2px]" />
                     </div>
                     <Radio className="w-4 h-4 text-slate-400 transform rotate-90" />
                   </div>
-                  <span className="text-xs font-mono text-slate-400 font-bold group-hover:text-cyan-300 transition-colors">
-                    KOLIANCE AGENT
+                  <span className="text-xs font-mono text-cyan-300 font-bold">
+                    KOLIANCE DEBIT
                   </span>
                 </div>
 
-                {/* Embossed Card Number (3D Pop-out) */}
+                {/* Embossed Card Number */}
                 <div className="relative z-10 space-y-1 my-auto" style={{ transform: "translateZ(30px)" }}>
-                  <span className="text-lg sm:text-xl font-mono text-white tracking-widest font-black drop-shadow-md group-hover:text-cyan-100 transition-colors">
-                    4219 &bull;&bull;&bull;&bull; &bull;&bull;&bull;&bull; {targetAddress.slice(2, 6).toUpperCase()}
+                  <span className="text-lg sm:text-xl font-mono text-white tracking-widest font-black drop-shadow-md">
+                    4928 &bull;&bull;&bull;&bull; &bull;&bull;&bull;&bull; 9049
                   </span>
                   <div className="flex items-center gap-4 text-[10px] font-mono text-slate-400">
-                    <span>EXP: 10/29</span>
-                    <span>CVV: &bull;&bull;&bull;</span>
-                    <span>CREDIT: ${creditLimit.toLocaleString()}</span>
+                    <span>EXP: 10/30</span>
+                    <span>CVV: 519</span>
+                    <span>AVAIL: ${(creditLimit - creditUsed).toFixed(2)}</span>
                   </div>
                 </div>
 
-                {/* Cardholder DID & Visa Hologram (3D Pop-out) */}
+                {/* Cardholder DID & Visa Logo */}
                 <div className="relative z-10 flex items-center justify-between pt-2 border-t border-white/[0.08]" style={{ transform: "translateZ(25px)" }}>
                   <div>
                     <span className="text-[9px] font-mono text-slate-400 uppercase block">AUTHORIZED AGENT DID</span>
@@ -378,316 +468,265 @@ export function AgentCardTerminal({ currentAccount, records }: AgentCardTerminal
                     </span>
                   </div>
                   <div className="flex flex-col items-end">
-                    <span className="text-xl font-black italic tracking-tighter text-white group-hover:drop-shadow-[0_0_10px_rgba(255,255,255,0.9)] transition-all">
+                    <span className="text-2xl font-black italic tracking-tighter text-white">
                       VISA
                     </span>
-                    <span className="text-[8px] font-mono text-slate-400 uppercase">PLATINUM AGENT</span>
+                    <span className="text-[8px] font-mono text-cyan-300 uppercase font-bold">DEPOSIT READY</span>
                   </div>
                 </div>
               </motion.div>
             </div>
           </div>
 
-          {/* Card Management Controls */}
-          <div className="space-y-3 pt-4 border-t border-white/[0.08]">
+          {/* Balance & Actions */}
+          <div className="space-y-4 pt-4 border-t border-white/[0.08]">
             <div className="flex items-center justify-between text-xs font-mono">
-              <span className="text-slate-400">Credit Used:</span>
-              <strong className="text-white font-bold">${creditUsed.toLocaleString()} / ${creditLimit.toLocaleString()}</strong>
+              <span className="text-slate-400">已用 / 总授信额度:</span>
+              <strong className="text-white font-bold">
+                ${creditUsed.toLocaleString()} / ${creditLimit.toLocaleString()} USD
+              </strong>
             </div>
 
-            <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
+            <div className="w-full h-2.5 bg-slate-800 rounded-full overflow-hidden">
               <div
-                className="h-full bg-gradient-to-r from-white to-slate-300 rounded-full"
-                style={{ width: `${(creditUsed / creditLimit) * 100}%` }}
+                className="h-full bg-gradient-to-r from-cyan-400 to-purple-500 rounded-full transition-all duration-500"
+                style={{ width: `${Math.min((creditUsed / creditLimit) * 100, 100)}%` }}
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-2 pt-2">
+            {/* Quick Action Buttons: Stripe Top Up + Freeze */}
+            <div className="grid grid-cols-2 gap-3 pt-1">
+              <button
+                onClick={() => setStripeModalOpen(true)}
+                className="flex items-center justify-center gap-2 py-3 rounded-2xl bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white font-bold text-xs font-mono transition shadow-[0_0_20px_rgba(99,102,241,0.35)] active:scale-95"
+              >
+                <DollarSign className="w-4 h-4" />
+                <span>💳 使用 Stripe 充值</span>
+              </button>
+
               <button
                 onClick={() => setCardFrozen(!cardFrozen)}
-                className={`flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-mono transition ${
+                className={`flex items-center justify-center gap-2 py-3 rounded-2xl text-xs font-mono font-bold transition border ${
                   cardFrozen
-                    ? "bg-red-500/20 text-red-300 border border-red-500/40"
-                    : "bg-white/[0.06] hover:bg-white/10 text-white border border-white/10"
+                    ? "bg-red-500/20 text-red-300 border-red-500/40"
+                    : "bg-white/[0.06] hover:bg-white/10 text-white border-white/10"
                 }`}
               >
-                {cardFrozen ? <Lock className="w-3.5 h-3.5" /> : <Unlock className="w-3.5 h-3.5" />}
-                <span>{cardFrozen ? "Card Frozen" : "Freeze Card"}</span>
-              </button>
-
-              <button
-                onClick={() => setCreditLimit((l) => l + 2500)}
-                className="flex items-center justify-center gap-1.5 py-2 rounded-xl bg-white hover:bg-slate-100 text-black text-xs font-mono font-bold transition shadow-sm active:scale-95"
-              >
-                <TrendingUp className="w-3.5 h-3.5" />
-                <span>Boost Limit</span>
+                {cardFrozen ? <Lock className="w-4 h-4" /> : <Unlock className="w-4 h-4" />}
+                <span>{cardFrozen ? "卡片已冻结" : "冻结卡片"}</span>
               </button>
             </div>
           </div>
         </div>
 
-        {/* Col 2 (5 cols): High-Frequency Gaming Achievement Micro-Rewards ($0.0000001) */}
-        <div className="lg:col-span-5 rounded-3xl bg-[#121622]/90 border border-white/[0.08] hover:border-emerald-500/40 p-6 space-y-5 shadow-xl hover:shadow-[0_20px_50px_rgba(52,211,153,0.16)] hover:-translate-y-2 hover:scale-[1.02] backdrop-blur-xl flex flex-col justify-between transition-all duration-300">
+        {/* Col 2 (7 cols): High-Frequency Visa Micro-Payment Simulator (KISS) */}
+        <div className="lg:col-span-7 rounded-3xl bg-[#121622]/90 border border-white/[0.08] p-6 space-y-5 shadow-xl backdrop-blur-xl flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between border-b border-white/[0.08] pb-3">
-              <div className="flex items-center gap-2">
-                <Gamepad2 className="w-4 h-4 text-emerald-400" />
-                <h3 className="font-bold text-base text-white">Gaming Micro-Achievement Rewards</h3>
+              <div className="flex items-center gap-2.5">
+                <Zap className="w-5 h-5 text-amber-400" />
+                <h3 className="font-bold text-base text-white">高频小额微支付模拟 (Visa Micropayments)</h3>
               </div>
-              <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                $0.0000001 / ACH
+              <span className="text-[11px] font-mono px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                0 延迟 · 内存记账
               </span>
             </div>
 
-            {/* Total Stream Metric */}
-            <div className="p-4 rounded-2xl bg-[#0d1017] border border-white/[0.06] mt-4 flex items-center justify-between">
-              <div>
-                <span className="text-[10px] font-mono text-slate-400 block uppercase">
-                  Accumulated Micro-Rewards Streamed
-                </span>
-                <strong className="text-xl sm:text-2xl font-mono font-black text-emerald-400">
-                  ${totalMicroRewards.toFixed(7)} USD
-                </strong>
-              </div>
-              <button
-                onClick={triggerAchievementPayout}
-                disabled={isSimulatingAchievement}
-                className="px-4 py-2.5 rounded-xl bg-white hover:bg-slate-100 text-black text-xs font-mono font-bold transition shadow-sm flex items-center gap-1.5 active:scale-95"
-              >
-                {isSimulatingAchievement ? (
-                  <>
-                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                    <span>0.4s Finalizing...</span>
-                  </>
-                ) : (
-                  <>
-                    <Zap className="w-3.5 h-3.5" />
-                    <span>Trigger Achievement</span>
-                  </>
-                )}
-              </button>
-            </div>
-
-            {/* Live Micro-Achievement Feed */}
-            <div className="space-y-2 mt-4">
-              <span className="text-[10px] font-mono text-slate-400 block uppercase">
-                Real-Time Monad Micro-Reward Ledger
+            {/* Micro-Payment Test Buttons (KISS) */}
+            <div className="space-y-3 pt-4">
+              <span className="text-xs font-mono text-slate-300 block">
+                ⚡ 快捷测试高频小额扣款与 Session Key 权限控制：
               </span>
 
-              <AnimatePresence>
-                {achievements.map((item) => (
-                  <motion.div
-                    key={item.id}
-                    initial={{ opacity: 0, x: -10 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0 }}
-                    className="flex items-center justify-between p-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06] text-xs font-mono"
-                  >
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-7 h-7 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
-                        <Flame className="w-3.5 h-3.5" />
-                      </div>
-                      <div>
-                        <span className="font-bold text-white text-[11px] block">{item.title}</span>
-                        <span className="text-[10px] text-slate-400">{item.game}</span>
-                      </div>
-                    </div>
-
-                    <div className="text-right">
-                      <strong className="text-emerald-400 font-bold block">{item.payout}</strong>
-                      <span className="text-[9px] text-slate-500">Slot {item.slot} &bull; {item.timestamp}</span>
-                    </div>
-                  </motion.div>
-                ))}
-              </AnimatePresence>
-            </div>
-          </div>
-
-          <div className="pt-3 border-t border-white/[0.08] text-[11px] font-mono text-slate-400 flex items-center justify-between">
-            <span>Execution Latency: <strong className="text-white">~380ms</strong></span>
-            <span>Gas: <strong className="text-emerald-400">&lt; $0.000001</strong></span>
-          </div>
-        </div>
-
-        {/* Col 3 (3 cols): Cross-Asset Tokenized US Stocks & Crypto Matching */}
-        <div className="lg:col-span-3 rounded-3xl bg-[#121622]/90 border border-white/[0.08] hover:border-cyan-500/40 p-6 space-y-4 shadow-xl hover:shadow-[0_20px_50px_rgba(0,242,254,0.16)] hover:-translate-y-2 hover:scale-[1.02] backdrop-blur-xl flex flex-col justify-between transition-all duration-300">
-          <div>
-            <div className="flex items-center justify-between border-b border-white/[0.08] pb-3">
-              <div className="flex items-center gap-2">
-                <TrendingUp className="w-4 h-4 text-slate-300" />
-                <h3 className="font-bold text-base text-white">Cross-Asset Matching</h3>
-              </div>
-              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-white/10 text-slate-200">
-                US STOCKS &amp; MON
-              </span>
-            </div>
-
-            {/* Orderbook List */}
-            <div className="space-y-2 mt-4 text-xs font-mono">
-              {orderbook.map((ord) => (
-                <div
-                  key={ord.id}
-                  className="p-3 rounded-xl bg-white/[0.03] border border-white/[0.06] space-y-1"
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <button
+                  onClick={() => handleSimulateMicropayment(4.50, "Steam Games / Valve", "7999")}
+                  disabled={micropayLoading}
+                  className="p-3.5 rounded-2xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/10 hover:border-cyan-400/50 text-left transition space-y-1 active:scale-95 group"
                 >
                   <div className="flex items-center justify-between">
-                    <span className="font-bold text-white text-xs">{ord.asset}</span>
-                    <span
-                      className={`px-1.5 py-0.2 rounded text-[10px] font-bold ${
-                        ord.type === "BUY" ? "bg-emerald-500/20 text-emerald-400" : "bg-red-500/20 text-red-400"
-                      }`}
-                    >
-                      {ord.type}
-                    </span>
+                    <span className="font-bold text-xs text-white">🛒 Steam 游戏微支付</span>
+                    <span className="text-xs font-mono text-cyan-300 font-bold">$4.50</span>
                   </div>
-                  <div className="flex justify-between text-slate-400 text-[11px]">
-                    <span>{ord.amount}</span>
-                    <strong className="text-white font-mono">{ord.price}</strong>
-                  </div>
-                  <div className="flex justify-between text-[10px] text-slate-500 pt-1 border-t border-white/[0.04]">
-                    <span>{ord.agentId}</span>
-                    <span className="text-emerald-400">{ord.status}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
+                  <span className="text-[10px] text-slate-400 font-mono block">MCC 7999 (娱乐) · 预期代码 00</span>
+                </button>
 
-          <div className="pt-3 border-t border-white/[0.08] text-center">
-            <span className="text-[11px] font-mono text-slate-400">
-              Matched via Monad Parallel Orderbook Engine
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {/* Bottom Section: 4 Deep On-Chain Verification Pillars */}
-      <div className="rounded-3xl bg-[#121622]/90 border border-white/[0.08] p-6 shadow-xl backdrop-blur-xl space-y-5">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/[0.08] pb-4">
-          <div>
-            <h3 className="font-bold text-lg text-white flex items-center gap-2">
-              <Shield className="w-5 h-5 text-white" />
-              <span>On-Chain Account Trust &amp; Capability Verification</span>
-            </h3>
-            <p className="text-xs text-slate-400 font-mono mt-0.5">
-              Target Monad Address: <code className="text-white font-bold">{targetAddress}</code>
-            </p>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2 text-xs font-mono">
-            {[
-              { id: "identity", label: "1. 检查身份 (Identity)", icon: <User className="w-3.5 h-3.5" /> },
-              { id: "reputation", label: "2. 检查信誉 (Reputation)", icon: <Award className="w-3.5 h-3.5" /> },
-              { id: "transactions", label: "3. 检查历史交易 (Ledger)", icon: <Clock className="w-3.5 h-3.5" /> },
-              { id: "capabilities", label: "4. 检查能力证明 (ZK-Proof)", icon: <FileCheck className="w-3.5 h-3.5" /> },
-            ].map((t) => {
-              const active = activeTab === t.id;
-              return (
                 <button
-                  key={t.id}
-                  onClick={() => setActiveTab(t.id as any)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl transition ${
-                    active ? "bg-white text-black font-bold shadow-sm" : "bg-white/[0.04] text-slate-400 hover:text-white"
+                  onClick={() => handleSimulateMicropayment(3.20, "Starbucks Coffee", "5814")}
+                  disabled={micropayLoading}
+                  className="p-3.5 rounded-2xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/10 hover:border-emerald-400/50 text-left transition space-y-1 active:scale-95 group"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-xs text-white">☕ 星巴克日常消费</span>
+                    <span className="text-xs font-mono text-emerald-400 font-bold">$3.20</span>
+                  </div>
+                  <span className="text-[10px] text-slate-400 font-mono block">MCC 5814 (快餐) · 预期代码 00</span>
+                </button>
+
+                <button
+                  onClick={() => handleSimulateMicropayment(50.00, "Luxury Goods", "5944")}
+                  disabled={micropayLoading}
+                  className="p-3.5 rounded-2xl bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-left transition space-y-1 active:scale-95 group"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-xs text-red-300">⚠️ 模拟超限拒付</span>
+                    <span className="text-xs font-mono text-red-400 font-bold">$50.00</span>
+                  </div>
+                  <span className="text-[10px] text-red-400/80 font-mono block">超单笔 $10 限额 · 预期代码 57</span>
+                </button>
+              </div>
+
+              {/* Toast Feedback */}
+              {micropayNotice && (
+                <motion.div
+                  initial={{ opacity: 0, y: -5 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className={`p-3 rounded-2xl text-xs font-mono flex items-center gap-2 border ${
+                    micropayNotice.type === "success"
+                      ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40"
+                      : "bg-red-500/20 text-red-300 border-red-500/40"
                   }`}
                 >
-                  {t.icon}
-                  <span>{t.label}</span>
-                </button>
-              );
-            })}
+                  {micropayNotice.type === "success" ? (
+                    <Check className="w-4 h-4 shrink-0" />
+                  ) : (
+                    <AlertCircle className="w-4 h-4 shrink-0" />
+                  )}
+                  <span>{micropayNotice.msg}</span>
+                </motion.div>
+              )}
+            </div>
+
+            {/* Real-Time Transaction Table */}
+            <div className="space-y-2 pt-4 border-t border-white/[0.08]">
+              <span className="text-[11px] font-mono text-slate-400 uppercase block">
+                实时 Visa 交易日志 (Real-Time Authorization Logs)
+              </span>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs font-mono">
+                  <thead>
+                    <tr className="border-b border-white/[0.08] text-slate-400 text-[10px]">
+                      <th className="py-1.5 px-2">商户 / 交易类型</th>
+                      <th className="py-1.5 px-2">金额</th>
+                      <th className="py-1.5 px-2">MCC</th>
+                      <th className="py-1.5 px-2">授权码</th>
+                      <th className="py-1.5 px-2">状态</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/[0.04]">
+                    {microTxList.map((tx) => (
+                      <tr key={tx.txId} className="hover:bg-white/[0.02]">
+                        <td className="py-2 px-2 text-white font-bold">{tx.merchant}</td>
+                        <td className="py-2 px-2 font-bold text-white">${tx.amountUSD.toFixed(2)}</td>
+                        <td className="py-2 px-2 text-slate-400">{tx.mcc}</td>
+                        <td className="py-2 px-2 text-slate-300">{tx.authCode}</td>
+                        <td className="py-2 px-2">
+                          <span
+                            className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                              tx.status === "APPROVED"
+                                ? "bg-emerald-500/20 text-emerald-400"
+                                : "bg-red-500/20 text-red-400"
+                            }`}
+                          >
+                            {tx.status} ({tx.responseCode})
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
         </div>
-
-        {/* Tab 1: Identity */}
-        {activeTab === "identity" && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-mono">
-            <div className="p-4 rounded-2xl bg-white/[0.03] border border-white/[0.06] space-y-2">
-              <span className="text-slate-400 text-[10px] uppercase">Monad DID Registration</span>
-              <p className="text-white font-bold text-sm">did:monad:{targetAddress}</p>
-              <span className="text-emerald-400 text-[11px] block">Verified &amp; Active on Monad Testnet #10143</span>
-            </div>
-
-            <div className="p-4 rounded-2xl bg-white/[0.03] border border-white/[0.06] space-y-2">
-              <span className="text-slate-400 text-[10px] uppercase">IPFS Identity Hash</span>
-              <p className="text-white font-mono truncate">ipfs://koliance-agent-{targetAddress.slice(2, 10)}-proof-metadata</p>
-              <span className="text-slate-400 text-[11px] block">Cryptographic Hash anchored in smart contract</span>
-            </div>
-          </div>
-        )}
-
-        {/* Tab 2: Reputation */}
-        {activeTab === "reputation" && (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs font-mono">
-            <div className="p-4 rounded-2xl bg-white/[0.03] border border-white/[0.06] space-y-1 text-center">
-              <span className="text-slate-400 text-[10px] uppercase">Trust Score</span>
-              <p className="text-3xl font-black text-white font-mono">96.8 / 100</p>
-              <span className="text-emerald-400 text-[11px]">Sovereign Tier</span>
-            </div>
-            <div className="p-4 rounded-2xl bg-white/[0.03] border border-white/[0.06] space-y-1 text-center">
-              <span className="text-slate-400 text-[10px] uppercase">Sybil Resistance</span>
-              <p className="text-3xl font-black text-emerald-400 font-mono">99.4%</p>
-              <span className="text-slate-400 text-[11px]">High Risk Protected</span>
-            </div>
-            <div className="p-4 rounded-2xl bg-white/[0.03] border border-white/[0.06] space-y-1 text-center">
-              <span className="text-slate-400 text-[10px] uppercase">Credit Line Assigned</span>
-              <p className="text-3xl font-black text-white font-mono">${creditLimit.toLocaleString()}</p>
-              <span className="text-slate-400 text-[11px]">Backed by Monad Stake</span>
-            </div>
-          </div>
-        )}
-
-        {/* Tab 3: Transactions */}
-        {activeTab === "transactions" && (
-          <div className="overflow-x-auto text-xs font-mono">
-            <table className="w-full text-left">
-              <thead>
-                <tr className="border-b border-white/[0.08] text-slate-400 text-[11px]">
-                  <th className="py-2 px-3">TX HASH</th>
-                  <th className="py-2 px-3">METHOD</th>
-                  <th className="py-2 px-3">LATENCY</th>
-                  <th className="py-2 px-3">STATUS</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-white/[0.04]">
-                <tr className="hover:bg-white/[0.02]">
-                  <td className="py-2.5 px-3 text-white">0x5c7b...f8e9</td>
-                  <td className="py-2.5 px-3 text-slate-300">addTrust(address, action, proof)</td>
-                  <td className="py-2.5 px-3 text-emerald-400">380ms</td>
-                  <td className="py-2.5 px-3 text-emerald-400">Single-Slot Finalized</td>
-                </tr>
-                <tr className="hover:bg-white/[0.02]">
-                  <td className="py-2.5 px-3 text-white">0x91b2...86da</td>
-                  <td className="py-2.5 px-3 text-slate-300">executeMicroPayment($0.0000001)</td>
-                  <td className="py-2.5 px-3 text-emerald-400">375ms</td>
-                  <td className="py-2.5 px-3 text-emerald-400">Single-Slot Finalized</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        )}
-
-        {/* Tab 4: Capabilities */}
-        {activeTab === "capabilities" && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-mono">
-            <div className="p-4 rounded-2xl bg-white/[0.03] border border-white/[0.06] space-y-2">
-              <div className="flex justify-between items-center">
-                <span className="text-white font-bold text-sm">CORE_DEVELOPER_CREDENTIAL</span>
-                <span className="text-emerald-400 text-[10px]">Valid</span>
-              </div>
-              <p className="text-slate-400 text-[11px]">Proof: 0xa3872c9167b5e40e2d1d07c089207e4d82b3d81b312783709b119c43bcae619a</p>
-              <span className="text-slate-500 text-[10px]">Signed by Koliance Smart Contract</span>
-            </div>
-
-            <div className="p-4 rounded-2xl bg-white/[0.03] border border-white/[0.06] space-y-2">
-              <div className="flex justify-between items-center">
-                <span className="text-white font-bold text-sm">AI_AGENT_MICRO_SETTLEMENT_SEAL</span>
-                <span className="text-emerald-400 text-[10px]">Valid</span>
-              </div>
-              <p className="text-slate-400 text-[11px]">Proof: 0xfe31889c0993d0d866a27e792c3a502c38d4f40f06579bb8d2efebc8b05619d4</p>
-              <span className="text-slate-500 text-[10px]">Signed by Monad Single-Slot Engine</span>
-            </div>
-          </div>
-        )}
       </div>
+
+      {/* ==================== STRIPE MODAL ==================== */}
+      <AnimatePresence>
+        {stripeModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="w-full max-w-md rounded-3xl bg-[#141824] border border-white/20 p-6 space-y-5 shadow-2xl font-mono text-white"
+            >
+              <div className="flex items-center justify-between border-b border-white/10 pb-3">
+                <div className="flex items-center gap-2">
+                  <DollarSign className="w-5 h-5 text-indigo-400" />
+                  <h3 className="font-bold text-base">Stripe 快速充值 AgentCard</h3>
+                </div>
+                <button
+                  onClick={() => setStripeModalOpen(false)}
+                  className="text-slate-400 hover:text-white text-sm"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="space-y-3">
+                <span className="text-xs text-slate-300">选择快捷充值金额 (USD)：</span>
+                <div className="grid grid-cols-3 gap-2">
+                  {[10, 50, 100].map((amt) => (
+                    <button
+                      key={amt}
+                      onClick={() => setTopupAmount(amt)}
+                      className={`py-3 rounded-2xl text-sm font-bold transition border ${
+                        topupAmount === amt
+                          ? "bg-white text-black border-white"
+                          : "bg-white/[0.05] text-slate-300 border-white/10 hover:border-white/30"
+                      }`}
+                    >
+                      ${amt}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="pt-2">
+                  <span className="text-[11px] text-slate-400 block mb-1">自定义金额:</span>
+                  <input
+                    type="number"
+                    value={topupAmount}
+                    onChange={(e) => setTopupAmount(Number(e.target.value))}
+                    min={1}
+                    className="w-full px-4 py-2.5 rounded-xl bg-black/50 border border-white/10 text-white text-sm focus:outline-none focus:border-indigo-400"
+                  />
+                </div>
+              </div>
+
+              {stripeToast && (
+                <div className="p-3 rounded-xl bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-xs">
+                  {stripeToast}
+                </div>
+              )}
+
+              <div className="pt-2 space-y-2">
+                <button
+                  onClick={handleExecuteStripeCheckout}
+                  disabled={stripeLoading || topupAmount <= 0}
+                  className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white font-bold text-sm transition shadow-lg flex items-center justify-center gap-2 active:scale-95"
+                >
+                  {stripeLoading ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                      <span>正在连接 Stripe 收银台...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Zap className="w-4 h-4" />
+                      <span>前往 Stripe 安全支付 (${topupAmount} USD)</span>
+                    </>
+                  )}
+                </button>
+                <p className="text-[10px] text-slate-500 text-center">
+                  由 Stripe Test Mode 沙盒提供安全支付保障 · 支持 Visa / Mastercard
+                </p>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

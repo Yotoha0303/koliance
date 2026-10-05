@@ -36,6 +36,7 @@ import { EnergyCoreHero } from "@/components/EnergyCoreHero";
 import { TrustConstellation } from "@/components/TrustConstellation";
 import { ProductStudio } from "@/components/ProductStudio";
 import { MarketTerminal } from "@/components/MarketTerminal";
+import { AgentCardTerminal } from "@/components/AgentCardTerminal";
 import { IdentityCard } from "@/components/IdentityCard";
 import { TrustAttestationCard } from "@/components/TrustAttestationCard";
 import { TrustStream } from "@/components/TrustStream";
@@ -510,27 +511,25 @@ function MainContent() {
               <MarketTerminal onTradeAction={() => setCurrentView("DETAIL")} />
             </motion.div>
           )}
-        </AnimatePresence>
 
-        {/* TAB 5: AGENTCARD (Neural Asset Processor / AI Card Scanner - Persistent Warm Canvas) */}
-        {hasVisitedAgentCard && (
-          <div
-            className={`pt-16 w-full h-[calc(100vh-64px)] ${
-              currentView === "AGENTCARD" ? "block" : "hidden"
-            }`}
-          >
-            <iframe
-              src="/agentcard/index.html"
-              className="w-full h-full border-0"
-              title="AI Card Scanner // Neural Asset Processor"
-            />
-          </div>
-        )}
+          {/* TAB 5: AGENTCARD (Neural Asset Processor & Physical Visa Card Terminal) */}
+          {currentView === "AGENTCARD" && (
+            <motion.div
+              key="view-agentcard"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.35, ease: "easeInOut" }}
+              className="pt-20 max-w-7xl mx-auto px-4 sm:px-6 py-4"
+            >
+              <AgentCardTerminal currentAccount={account} records={records} />
+            </motion.div>
+          )}
+        </AnimatePresence>
       </main>
 
-      {/* Global Footer (shown on INDEX, DETAIL, PRODUCT, MARKET) */}
-      {currentView !== "AGENTCARD" && (
-        <footer className="border-t border-white/10 py-6 px-4 sm:px-8 mt-12 bg-[#0d1017]/80 backdrop-blur-md">
+      {/* Global Footer */}
+      <footer className="border-t border-white/10 py-6 px-4 sm:px-8 mt-12 bg-[#0d1017]/80 backdrop-blur-md">
           <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-xs font-mono text-slate-400">
             <div className="flex items-center gap-3">
               <BrandIcon size={24} />
@@ -585,7 +584,6 @@ function MainContent() {
             </div>
           </div>
         </footer>
-      )}
 
       {/* Network Switch Modal */}
       <NetworkModal
