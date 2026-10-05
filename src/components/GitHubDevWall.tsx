@@ -122,7 +122,8 @@ export function GitHubDevWall({ currentAccount, onProofMinted }: GitHubDevWallPr
   const handleGitHubOAuthRedirect = () => {
     const configuredClientId =
       process.env.NEXT_PUBLIC_GITHUB_CLIENT_ID ||
-      localStorage.getItem("koliance_github_client_id");
+      localStorage.getItem("koliance_github_client_id") ||
+      "Ov23liz5v98MTdxFmu5u";
 
     if (!configuredClientId) {
       // Prompt modal to enter Client ID or create one with 1-click link

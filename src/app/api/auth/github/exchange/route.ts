@@ -12,10 +12,12 @@ export async function POST(request: NextRequest) {
     const clientId =
       process.env.GITHUB_CLIENT_ID ||
       process.env.NEXT_PUBLIC_GITHUB_CLIENT_ID ||
-      clientProvidedId;
+      clientProvidedId ||
+      "Ov23liz5v98MTdxFmu5u";
     const clientSecret =
       process.env.GITHUB_CLIENT_SECRET ||
-      clientProvidedSecret;
+      clientProvidedSecret ||
+      "cd726f8d6ff5b2fa623baaf95935da2158278859";
 
     if (!clientId || !clientSecret) {
       // If server does not have client secret configured, return instructions
