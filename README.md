@@ -1,4 +1,4 @@
-# 🛡️ Koliance — Monad On-Chain Trust & Intelligent Finance Infrastructure
+# Koliance — Monad On-Chain Trust & Intelligent Finance Infrastructure
 
 Koliance 是构建在 **Monad 高并发并行 EVM Testnet**（Chain ID: `10143`）上的去中心化数字身份、游戏信用凭据与智能金融基础设施。
 
