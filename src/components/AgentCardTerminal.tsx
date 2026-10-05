@@ -129,6 +129,12 @@ export function AgentCardTerminal({ currentAccount }: AgentCardTerminalProps) {
       window.history.replaceState({}, document.title, window.location.pathname);
     }
 
+    // Detect GitHub OAuth callback (?code=...)
+    const githubCode = params.get("code");
+    if (githubCode) {
+      setAttestationTab("github");
+    }
+
     // Detect Steam OpenID callback (claimed_id format: https://steamcommunity.com/openid/id/76561198...)
     const claimedId = params.get("openid.claimed_id") || params.get("openid.identity");
     const rawMatch = (claimedId || window.location.href).match(/openid\/id\/(\d{17})/) || (claimedId ? claimedId.match(/(\d{17})/) : null);
