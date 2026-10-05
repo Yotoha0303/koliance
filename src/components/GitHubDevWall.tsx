@@ -188,9 +188,9 @@ export function GitHubDevWall({ currentAccount, onProofMinted }: GitHubDevWallPr
       t: Date.now(),
     });
 
-    // Omit redirect_uri so GitHub redirects to the app's registered callback URL
-    // (supporting both https://koliance.oodai.space and https://koliance.vercel.app via relay)
-    window.location.href = `https://github.com/login/oauth/authorize?client_id=${configuredClientId}&scope=read:user&state=${state}`;
+    // Pass prompt=select_account so GitHub forces the account switcher dialog,
+    // allowing the user to pick a different account or sign in with another account!
+    window.location.href = `https://github.com/login/oauth/authorize?client_id=${configuredClientId}&prompt=select_account&scope=read:user&state=${state}`;
   };
 
   const handleSaveOAuthAndRedirect = () => {
@@ -207,7 +207,7 @@ export function GitHubDevWall({ currentAccount, onProofMinted }: GitHubDevWallPr
       t: Date.now(),
     });
 
-    window.location.href = `https://github.com/login/oauth/authorize?client_id=${clientIdInput.trim()}&scope=read:user&state=${state}`;
+    window.location.href = `https://github.com/login/oauth/authorize?client_id=${clientIdInput.trim()}&prompt=select_account&scope=read:user&state=${state}`;
   };
 
   const handleCustomSubmit = (e: React.FormEvent) => {
@@ -223,7 +223,7 @@ export function GitHubDevWall({ currentAccount, onProofMinted }: GitHubDevWallPr
     setGithubConnected(false);
     setDevStats(null);
     setBuidlProof(null);
-    setNotice(null);
+    setNotice("已解除当前账号绑定。点击官方认证可在 GitHub 页面切换任意账号，或直接在下方输入账号绑定。");
   };
 
   const handleMintProof = async () => {

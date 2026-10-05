@@ -430,6 +430,7 @@ export function AgentCardTerminal({ currentAccount }: AgentCardTerminalProps) {
                   setSteamConnected(false);
                   setSteamData(null);
                   localStorage.removeItem("koliance_steam_id");
+                  setSteamNotice("已解除 Steam 绑定。可通过官方认证登录或直接在下方输入任意玩家 ID / 昵称。");
                 }}
               />
             ) : (
