@@ -16,6 +16,9 @@ out/
 build/
 dist/
 
+# TypeScript incremental build info
+*.tsbuildinfo
+
 # Hardhat build output & cache
 artifacts/
 cache/
