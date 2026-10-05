@@ -11,6 +11,7 @@ import (
 
 	"github.com/koliance/backend/internal/agentcard"
 	"github.com/koliance/backend/internal/config"
+	"github.com/koliance/backend/internal/developer"
 	"github.com/koliance/backend/internal/game"
 	"github.com/koliance/backend/internal/market"
 	"github.com/koliance/backend/internal/model"
@@ -62,6 +63,10 @@ func main() {
 	// 5. Initialize Stripe Client
 	stripeCli := stripeclient.New(cfg.StripeSecretKey)
 
+	// 6. Initialize GitHub Developer Service
+	githubCli := developer.NewGitHubClient("")
+	devService := developer.NewService(githubCli)
+
 	mux := http.NewServeMux()
 
 	// Health Check
@@ -72,12 +77,13 @@ func main() {
 			"contract":  cfg.KolianceContract,
 			"timestamp": time.Now().UTC(),
 			"services": map[string]bool{
-				"steam":    true,
-				"alpaca":   true,
-				"pyth":     true,
+				"steam":     true,
+				"github":    true,
+				"alpaca":    true,
+				"pyth":      true,
 				"agentcard": true,
-				"stripe":   cfg.StripeSecretKey != "",
-				"database": db.IsConnected,
+				"stripe":    cfg.StripeSecretKey != "",
+				"database":  db.IsConnected,
 			},
 		})
 	}))
@@ -129,6 +135,49 @@ func main() {
 		}
 
 		proof, err := gameService.GenerateGameplayProof(req.SteamID, req.WalletAddress, req.AppID)
+		if err != nil {
+			jsonResponse(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+			return
+		}
+		jsonResponse(w, http.StatusOK, proof)
+	}))
+
+	// ==================== DEVELOPER MODULE (GITHUB) ====================
+
+	// GET /api/v1/developer/github/profile?username=moonhotline
+	mux.HandleFunc("/api/v1/developer/github/profile", enableCORS(func(w http.ResponseWriter, r *http.Request) {
+		username := r.URL.Query().Get("username")
+		if username == "" {
+			username = "moonhotline"
+		}
+
+		stats, err := devService.GetDeveloperStats(username)
+		if err != nil {
+			jsonResponse(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+			return
+		}
+		jsonResponse(w, http.StatusOK, stats)
+	}))
+
+	// POST /api/v1/developer/github/proof
+	mux.HandleFunc("/api/v1/developer/github/proof", enableCORS(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		var req struct {
+			Username      string `json:"username"`
+			WalletAddress string `json:"walletAddress"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			jsonResponse(w, http.StatusBadRequest, map[string]string{"error": "invalid payload"})
+			return
+		}
+		if req.Username == "" {
+			req.Username = "moonhotline"
+		}
+
+		proof, err := devService.GenerateBUIDLProof(req.Username, req.WalletAddress)
 		if err != nil {
 			jsonResponse(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 			return

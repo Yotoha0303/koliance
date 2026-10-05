@@ -15,6 +15,7 @@ import {
   Trophy,
   ExternalLink,
   CheckCircle2,
+  Info,
 } from "lucide-react";
 import { GameplayProof } from "@/lib/api";
 
@@ -206,7 +207,7 @@ export function SteamGameWall({
             ) : (
               <>
                 <Sparkles className="w-4 h-4 text-cyan-200 fill-current" />
-                <span>⚡ 铸造当前游戏信用凭证 (+500 额度)</span>
+                <span>铸造当前游戏信用凭证 (+500 额度)</span>
               </>
             )}
           </button>
@@ -254,18 +255,30 @@ export function SteamGameWall({
       {/* ==================== 1. INFINITE ROLLING GAME MARQUEE ==================== */}
       {viewMode === "marquee" ? (
         <div
-          className="relative w-full py-4 overflow-hidden rounded-2xl group"
+          className="relative w-full py-6 overflow-hidden rounded-2xl group perspective-stage"
           style={{
-            perspective: 1200,
+            perspective: 1600,
+            transformStyle: "preserve-3d",
             maskImage:
-              "linear-gradient(to right, transparent 0%, black 5%, black 95%, transparent 100%)",
+              "linear-gradient(to right, transparent 0%, black 6%, black 94%, transparent 100%)",
             WebkitMaskImage:
-              "linear-gradient(to right, transparent 0%, black 5%, black 95%, transparent 100%)",
+              "linear-gradient(to right, transparent 0%, black 6%, black 94%, transparent 100%)",
           }}
         >
-          {/* Row 1: Scrolls to the Left */}
-          <div className="space-y-4">
-            <div className="animate-marquee-left flex gap-4">
+          {/* Subtle Top & Bottom Cinematic Shadow for Camera Depth */}
+          <div className="absolute inset-x-0 top-0 h-4 bg-gradient-to-b from-[#10131d] to-transparent z-10 pointer-events-none" />
+          <div className="absolute inset-x-0 bottom-0 h-4 bg-gradient-to-t from-[#0c0e15] to-transparent z-10 pointer-events-none" />
+
+          {/* 3D Stage tilted for realistic spatial camera perspective */}
+          <div
+            className="space-y-6"
+            style={{
+              transform: "rotateX(4deg)",
+              transformStyle: "preserve-3d",
+            }}
+          >
+            {/* Row 1: Foreground Layer (Crisp, High-Detail Depth) */}
+            <div className="animate-marquee-left flex gap-5 dof-foreground">
               {seamlessRow1.map((game, idx) => {
                 const isSelected = activeGame.appId === game.appId;
                 const header =
@@ -275,33 +288,40 @@ export function SteamGameWall({
                   <div
                     key={`r1-${game.appId}-${idx}`}
                     onClick={() => onSelectGame(game)}
-                    className={`relative w-64 h-36 rounded-2xl overflow-hidden cursor-pointer shrink-0 transition-all duration-300 group/card select-none border ${
+                    className={`relative w-64 h-36 rounded-2xl overflow-hidden cursor-pointer shrink-0 transition-all duration-300 group/card select-none border shadow-[0_18px_38px_-10px_rgba(0,0,0,0.85)] ${
                       isSelected
-                        ? "border-cyan-400 ring-4 ring-cyan-400/30 scale-105 z-20 shadow-[0_10px_35px_rgba(34,211,238,0.5)]"
-                        : "border-white/10 hover:border-cyan-400/80 hover:scale-105 hover:z-20 hover:shadow-[0_10px_30px_rgba(0,242,254,0.3)]"
+                        ? "border-cyan-400 ring-4 ring-cyan-400/40 z-30 shadow-[0_20px_50px_rgba(34,211,238,0.5)]"
+                        : "border-white/10 hover:border-cyan-400/80 hover:z-30 hover:shadow-[0_20px_40px_rgba(0,242,254,0.35)]"
                     }`}
+                    style={{
+                      transformStyle: "preserve-3d",
+                    }}
                   >
                     <img
                       src={header}
                       alt={game.name}
                       onError={(e) => {
-                        // Fallback image if header is missing
                         (e.target as HTMLImageElement).src =
                           "https://cdn.cloudflare.steamstatic.com/steam/apps/730/header.jpg";
                       }}
-                      className="w-full h-full object-cover group-hover/card:scale-110 transition-transform duration-500"
+                      className="w-full h-full object-cover group-hover/card:scale-108 transition-transform duration-500"
                     />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/40 to-transparent p-3 flex flex-col justify-between" />
+                    
+                    {/* Gloss Reflection Overlay */}
+                    <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/[0.06] to-transparent pointer-events-none" />
+                    
+                    {/* Dark gradient for text readability */}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/35 to-transparent p-3 flex flex-col justify-between" />
                     
                     {/* Top Pill */}
                     <div className="absolute top-2.5 left-2.5 right-2.5 flex items-center justify-between">
-                      <span className="px-2 py-0.5 rounded-md text-[10px] font-black bg-black/70 backdrop-blur-md text-cyan-300 border border-cyan-400/30 shadow-sm flex items-center gap-1">
+                      <span className="px-2 py-0.5 rounded-md text-[10px] font-black bg-black/75 backdrop-blur-md text-cyan-300 border border-cyan-400/30 shadow-sm flex items-center gap-1">
                         <Flame className="w-3 h-3 text-cyan-400" />
                         <span>{game.hoursPlayed.toFixed(0)}h 时长</span>
                       </span>
 
                       {isSelected && (
-                        <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-cyan-400 text-black">
+                        <span className="px-2 py-0.5 rounded text-[9px] font-bold bg-cyan-400 text-black shadow-sm">
                           已锚定
                         </span>
                       )}
@@ -312,15 +332,15 @@ export function SteamGameWall({
                       <span className="text-xs font-bold text-white drop-shadow-md line-clamp-1 block">
                         {game.name}
                       </span>
-                      <span className="text-[10px] text-slate-400 block">AppID: {game.appId}</span>
+                      <span className="text-[10px] text-slate-400 block font-mono">AppID: {game.appId}</span>
                     </div>
                   </div>
                 );
               })}
             </div>
 
-            {/* Row 2: Scrolls to the Right (Reverse) */}
-            <div className="animate-marquee-right flex gap-4">
+            {/* Row 2: Background Layer (Recessed Spatial Distance with Optical DOF) */}
+            <div className="animate-marquee-right flex gap-5 dof-background">
               {seamlessRow2.map((game, idx) => {
                 const isSelected = activeGame.appId === game.appId;
                 const header =
@@ -330,11 +350,14 @@ export function SteamGameWall({
                   <div
                     key={`r2-${game.appId}-${idx}`}
                     onClick={() => onSelectGame(game)}
-                    className={`relative w-64 h-36 rounded-2xl overflow-hidden cursor-pointer shrink-0 transition-all duration-300 group/card select-none border ${
+                    className={`relative w-64 h-36 rounded-2xl overflow-hidden cursor-pointer shrink-0 transition-all duration-300 group/card select-none border shadow-[0_18px_38px_-10px_rgba(0,0,0,0.85)] ${
                       isSelected
-                        ? "border-cyan-400 ring-4 ring-cyan-400/30 scale-105 z-20 shadow-[0_10px_35px_rgba(34,211,238,0.5)]"
-                        : "border-white/10 hover:border-cyan-400/80 hover:scale-105 hover:z-20 hover:shadow-[0_10px_30px_rgba(0,242,254,0.3)]"
+                        ? "border-cyan-400 ring-4 ring-cyan-400/40 z-30 shadow-[0_20px_50px_rgba(34,211,238,0.5)]"
+                        : "border-white/10 hover:border-cyan-400/80 hover:z-30 hover:shadow-[0_20px_40px_rgba(0,242,254,0.35)]"
                     }`}
+                    style={{
+                      transformStyle: "preserve-3d",
+                    }}
                   >
                     <img
                       src={header}
@@ -343,19 +366,24 @@ export function SteamGameWall({
                         (e.target as HTMLImageElement).src =
                           "https://cdn.cloudflare.steamstatic.com/steam/apps/570/header.jpg";
                       }}
-                      className="w-full h-full object-cover group-hover/card:scale-110 transition-transform duration-500"
+                      className="w-full h-full object-cover group-hover/card:scale-108 transition-transform duration-500"
                     />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/40 to-transparent p-3 flex flex-col justify-between" />
+
+                    {/* Gloss Reflection Overlay */}
+                    <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/[0.06] to-transparent pointer-events-none" />
+
+                    {/* Dark gradient for text readability */}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/35 to-transparent p-3 flex flex-col justify-between" />
                     
                     {/* Top Pill */}
                     <div className="absolute top-2.5 left-2.5 right-2.5 flex items-center justify-between">
-                      <span className="px-2 py-0.5 rounded-md text-[10px] font-black bg-black/70 backdrop-blur-md text-amber-300 border border-amber-400/30 shadow-sm flex items-center gap-1">
+                      <span className="px-2 py-0.5 rounded-md text-[10px] font-black bg-black/75 backdrop-blur-md text-amber-300 border border-amber-400/30 shadow-sm flex items-center gap-1">
                         <Flame className="w-3 h-3 text-amber-400" />
                         <span>{game.hoursPlayed.toFixed(0)}h 时长</span>
                       </span>
 
                       {isSelected && (
-                        <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-cyan-400 text-black">
+                        <span className="px-2 py-0.5 rounded text-[9px] font-bold bg-cyan-400 text-black shadow-sm">
                           已锚定
                         </span>
                       )}
@@ -366,7 +394,7 @@ export function SteamGameWall({
                       <span className="text-xs font-bold text-white drop-shadow-md line-clamp-1 block">
                         {game.name}
                       </span>
-                      <span className="text-[10px] text-slate-400 block">AppID: {game.appId}</span>
+                      <span className="text-[10px] text-slate-400 block font-mono">AppID: {game.appId}</span>
                     </div>
                   </div>
                 );
@@ -427,8 +455,11 @@ export function SteamGameWall({
 
       {/* Bottom Hint */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-[11px] text-slate-400 border-t border-white/[0.08] pt-3">
-        <span>💡 悬停即可暂停滚动；点击任意游戏卡片即可将其设为首选信用背书标的。</span>
-        <span className="text-cyan-400/80">由 Valve Steam Web API 官方认证提供</span>
+        <div className="flex items-center gap-1.5">
+          <Info className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+          <span>悬停即可暂停滚动；点击任意游戏卡片即可将其设为首选信用背书标的。</span>
+        </div>
+        <span className="text-cyan-400/80 font-mono">由 Valve Steam Web API 官方认证提供</span>
       </div>
     </div>
   );

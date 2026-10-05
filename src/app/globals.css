@@ -103,7 +103,7 @@ body {
   -webkit-text-fill-color: transparent;
 }
 
-/* Infinite Marquee Animations for Steam Game Wall */
+/* Infinite Marquee Animations for Steam Game Wall (Smooth Museum / Gallery Speed) */
 @keyframes marquee-left {
   0% {
     transform: translateX(0%);
@@ -125,18 +125,43 @@ body {
 .animate-marquee-left {
   display: flex;
   width: max-content;
-  animation: marquee-left 45s linear infinite;
+  animation: marquee-left 80s linear infinite;
   will-change: transform;
 }
 
 .animate-marquee-right {
   display: flex;
   width: max-content;
-  animation: marquee-right 50s linear infinite;
+  animation: marquee-right 92s linear infinite;
   will-change: transform;
 }
 
 .animate-marquee-left:hover,
 .animate-marquee-right:hover {
   animation-play-state: paused;
+}
+
+/* 3D Depth of Field and Perspective Spatial Stage */
+.perspective-stage {
+  perspective: 1600px;
+  perspective-origin: 50% 50%;
+  transform-style: preserve-3d;
+}
+
+.dof-foreground {
+  transform: translateZ(18px);
+  transition: transform 0.45s cubic-bezier(0.16, 1, 0.3, 1), filter 0.45s ease;
+}
+
+.dof-background {
+  transform: translateZ(-28px) scale(0.96);
+  filter: brightness(0.85) contrast(0.95);
+  transition: transform 0.45s cubic-bezier(0.16, 1, 0.3, 1), filter 0.45s ease;
+}
+
+.dof-background:hover,
+.dof-foreground:hover {
+  transform: translateZ(50px) scale(1.06) !important;
+  filter: brightness(1.12) contrast(1.05) drop-shadow(0 20px 40px rgba(0, 242, 254, 0.35)) !important;
+  z-index: 50;
 }

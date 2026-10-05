@@ -21,10 +21,10 @@ import {
   Cpu,
   Info,
   Sliders,
-  ChevronRight,
   Zap,
   Check,
   AlertCircle,
+  Send,
 } from "lucide-react";
 import { fetchMarketOverview, executeMarketTrade, closeMarketPosition, MarketPosition } from "@/lib/api";
 
@@ -229,7 +229,7 @@ export function MarketTerminal({ onTradeAction }: MarketTerminalProps) {
           ...prev.slice(0, 4),
         ]);
         setTradeToast({
-          msg: `🎉 Alpaca 订单执行成功！${tradeSide.toUpperCase()} ${cleanSym} (保证金 $${tradeAmount} USD · ${tradeLeverage}x 杠杆 · 实际建仓 $${(tradeAmount * tradeLeverage).toFixed(2)} USD)`,
+          msg: `Alpaca 订单执行成功！${tradeSide.toUpperCase()} ${cleanSym} (保证金 $${tradeAmount} USD · ${tradeLeverage}x 杠杆 · 实际建仓 $${(tradeAmount * tradeLeverage).toFixed(2)} USD)`,
           type: "success",
         });
         await loadAlpacaData();
@@ -599,12 +599,14 @@ export function MarketTerminal({ onTradeAction }: MarketTerminalProps) {
               </div>
               <p className="text-[11px] leading-relaxed pt-0.5">
                 {tradeSide === "buy" ? (
-                  <span className="text-emerald-300">
-                    🟢 多头建仓 (Long)：借入购买力做多 ${(tradeAmount * tradeLeverage).toFixed(0)} USD {selectedSymbol}。标的上涨即可放大获利！
+                  <span className="text-emerald-300 flex items-center gap-1.5">
+                    <ArrowUpRight className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                    <span>多头建仓 (Long)：借入购买力做多 ${(tradeAmount * tradeLeverage).toFixed(0)} USD {selectedSymbol}。标的上涨即可放大获利！</span>
                   </span>
                 ) : (
-                  <span className="text-red-300">
-                    🔴 融券做空 (Short)：融券借出并卖空 -${(tradeAmount * tradeLeverage).toFixed(0)} USD {selectedSymbol}。标的下跌即可放大获利！
+                  <span className="text-red-300 flex items-center gap-1.5">
+                    <ArrowDownRight className="w-3.5 h-3.5 text-rose-400 shrink-0" />
+                    <span>融券做空 (Short)：融券借出并卖空 -${(tradeAmount * tradeLeverage).toFixed(0)} USD {selectedSymbol}。标的下跌即可放大获利！</span>
                   </span>
                 )}
               </p>
@@ -627,9 +629,9 @@ export function MarketTerminal({ onTradeAction }: MarketTerminalProps) {
                 </>
               ) : (
                 <>
-                  <Zap className="w-4 h-4 fill-current" />
+                  <Send className="w-4 h-4" />
                   <span>
-                    🚀 提交 Alpaca 订单 ({tradeSide.toUpperCase()} {selectedSymbol} 敞口 ${(tradeAmount * tradeLeverage).toFixed(0)} USD)
+                    提交 Alpaca 订单 ({tradeSide.toUpperCase()} {selectedSymbol} 敞口 ${(tradeAmount * tradeLeverage).toFixed(0)} USD)
                   </span>
                 </>
               )}
