@@ -94,27 +94,80 @@ export function AgentCardTerminal({ currentAccount }: AgentCardTerminalProps) {
     setCardTilt({ rotateX: 0, rotateY: 0, glareX: 50, glareY: 50, active: false });
   };
 
-  // ==================== 1. STEAM 1-CLICK CONNECT & PROOFS ====================
+  // ==================== 1. STEAM CONNECT & PROOFS ====================
   const [steamConnected, setSteamConnected] = useState(false);
   const [steamLoading, setSteamLoading] = useState(false);
   const [steamData, setSteamData] = useState<GameStats | null>(null);
   const [gameProof, setGameProof] = useState<GameplayProof | null>(null);
   const [proofLoading, setProofLoading] = useState(false);
+  const [customSteamInput, setCustomSteamInput] = useState("");
+  const [showCustomInput, setShowCustomInput] = useState(false);
+  const [steamNotice, setSteamNotice] = useState<string | null>(null);
 
-  const handle1ClickSteamConnect = async () => {
+  // Auto-detect OpenID callback or Stripe success on mount
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+
+    // Detect Stripe checkout return
+    const status = params.get("status");
+    if (status === "success") {
+      setStripeToast("🎉 Stripe 充值成功！资金已到账至您的 AgentCard 授信额度。");
+      setCreditLimit((prev) => prev + 50);
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+
+    // Detect Steam OpenID callback (claimed_id format: https://steamcommunity.com/openid/id/76561198...)
+    const claimedId = params.get("openid.claimed_id");
+    if (claimedId) {
+      const match = claimedId.match(/\/id\/(\d+)/);
+      if (match && match[1]) {
+        const id = match[1];
+        localStorage.setItem("koliance_steam_id", id);
+        loadSteamProfile(id);
+        window.history.replaceState({}, document.title, window.location.pathname);
+        return;
+      }
+    }
+
+    // Check cached Steam ID
+    const cached = localStorage.getItem("koliance_steam_id");
+    if (cached) {
+      loadSteamProfile(cached);
+    }
+  }, []);
+
+  const loadSteamProfile = async (identifier: string) => {
     setSteamLoading(true);
+    setSteamNotice(null);
     try {
-      // 1-Click zero typing: default active gaming operative account
-      const res = await fetchGameStats("76561198000000000");
+      const res = await fetchGameStats(identifier);
       if (res) {
         setSteamData(res);
         setSteamConnected(true);
+        localStorage.setItem("koliance_steam_id", res.steamId);
+        if (res.totalGames === 0) {
+          setSteamNotice("💡 提示：若游戏时长显示为 0，请检查 Steam [个人资料 -> 隐私设置] 是否将『游戏详情』设为公开。");
+        }
       }
-    } catch (err) {
-      console.error(err);
+    } catch (err: any) {
+      setSteamNotice(`读取 Steam 资料失败: ${err?.message || err}`);
     } finally {
       setSteamLoading(false);
     }
+  };
+
+  // Official Steam OpenID 2.0 1-Click Redirect
+  const handleSteamOpenIDLogin = () => {
+    const returnUrl = encodeURIComponent(`${window.location.origin}/agentcard`);
+    const realm = encodeURIComponent(window.location.origin);
+    window.location.href = `https://steamcommunity.com/openid/login?openid.ns=http://specs.openid.net/auth/2.0&openid.mode=checkid_setup&openid.return_to=${returnUrl}&openid.realm=${realm}&openid.identity=http://specs.openid.net/auth/2.0/identifier_select&openid.claimed_id=http://specs.openid.net/auth/2.0/identifier_select`;
+  };
+
+  const handleCustomSteamSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!customSteamInput.trim()) return;
+    loadSteamProfile(customSteamInput.trim());
   };
 
   const handleMintGameplayProof = async () => {
@@ -124,7 +177,6 @@ export function AgentCardTerminal({ currentAccount }: AgentCardTerminalProps) {
       const proof = await generateGameplayProof(steamData.steamId, targetAddress, 730);
       if (proof) {
         setGameProof(proof);
-        // Automatically unlock extra credit limit
         setCreditLimit((prev) => prev + proof.creditUnlockUSD);
       }
     } catch (err) {
@@ -136,32 +188,31 @@ export function AgentCardTerminal({ currentAccount }: AgentCardTerminalProps) {
 
   // ==================== 2. STRIPE 1-CLICK TOP-UP ====================
   const [stripeModalOpen, setStripeModalOpen] = useState(false);
-  const [topupAmount, setTopupAmount] = useState<number>(50);
+  const [topupAmount, setTopupAmount] = useState<number>(25);
   const [stripeLoading, setStripeLoading] = useState(false);
   const [stripeToast, setStripeToast] = useState<string | null>(null);
 
   const handleExecuteStripeCheckout = async () => {
+    if (topupAmount < 0.5) {
+      setStripeToast("⚠️ Stripe 官方规定 USD 最低充值金额为 $0.50");
+      return;
+    }
     setStripeLoading(true);
+    setStripeToast(null);
     try {
-      const res = await createStripeCheckout(topupAmount * 100, `AgentCard Deposit $${topupAmount} USD`);
+      const amountCents = Math.round(topupAmount * 100);
+      const res = await createStripeCheckout(amountCents, `Koliance AgentCard $${topupAmount} Top-Up`);
       if (res && res.url) {
-        // Open real Stripe Checkout URL in new window
-        window.open(res.url, "_blank");
-        setStripeToast(`Stripe 收银台已生成！充值 $${topupAmount} USD 已记账`);
-        setCreditLimit((prev) => prev + topupAmount);
+        setStripeToast("🚀 正在跳转至 Stripe 官方安全收银台...");
+        // Direct redirect to Stripe Hosted Checkout
+        window.location.href = res.url;
       } else {
-        // Fallback local instant simulation
-        setCreditLimit((prev) => prev + topupAmount);
-        setStripeToast(`已为卡片充值 $${topupAmount} USD！可用额度已刷新`);
+        setStripeToast(`Stripe 异常: ${res?.error || "请检查网络或稍后重试"}`);
       }
-      setTimeout(() => setStripeModalOpen(false), 1200);
-    } catch {
-      setCreditLimit((prev) => prev + topupAmount);
-      setStripeToast(`模拟充值 $${topupAmount} USD 成功！`);
-      setTimeout(() => setStripeModalOpen(false), 1200);
+    } catch (err: any) {
+      setStripeToast(`发起支付失败: ${err?.message || err}`);
     } finally {
       setStripeLoading(false);
-      setTimeout(() => setStripeToast(null), 4000);
     }
   };
 
@@ -288,39 +339,52 @@ export function AgentCardTerminal({ currentAccount }: AgentCardTerminalProps) {
                 Steam 游戏时长与成就认证 (Proof of Gameplay)
               </h2>
               <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-400/30">
-                KISS · 免输长ID
+                支持官方 OpenID / 自定义账号
               </span>
             </div>
             <p className="text-xs sm:text-sm text-slate-300 font-mono">
-              点击即可秒级连接官方 Steam Web API，提取玩家全量游戏库与总时长，生成 Keccak256 链上信用背书。
+              连接您的真实 Steam 账号或自定义绑定，实时拉取全量游戏库与总时长，生成 Keccak256 链上信用背书。
             </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
             {!steamConnected ? (
-              <button
-                onClick={handle1ClickSteamConnect}
-                disabled={steamLoading}
-                className="px-6 py-3 rounded-2xl bg-cyan-400 hover:bg-cyan-300 text-black font-extrabold text-xs sm:text-sm font-mono transition shadow-[0_0_25px_rgba(34,211,238,0.4)] flex items-center gap-2 active:scale-95"
-              >
-                {steamLoading ? (
-                  <>
-                    <RefreshCw className="w-4 h-4 animate-spin text-black" />
-                    <span>正在连接 Steam API...</span>
-                  </>
-                ) : (
-                  <>
-                    <Zap className="w-4 h-4 text-black fill-current" />
-                    <span>🎮 一键连接并同步 Steam 游戏库</span>
-                  </>
-                )}
-              </button>
+              <>
+                {/* 1. Official Steam OpenID Button */}
+                <button
+                  onClick={handleSteamOpenIDLogin}
+                  className="px-5 py-3 rounded-2xl bg-cyan-400 hover:bg-cyan-300 text-black font-extrabold text-xs sm:text-sm font-mono transition shadow-[0_0_25px_rgba(34,211,238,0.4)] flex items-center gap-2 active:scale-95"
+                >
+                  <Zap className="w-4 h-4 text-black fill-current" />
+                  <span>🔑 登录我的 Steam 账号 (官方认证)</span>
+                </button>
+
+                {/* 2. Custom Input Toggle */}
+                <button
+                  onClick={() => setShowCustomInput(!showCustomInput)}
+                  className="px-4 py-3 rounded-2xl bg-white/[0.06] hover:bg-white/10 text-slate-200 border border-white/10 text-xs font-mono transition"
+                >
+                  {showCustomInput ? "收起输入框" : "输入 Steam 昵称 / 链接"}
+                </button>
+              </>
             ) : (
-              <div className="flex items-center gap-3">
+              <div className="flex flex-wrap items-center gap-3">
                 <span className="px-3 py-1.5 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 text-xs font-mono flex items-center gap-1.5">
                   <Check className="w-3.5 h-3.5" />
-                  <span>Steam 已连接：{steamData?.personaName}</span>
+                  <span>已绑定：{steamData?.personaName}</span>
                 </span>
+
+                <button
+                  onClick={() => {
+                    setSteamConnected(false);
+                    setSteamData(null);
+                    localStorage.removeItem("koliance_steam_id");
+                  }}
+                  className="px-3 py-1.5 rounded-xl bg-white/[0.06] hover:bg-white/10 text-slate-400 hover:text-white text-xs font-mono transition"
+                >
+                  切换账号
+                </button>
+
                 <button
                   onClick={handleMintGameplayProof}
                   disabled={proofLoading || !!gameProof}
@@ -345,6 +409,54 @@ export function AgentCardTerminal({ currentAccount }: AgentCardTerminalProps) {
           </div>
         </div>
 
+        {/* Custom Steam Input & Presets Bar */}
+        {(!steamConnected && showCustomInput) && (
+          <div className="mt-4 pt-4 border-t border-white/10 space-y-3 font-mono">
+            <form onSubmit={handleCustomSteamSubmit} className="flex gap-2">
+              <input
+                type="text"
+                value={customSteamInput}
+                onChange={(e) => setCustomSteamInput(e.target.value)}
+                placeholder="输入你的 Steam 自定义昵称 / 主页链接 / 17位ID (如 gabelogannewell 或 https://steamcommunity.com/id/...)"
+                className="flex-1 px-4 py-2.5 rounded-xl bg-black/50 border border-white/10 text-white text-xs focus:outline-none focus:border-cyan-400"
+              />
+              <button
+                type="submit"
+                disabled={steamLoading || !customSteamInput.trim()}
+                className="px-5 py-2.5 rounded-xl bg-cyan-400 hover:bg-cyan-300 text-black font-bold text-xs transition"
+              >
+                {steamLoading ? "查询中..." : "绑定此账号"}
+              </button>
+            </form>
+
+            <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-400">
+              <span>快速体验公开账号：</span>
+              <button
+                type="button"
+                onClick={() => loadSteamProfile("76561197960287930")}
+                className="px-2.5 py-1 rounded-lg bg-white/[0.06] hover:bg-white/10 text-cyan-300 transition"
+              >
+                👑 Gabe Newell (Valve CEO)
+              </button>
+              <button
+                type="button"
+                onClick={() => loadSteamProfile("76561198034202275")}
+                className="px-2.5 py-1 rounded-lg bg-white/[0.06] hover:bg-white/10 text-emerald-300 transition"
+              >
+                ⚡ CS2 5000h 高玩
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Privacy Notice or Warning */}
+        {steamNotice && (
+          <div className="mt-3 p-3 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-300 text-xs font-mono flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 shrink-0" />
+            <span>{steamNotice}</span>
+          </div>
+        )}
+
         {/* Display Connected Games & Live Playtime */}
         {steamConnected && steamData && (
           <motion.div
@@ -358,8 +470,8 @@ export function AgentCardTerminal({ currentAccount }: AgentCardTerminalProps) {
                 alt="Avatar"
                 className="w-10 h-10 rounded-xl border border-white/20"
               />
-              <div>
-                <span className="text-white font-bold block">{steamData.personaName}</span>
+              <div className="overflow-hidden">
+                <span className="text-white font-bold block truncate">{steamData.personaName}</span>
                 <span className="text-slate-400 text-[10px]">SteamID: {steamData.steamId.slice(0, 10)}...</span>
               </div>
             </div>
@@ -375,11 +487,15 @@ export function AgentCardTerminal({ currentAccount }: AgentCardTerminalProps) {
               <div className="space-y-1">
                 <span className="text-slate-400 text-[10px] block">前三热门时长标的</span>
                 <div className="flex items-center gap-2">
-                  {steamData.topGames.slice(0, 3).map((g) => (
-                    <span key={g.appId} className="px-2 py-0.5 rounded bg-white/10 text-white text-[11px] font-bold">
-                      {g.name}: {g.hoursPlayed.toFixed(0)}h
-                    </span>
-                  ))}
+                  {steamData.topGames.length > 0 ? (
+                    steamData.topGames.slice(0, 3).map((g) => (
+                      <span key={g.appId} className="px-2 py-0.5 rounded bg-white/10 text-white text-[11px] font-bold">
+                        {g.name}: {g.hoursPlayed.toFixed(0)}h
+                      </span>
+                    ))
+                  ) : (
+                    <span className="text-slate-500 text-[11px]">隐私设置为非公开或暂无公开记录</span>
+                  )}
                 </div>
               </div>
               <span className="px-2.5 py-1 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 font-bold text-[11px] shrink-0">
@@ -666,37 +782,58 @@ export function AgentCardTerminal({ currentAccount }: AgentCardTerminalProps) {
               </div>
 
               <div className="space-y-3">
-                <span className="text-xs text-slate-300">选择快捷充值金额 (USD)：</span>
-                <div className="grid grid-cols-3 gap-2">
-                  {[10, 50, 100].map((amt) => (
-                    <button
-                      key={amt}
-                      onClick={() => setTopupAmount(amt)}
-                      className={`py-3 rounded-2xl text-sm font-bold transition border ${
-                        topupAmount === amt
-                          ? "bg-white text-black border-white"
-                          : "bg-white/[0.05] text-slate-300 border-white/10 hover:border-white/30"
-                      }`}
-                    >
-                      ${amt}
-                    </button>
-                  ))}
+                <div className="p-3 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 text-xs space-y-1">
+                  <span className="text-indigo-300 font-bold block">💡 充值资金流向说明：</span>
+                  <p className="text-slate-300 text-[11px] leading-relaxed">
+                    资金直接入账至您的 Stripe 开发者测试商户；支付完成后自动同步记入本 AgentCard（Visa 4928）的可用授信额度。
+                  </p>
                 </div>
 
-                <div className="pt-2">
-                  <span className="text-[11px] text-slate-400 block mb-1">自定义金额:</span>
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-slate-300">选择快捷充值金额 (USD)：</span>
+                    <span className="text-[10px] text-amber-400">⚠️ Stripe 最低金额: $0.50</span>
+                  </div>
+                  <div className="grid grid-cols-5 gap-1.5">
+                    {[5, 10, 25, 50, 100].map((amt) => (
+                      <button
+                        key={amt}
+                        onClick={() => setTopupAmount(amt)}
+                        className={`py-2 rounded-xl text-xs font-bold transition border ${
+                          topupAmount === amt
+                            ? "bg-white text-black border-white"
+                            : "bg-white/[0.05] text-slate-300 border-white/10 hover:border-white/30"
+                        }`}
+                      >
+                        ${amt}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="pt-1">
+                  <div className="flex items-center justify-between text-[11px] text-slate-400 mb-1">
+                    <span>自定义金额 (USD):</span>
+                    <span className="text-slate-500">需 &ge; $0.50</span>
+                  </div>
                   <input
                     type="number"
                     value={topupAmount}
                     onChange={(e) => setTopupAmount(Number(e.target.value))}
-                    min={1}
-                    className="w-full px-4 py-2.5 rounded-xl bg-black/50 border border-white/10 text-white text-sm focus:outline-none focus:border-indigo-400"
+                    min={0.5}
+                    step={0.5}
+                    className="w-full px-4 py-2.5 rounded-xl bg-black/50 border border-white/10 text-white text-sm focus:outline-none focus:border-indigo-400 font-mono"
                   />
+                  {topupAmount < 0.5 && (
+                    <span className="text-red-400 text-[10px] block mt-1">
+                      * Stripe 官方规定 USD 单笔最低扣费金额为 $0.50 (50 美分)
+                    </span>
+                  )}
                 </div>
               </div>
 
               {stripeToast && (
-                <div className="p-3 rounded-xl bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-xs">
+                <div className="p-3 rounded-xl bg-indigo-500/20 text-indigo-200 border border-indigo-500/40 text-xs">
                   {stripeToast}
                 </div>
               )}
@@ -704,23 +841,23 @@ export function AgentCardTerminal({ currentAccount }: AgentCardTerminalProps) {
               <div className="pt-2 space-y-2">
                 <button
                   onClick={handleExecuteStripeCheckout}
-                  disabled={stripeLoading || topupAmount <= 0}
-                  className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white font-bold text-sm transition shadow-lg flex items-center justify-center gap-2 active:scale-95"
+                  disabled={stripeLoading || topupAmount < 0.5}
+                  className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 disabled:opacity-50 text-white font-bold text-sm transition shadow-lg flex items-center justify-center gap-2 active:scale-95"
                 >
                   {stripeLoading ? (
                     <>
                       <RefreshCw className="w-4 h-4 animate-spin" />
-                      <span>正在连接 Stripe 收银台...</span>
+                      <span>正在跳转 Stripe 收银台...</span>
                     </>
                   ) : (
                     <>
                       <Zap className="w-4 h-4" />
-                      <span>前往 Stripe 安全支付 (${topupAmount} USD)</span>
+                      <span>前往 Stripe 官方收银台支付 (${topupAmount} USD)</span>
                     </>
                   )}
                 </button>
                 <p className="text-[10px] text-slate-500 text-center">
-                  由 Stripe Test Mode 沙盒提供安全支付保障 · 支持 Visa / Mastercard
+                  跳转至 Stripe 官方托管收银页面 · 支持测试卡 4242 4242... 秒级支付
                 </p>
               </div>
             </motion.div>

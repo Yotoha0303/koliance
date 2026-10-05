@@ -51,6 +51,19 @@ export interface VisaCardData {
   createdAt: string;
 }
 
+export interface MarketPosition {
+  asset_id?: string;
+  symbol: string;
+  qty: string;
+  avg_entry_price?: string;
+  side: string;
+  market_value: string;
+  cost_basis?: string;
+  unrealized_pl: string;
+  unrealized_plpc: string;
+  current_price: string;
+}
+
 export interface MarketOverviewData {
   account: {
     id: string;
@@ -58,16 +71,13 @@ export interface MarketOverviewData {
     buying_power: string;
     cash: string;
     portfolio_value: string;
+    equity: string;
     multiplier: string;
     shorting_enabled: boolean;
+    long_market_value?: string;
+    short_market_value?: string;
   };
-  positions: Array<{
-    symbol: string;
-    qty: string;
-    side: string;
-    current_price: string;
-    unrealized_pl: string;
-  }>;
+  positions: MarketPosition[];
   realtimePrices: Array<{
     symbol: string;
     feedId: string;
@@ -174,6 +184,19 @@ export async function executeMarketTrade(symbol: string, side: "buy" | "sell", n
     return await res.json();
   } catch (err) {
     return { success: false, message: String(err) };
+  }
+}
+
+export async function closeMarketPosition(symbol: string) {
+  try {
+    const res = await fetch(`${GO_BACKEND_URL}/api/v1/market/close`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ symbol }),
+    });
+    return await res.json();
+  } catch (err) {
+    return { error: String(err) };
   }
 }
 

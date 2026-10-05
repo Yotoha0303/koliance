@@ -64,8 +64,13 @@ func (s *Service) ExecuteTrade(req TradeRequest) (*TradeResult, error) {
 		return &TradeResult{Success: false, Message: "Notional USD must be greater than zero"}, nil
 	}
 
+	effectiveNotional := req.NotionalUSD
+	if req.Leverage > 1 {
+		effectiveNotional = req.NotionalUSD * req.Leverage
+	}
+
 	// Format notional to 2 decimal places string
-	notionalStr := strconv.FormatFloat(req.NotionalUSD, 'f', 2, 64)
+	notionalStr := strconv.FormatFloat(effectiveNotional, 'f', 2, 64)
 
 	order, err := s.alpaca.CreateOrder(OrderRequest{
 		Symbol:      req.Symbol,
@@ -80,17 +85,17 @@ func (s *Service) ExecuteTrade(req TradeRequest) (*TradeResult, error) {
 			Message:     err.Error(),
 			Symbol:      req.Symbol,
 			Side:        req.Side,
-			NotionalUSD: req.NotionalUSD,
+			NotionalUSD: effectiveNotional,
 		}, nil
 	}
 
 	return &TradeResult{
 		Success:     true,
 		Order:       order,
-		Message:     fmt.Sprintf("Order placed successfully for %s (%s)", req.Symbol, req.Side),
+		Message:     fmt.Sprintf("Order placed successfully for %s (%s, %.0fx leverage: $%.2f notional with $%.2f margin)", req.Symbol, req.Side, req.Leverage, effectiveNotional, req.NotionalUSD),
 		Symbol:      req.Symbol,
 		Side:        req.Side,
-		NotionalUSD: req.NotionalUSD,
+		NotionalUSD: effectiveNotional,
 	}, nil
 }
 

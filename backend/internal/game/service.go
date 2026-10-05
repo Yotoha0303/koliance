@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/koliance/backend/internal/platform/database"
@@ -51,8 +52,35 @@ type GameplayProofResponse struct {
 	GeneratedAt    time.Time `json:"generatedAt"`
 }
 
+func cleanSteamIdentifier(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if idx := strings.Index(raw, "/profiles/"); idx != -1 {
+		part := raw[idx+len("/profiles/"):]
+		part = strings.Trim(part, "/")
+		if cut := strings.Index(part, "?"); cut != -1 {
+			part = part[:cut]
+		}
+		return part
+	}
+	if idx := strings.Index(raw, "/id/"); idx != -1 {
+		part := raw[idx+len("/id/"):]
+		part = strings.Trim(part, "/")
+		if cut := strings.Index(part, "?"); cut != -1 {
+			part = part[:cut]
+		}
+		return part
+	}
+	if idx := strings.Index(raw, "openid/id/"); idx != -1 {
+		part := raw[idx+len("openid/id/"):]
+		part = strings.Trim(part, "/")
+		return part
+	}
+	return strings.Trim(raw, "/")
+}
+
 // GetUserGameStats resolves vanity name if needed and aggregates play stats
-func (s *Service) GetUserGameStats(identifier string) (*GameStatsResponse, error) {
+func (s *Service) GetUserGameStats(rawIdentifier string) (*GameStatsResponse, error) {
+	identifier := cleanSteamIdentifier(rawIdentifier)
 	steamID := identifier
 	// If identifier is not all digits, resolve vanity
 	isAllDigits := true
@@ -62,7 +90,7 @@ func (s *Service) GetUserGameStats(identifier string) (*GameStatsResponse, error
 			break
 		}
 	}
-	if !isAllDigits {
+	if !isAllDigits && identifier != "" {
 		resolved, err := s.client.ResolveVanityURL(identifier)
 		if err == nil && resolved != "" {
 			steamID = resolved
