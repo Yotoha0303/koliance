@@ -1,12 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
 
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization",
+};
+
+export async function OPTIONS() {
+  return new NextResponse(null, {
+    status: 200,
+    headers: corsHeaders,
+  });
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { code, clientId: clientProvidedId, clientSecret: clientProvidedSecret } = body;
+    const { code, clientId: clientProvidedId, clientSecret: clientProvidedSecret, redirect_uri } = body;
 
     if (!code) {
-      return NextResponse.json({ error: "Missing authorization code" }, { status: 400 });
+      return NextResponse.json({ error: "Missing authorization code" }, { status: 400, headers: corsHeaders });
     }
 
     const clientId =
@@ -26,29 +39,34 @@ export async function POST(request: NextRequest) {
           error: "GITHUB_CLIENT_ID or GITHUB_CLIENT_SECRET not configured on server",
           needsConfig: true,
         },
-        { status: 400 }
+        { status: 400, headers: corsHeaders }
       );
     }
 
     // 1. Exchange code for access_token with GitHub OAuth
+    const tokenRequestBody: Record<string, string> = {
+      client_id: clientId,
+      client_secret: clientSecret,
+      code,
+    };
+    if (redirect_uri) {
+      tokenRequestBody.redirect_uri = redirect_uri;
+    }
+
     const tokenRes = await fetch("https://github.com/login/oauth/access_token", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Accept: "application/json",
       },
-      body: JSON.stringify({
-        client_id: clientId,
-        client_secret: clientSecret,
-        code,
-      }),
+      body: JSON.stringify(tokenRequestBody),
     });
 
     const tokenData = await tokenRes.json();
     if (!tokenRes.ok || tokenData.error) {
       return NextResponse.json(
         { error: tokenData.error_description || tokenData.error || "Failed to exchange code" },
-        { status: 400 }
+        { status: 400, headers: corsHeaders }
       );
     }
 
@@ -113,26 +131,29 @@ export async function POST(request: NextRequest) {
       creditUSD = 2500;
     }
 
-    return NextResponse.json({
-      success: true,
-      stats: {
-        username: userData.login,
-        name: userData.name || userData.login,
-        avatarUrl: userData.avatar_url,
-        htmlUrl: userData.html_url,
-        bio: userData.bio || "Verified GitHub Developer",
-        company: userData.company || "Independent",
-        location: userData.location || "Earth",
-        publicRepos: reposCount,
-        followers: userData.followers || 0,
-        totalStars,
-        languages: Array.from(langSet),
-        topRepos,
-        buidlTier: tier,
-        creditAllowanceUSD: creditUSD,
+    return NextResponse.json(
+      {
+        success: true,
+        stats: {
+          username: userData.login,
+          name: userData.name || userData.login,
+          avatarUrl: userData.avatar_url,
+          htmlUrl: userData.html_url,
+          bio: userData.bio || "Verified GitHub Developer",
+          company: userData.company || "Independent",
+          location: userData.location || "Earth",
+          publicRepos: reposCount,
+          followers: userData.followers || 0,
+          totalStars,
+          languages: Array.from(langSet),
+          topRepos,
+          buidlTier: tier,
+          creditAllowanceUSD: creditUSD,
+        },
       },
-    });
+      { headers: corsHeaders }
+    );
   } catch (err: any) {
-    return NextResponse.json({ error: String(err?.message || err) }, { status: 500 });
+    return NextResponse.json({ error: String(err?.message || err) }, { status: 500, headers: corsHeaders });
   }
 }

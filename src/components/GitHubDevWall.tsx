@@ -25,6 +25,43 @@ import {
   DeveloperProof,
 } from "@/lib/api";
 
+// Safe Base64 + URL encode/decode for cross-domain OAuth state relay
+function encodeOAuthState(data: { origin: string; path: string; t: number }): string {
+  try {
+    return encodeURIComponent(btoa(unescape(encodeURIComponent(JSON.stringify(data)))));
+  } catch {
+    return encodeURIComponent(btoa(JSON.stringify(data)));
+  }
+}
+
+function decodeOAuthState(str: string): { origin?: string; path?: string } | null {
+  try {
+    const raw = decodeURIComponent(str);
+    const decoded = decodeURIComponent(escape(atob(raw)));
+    return JSON.parse(decoded);
+  } catch {
+    try {
+      return JSON.parse(atob(decodeURIComponent(str)));
+    } catch {
+      return null;
+    }
+  }
+}
+
+const TRUSTED_ORIGINS = [
+  "https://koliance.oodai.space",
+  "https://koliance.vercel.app",
+  "http://localhost:3000",
+  "http://127.0.0.1:3000",
+];
+
+function isTrustedOrigin(origin: string): boolean {
+  if (TRUSTED_ORIGINS.includes(origin)) return true;
+  if (origin.startsWith("http://localhost:") || origin.startsWith("http://127.0.0.1:")) return true;
+  if (origin.endsWith(".vercel.app") || origin.endsWith(".oodai.space")) return true;
+  return false;
+}
+
 interface GitHubDevWallProps {
   currentAccount: `0x${string}` | null;
   onProofMinted?: (proof: DeveloperProof) => void;
@@ -50,8 +87,22 @@ export function GitHubDevWall({ currentAccount, onProofMinted }: GitHubDevWallPr
     if (typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
     const code = params.get("code");
+    const rawState = params.get("state");
 
     if (code) {
+      // 1. Dual-domain Relay Check:
+      // If authorization was initiated from another domain (e.g. started on https://koliance.oodai.space,
+      // but GitHub redirected to https://koliance.vercel.app as the registered callback),
+      // seamlessly bounce the user back to their initiating domain with the authorization code!
+      if (rawState) {
+        const stateData = decodeOAuthState(rawState);
+        if (stateData?.origin && stateData.origin !== window.location.origin && isTrustedOrigin(stateData.origin)) {
+          const targetPath = stateData.path || "/agentcard";
+          window.location.replace(`${stateData.origin}${targetPath}?code=${code}`);
+          return;
+        }
+      }
+
       handleOAuthCodeExchange(code);
       return;
     }
@@ -131,8 +182,15 @@ export function GitHubDevWall({ currentAccount, onProofMinted }: GitHubDevWallPr
       return;
     }
 
-    const returnUrl = encodeURIComponent(`${window.location.origin}/agentcard`);
-    window.location.href = `https://github.com/login/oauth/authorize?client_id=${configuredClientId}&redirect_uri=${returnUrl}&scope=read:user`;
+    const state = encodeOAuthState({
+      origin: window.location.origin,
+      path: window.location.pathname || "/agentcard",
+      t: Date.now(),
+    });
+
+    // Omit redirect_uri so GitHub redirects to the app's registered callback URL
+    // (supporting both https://koliance.oodai.space and https://koliance.vercel.app via relay)
+    window.location.href = `https://github.com/login/oauth/authorize?client_id=${configuredClientId}&scope=read:user&state=${state}`;
   };
 
   const handleSaveOAuthAndRedirect = () => {
@@ -143,8 +201,13 @@ export function GitHubDevWall({ currentAccount, onProofMinted }: GitHubDevWallPr
     }
     setOauthModalOpen(false);
 
-    const returnUrl = encodeURIComponent(`${window.location.origin}/agentcard`);
-    window.location.href = `https://github.com/login/oauth/authorize?client_id=${clientIdInput.trim()}&redirect_uri=${returnUrl}&scope=read:user`;
+    const state = encodeOAuthState({
+      origin: window.location.origin,
+      path: window.location.pathname || "/agentcard",
+      t: Date.now(),
+    });
+
+    window.location.href = `https://github.com/login/oauth/authorize?client_id=${clientIdInput.trim()}&scope=read:user&state=${state}`;
   };
 
   const handleCustomSubmit = (e: React.FormEvent) => {

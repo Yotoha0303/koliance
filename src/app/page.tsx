@@ -54,7 +54,7 @@ function MainContent() {
   const searchParams = useSearchParams();
   const initialView =
     (searchParams.get("view") as NavView) ||
-    (searchParams.get("openid.claimed_id") || searchParams.get("status") ? "AGENTCARD" : "INDEX");
+    (searchParams.get("openid.claimed_id") || searchParams.get("status") || searchParams.get("code") ? "AGENTCARD" : "INDEX");
 
   const [account, setAccount] = useState<`0x${string}` | null>(null);
   const [balance, setBalance] = useState("0.00");
