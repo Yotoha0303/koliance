@@ -52,7 +52,9 @@ import { checkBackendHealth } from "@/lib/api";
 
 function MainContent() {
   const searchParams = useSearchParams();
-  const initialView = (searchParams.get("view") as NavView) || "INDEX";
+  const initialView =
+    (searchParams.get("view") as NavView) ||
+    (searchParams.get("openid.claimed_id") || searchParams.get("status") ? "AGENTCARD" : "INDEX");
 
   const [account, setAccount] = useState<`0x${string}` | null>(null);
   const [balance, setBalance] = useState("0.00");

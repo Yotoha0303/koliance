@@ -118,16 +118,14 @@ export function AgentCardTerminal({ currentAccount }: AgentCardTerminalProps) {
     }
 
     // Detect Steam OpenID callback (claimed_id format: https://steamcommunity.com/openid/id/76561198...)
-    const claimedId = params.get("openid.claimed_id");
-    if (claimedId) {
-      const match = claimedId.match(/\/id\/(\d+)/);
-      if (match && match[1]) {
-        const id = match[1];
-        localStorage.setItem("koliance_steam_id", id);
-        loadSteamProfile(id);
-        window.history.replaceState({}, document.title, window.location.pathname);
-        return;
-      }
+    const claimedId = params.get("openid.claimed_id") || params.get("openid.identity");
+    const rawMatch = (claimedId || window.location.href).match(/openid\/id\/(\d{17})/) || (claimedId ? claimedId.match(/(\d{17})/) : null);
+    if (rawMatch && rawMatch[1]) {
+      const id = rawMatch[1];
+      localStorage.setItem("koliance_steam_id", id);
+      loadSteamProfile(id);
+      window.history.replaceState({}, document.title, window.location.pathname);
+      return;
     }
 
     // Check cached Steam ID
