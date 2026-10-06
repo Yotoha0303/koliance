@@ -80,4 +80,15 @@ interface IPositionManager {
     function maintenanceMarginBps() external view returns (uint256);
     function liquidatorRewardBps() external view returns (uint256);
     function maxLeverageBps() external view returns (uint256);
+
+    /// @notice 18-decimal USD the Vault must keep in reserve to honour open positions.
+    ///
+    /// Without this, LPs could withdraw the collateral backing live positions and
+    /// winning traders would have nothing to be paid from. `Vault.removeLiquidity`
+    /// subtracts this from available assets before allowing a withdrawal.
+    ///
+    /// Implementations should report the amount that could realistically be owed —
+    /// open collateral plus uncapped profit would be unbounded, so reporting open
+    /// collateral is the conservative floor.
+    function reservedAssets() external view returns (uint256);
 }
