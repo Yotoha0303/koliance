@@ -1,0 +1,544 @@
+import assert from "node:assert/strict";
+import { describe, it } from "node:test";
+import { network } from "hardhat";
+
+/**
+ * Integration tests: MockUSDC + DemoOracle + Vault + PositionManager wired
+ * together the way the deployment will be.
+ *
+ * Wiring order matters and is asserted below — PositionManager settles fees and
+ * payouts through the Vault, so `vault.setPositionManager(pm)` must happen before
+ * any position can open.
+ */
+
+const E18 = 10n ** 18n;
+const E6 = 10n ** 6n;
+const usd = (n: bigint | number) => BigInt(n) * E18;
+const usdc = (n: bigint | number) => BigInt(n) * E6;
+
+const NVDA = "0xa470c4ac46f44b547b2cba52338f311fb642b79375ce5f0cfd5cb5b99227b852" as const;
+const BTC = "0xe62df6c8b4a85fe1a67db44dc12de5db330f7ac66b72dc658afedf0f4a415b43" as const;
+
+const BPS = 10_000n;
+const OPEN_FEE_BPS = 10n;
+const CLOSE_FEE_BPS = 10n;
+const MMR_BPS = 100n;
+const LIQ_REWARD_BPS = 500n;
+
+const PRICE_180 = usd(180);
+
+/**
+ * Mirrors PositionManager._isLiquidatable so tests can compute the exact price at
+ * which a verdict flips. Kept in the same operation order as the contract — two
+ * integer divisions, in that order — or the boundary tests become meaningless.
+ */
+function computeLiquidationPrice(
+  collateralUsd: bigint,
+  entryPrice: bigint,
+  leverageBps: bigint,
+  isLong: boolean
+): bigint {
+  const size = (collateralUsd * leverageBps) / BPS;
+  const mm = (size * MMR_BPS) / BPS;
+  if (isLong) {
+    const num = mm - collateralUsd + size;
+    return (entryPrice * num) / size;
+  }
+  const num = collateralUsd + size - mm;
+  return (entryPrice * num) / size;
+}
+
+function pnlOf(
+  collateralUsd: bigint,
+  entryPrice: bigint,
+  leverageBps: bigint,
+  isLong: boolean,
+  exitPrice: bigint
+): bigint {
+  const size = (collateralUsd * leverageBps) / BPS;
+  const delta = isLong ? exitPrice - entryPrice : entryPrice - exitPrice;
+  return (size * delta) / entryPrice;
+}
+
+describe("PositionManager", async function () {
+  const { viem } = await network.getOrCreate();
+  const [deployer, lp, trader, otherTrader, liquidator] = await viem.getWalletClients();
+
+  /** Full deployment, wired the way production will be. */
+  async function setup() {
+    const token = await viem.deployContract("MockUSDC");
+    const oracle = await viem.deployContract("DemoOracle");
+    const vault = await viem.deployContract("Vault", [token.address, deployer.account.address]);
+    const pm = await viem.deployContract("PositionManager", [
+      vault.address,
+      oracle.address,
+      token.address,
+      deployer.account.address,
+    ]);
+
+    // PositionManager settles through the Vault, so the wiring has to precede use.
+    await vault.write.setPositionManager([pm.address]);
+
+    await oracle.write.setPrice([NVDA, PRICE_180]);
+    await oracle.write.setPrice([BTC, usd(65_000)]);
+
+    // Seed LP liquidity.
+    await token.write.mint([lp.account.address, usdc(100_000)]);
+    await token.write.approve([vault.address, usdc(100_000)], { account: lp.account });
+    await vault.write.addLiquidity([usdc(100_000)], { account: lp.account });
+
+    // Fund traders and approve the PositionManager (it is the spender, not the Vault).
+    for (const who of [trader, otherTrader, liquidator]) {
+      await token.write.mint([who.account.address, usdc(10_000)]);
+      await token.write.approve([pm.address, usdc(10_000)], { account: who.account });
+    }
+
+    return { token, oracle, vault, pm };
+  }
+
+  /** Open a position and return its id. */
+  async function open(
+    pm: any,
+    who: any,
+    opts: { feedId?: `0x${string}`; collateral?: bigint; leverageBps?: bigint; isLong?: boolean } = {}
+  ) {
+    const {
+      feedId = NVDA,
+      collateral = usdc(1_000),
+      leverageBps = 100_000n,
+      isLong = true,
+    } = opts;
+    await pm.write.openPosition([feedId, collateral, leverageBps, isLong, []], {
+      account: who.account,
+    });
+    return await pm.read.nextPositionId();
+  }
+
+  // ==================== OPEN ====================
+
+  it("Opens a position, routes collateral to the Vault, and takes the open fee", async function () {
+    const { token, vault, pm } = await setup();
+
+    const id = await open(pm, trader, { collateral: usdc(1_000), leverageBps: 100_000n });
+
+    // 1000 USDC in, 0.1% fee = 1 USD, so 999 USD of collateral.
+    const p = await pm.read.getPosition([id]);
+    assert.equal(p.collateralUsd, usd(999));
+    assert.equal(p.sizeUsd, usd(9_990)); // 999 * 10x
+    assert.equal(p.entryPrice, PRICE_180);
+    assert.equal(p.isLong, true);
+    assert.equal((p.owner as string).toLowerCase(), trader.account.address.toLowerCase());
+
+    // Collateral sits in the Vault, not the PositionManager.
+    assert.equal(await token.read.balanceOf([vault.address]), usdc(101_000));
+    assert.equal(await token.read.balanceOf([pm.address]), 0n);
+  });
+
+  it("Records the open fee against the Vault", async function () {
+    const { vault, pm } = await setup();
+
+    await open(pm, trader, { collateral: usdc(1_000) });
+
+    assert.equal(await vault.read.accumulatedFees(), usd(1));
+  });
+
+  it("Computes size from collateral after the fee, not before", async function () {
+    const { pm } = await setup();
+
+    const id = await open(pm, trader, { collateral: usdc(1_000), leverageBps: 100_000n });
+
+    // size = (1000 - 1) * 10 = 9990, NOT 1000 * 10 = 10000.
+    assert.equal((await pm.read.getPosition([id])).sizeUsd, usd(9_990));
+  });
+
+  it("Accepts 1x and 50x", async function () {
+    const { pm } = await setup();
+
+    await open(pm, trader, { collateral: usdc(100), leverageBps: 10_000n });
+    await open(pm, trader, { collateral: usdc(100), leverageBps: 500_000n });
+
+    assert.equal(await pm.read.nextPositionId(), 2n);
+  });
+
+  it("Rejects leverage above 50x", async function () {
+    const { pm } = await setup();
+
+    await assert.rejects(
+      pm.write.openPosition([NVDA, usdc(100), 500_001n, true, []], { account: trader.account })
+    );
+  });
+
+  it("Rejects leverage below 1x", async function () {
+    const { pm } = await setup();
+
+    await assert.rejects(
+      pm.write.openPosition([NVDA, usdc(100), 9_999n, true, []], { account: trader.account })
+    );
+  });
+
+  it("Rejects a zero-collateral position", async function () {
+    const { pm } = await setup();
+
+    await assert.rejects(
+      pm.write.openPosition([NVDA, 0n, 100_000n, true, []], { account: trader.account })
+    );
+  });
+
+  it("Ids start at 1, so 0 is never a valid position", async function () {
+    const { pm } = await setup();
+
+    const id = await open(pm, trader);
+
+    assert.equal(id, 1n);
+    // getPosition does not revert on an unknown id — Solidity returns the zero
+    // struct. isOpen is the field that actually distinguishes a real position.
+    assert.equal(await pm.read.isOpen([0n]), false);
+    assert.equal(
+      (await pm.read.getPosition([0n])).owner,
+      "0x0000000000000000000000000000000000000000"
+    );
+  });
+
+  it("Emits PositionOpened with the post-fee collateral", async function () {
+    const { pm } = await setup();
+    const publicClient = await viem.getPublicClient();
+
+    await pm.write.openPosition([NVDA, usdc(1_000), 100_000n, true, []], {
+      account: trader.account,
+    });
+
+    const events = await publicClient.getContractEvents({
+      address: pm.address,
+      abi: pm.abi,
+      eventName: "PositionOpened",
+      fromBlock: 0n,
+    });
+    assert.equal(events.length, 1);
+    assert.equal(events[0].args.collateralUsd, usd(999));
+    assert.equal(events[0].args.sizeUsd, usd(9_990));
+    assert.equal(events[0].args.isLong, true);
+  });
+
+  // ==================== RESERVED ASSETS ====================
+
+  it("Reports open collateral as reserved assets", async function () {
+    const { pm } = await setup();
+
+    await open(pm, trader, { collateral: usdc(1_000) });
+    await open(pm, trader, { collateral: usdc(500) });
+
+    // 999 USD from the first (1000 less the 0.1% fee) plus 499.5 from the second.
+    const halfUsd = (5n * E18) / 10n;
+    assert.equal(await pm.read.reservedAssets(), usd(999) + usd(499) + halfUsd);
+  });
+
+  it("Releases the reserve when a position closes", async function () {
+    const { pm } = await setup();
+    const id = await open(pm, trader, { collateral: usdc(1_000) });
+
+    await pm.write.closePosition([id, []], { account: trader.account });
+
+    assert.equal(await pm.read.reservedAssets(), 0n);
+  });
+
+  it("Stops LPs from withdrawing collateral backing an open position", async function () {
+    const { vault, pm } = await setup();
+
+    await open(pm, trader, { collateral: usdc(1_000) });
+
+    // Pool holds 101,000 USDC; 999 USD is reserved, so 100,001 is withdrawable.
+    assert.equal(await vault.read.reservedAssets(), usd(999));
+    assert.equal(await vault.read.availableAssets(), usd(100_001));
+
+    // Redeeming the LP's entire claim would return 101,000 USD (the pool grew by
+    // the trader's collateral), which exceeds what is available — must revert.
+    await assert.rejects(
+      vault.write.removeLiquidity([usd(100_000)], { account: lp.account })
+    );
+
+    // Within the limit it goes through.
+    await vault.write.removeLiquidity([usd(99_000)], { account: lp.account });
+    assert.equal(await vault.read.reservedAssets(), usd(999));
+  });
+
+  // ==================== CLOSE ====================
+
+  it("Pays a winning long out of the pool", async function () {
+    const { token, oracle, pm } = await setup();
+    const id = await open(pm, trader, { collateral: usdc(1_000), leverageBps: 100_000n });
+
+    // 180 -> 200 is +11.1% on 9990 notional = +1110 USD.
+    await oracle.write.setPrice([NVDA, usd(200)]);
+    await pm.write.closePosition([id, []], { account: trader.account });
+
+    const expectedPnl = pnlOf(usd(999), PRICE_180, 100_000n, true, usd(200));
+    const equity = usd(999) + expectedPnl;
+    const afterFee = equity - (equity * CLOSE_FEE_BPS) / BPS;
+
+    // Started with 10,000, posted 1,000 as collateral, receives the payout back.
+    assert.equal(
+      await token.read.balanceOf([trader.account.address]),
+      usdc(9_000) + afterFee / 10n ** 12n
+    );
+    assert.equal(await pm.read.isOpen([id]), false);
+  });
+
+  it("Leaves a losing long's remainder in the pool", async function () {
+    const { token, oracle, vault, pm } = await setup();
+    const id = await open(pm, trader, { collateral: usdc(1_000), leverageBps: 100_000n });
+    const poolBefore = await vault.read.totalAssets();
+
+    // 180 -> 170 is -5.55% on 9990 notional = -555 USD.
+    await oracle.write.setPrice([NVDA, usd(170)]);
+    await pm.write.closePosition([id, []], { account: trader.account });
+
+    const pnl = pnlOf(usd(999), PRICE_180, 100_000n, true, usd(170));
+    const equity = usd(999) + pnl; // pnl is negative
+    const afterFee = equity - (equity * CLOSE_FEE_BPS) / BPS;
+    const paidOut = afterFee / (10n ** 12n);
+
+    assert.equal(await token.read.balanceOf([trader.account.address]), usdc(9_000) + paidOut);
+    // The pool kept the loss.
+    assert.ok((await vault.read.totalAssets()) > poolBefore - usd(1_000));
+  });
+
+  it("Caps a catastrophic loss at the posted collateral, never below zero", async function () {
+    const { token, oracle, pm } = await setup();
+    const id = await open(pm, trader, { collateral: usdc(1_000), leverageBps: 500_000n });
+
+    // 50x long, price halves — the position is far past liquidation. Closing must
+    // still succeed and simply pay nothing, not underflow.
+    await oracle.write.setPrice([NVDA, usd(90)]);
+    await pm.write.closePosition([id, []], { account: trader.account });
+
+    assert.equal(await token.read.balanceOf([trader.account.address]), usdc(9_000));
+  });
+
+  it("Refuses to close someone else's position", async function () {
+    const { pm } = await setup();
+    const id = await open(pm, trader);
+
+    await assert.rejects(
+      pm.write.closePosition([id, []], { account: otherTrader.account })
+    );
+  });
+
+  it("Refuses to close the same position twice", async function () {
+    const { pm } = await setup();
+    const id = await open(pm, trader);
+
+    await pm.write.closePosition([id, []], { account: trader.account });
+
+    await assert.rejects(
+      pm.write.closePosition([id, []], { account: trader.account })
+    );
+  });
+
+  // ==================== LIQUIDATION THRESHOLD ====================
+
+  it("Is liquidatable exactly at the computed liquidation price", async function () {
+    const { oracle, pm } = await setup();
+    const id = await open(pm, trader, { collateral: usdc(1_000), leverageBps: 100_000n });
+
+    const liq = computeLiquidationPrice(usd(999), PRICE_180, 100_000n, true);
+    await oracle.write.setPrice([NVDA, liq]);
+
+    assert.equal(await pm.read.isLiquidatable([id]), true);
+  });
+
+  it("Is not liquidatable one wei above the liquidation price", async function () {
+    const { oracle, pm } = await setup();
+    const id = await open(pm, trader, { collateral: usdc(1_000), leverageBps: 100_000n });
+
+    const liq = computeLiquidationPrice(usd(999), PRICE_180, 100_000n, true);
+    await oracle.write.setPrice([NVDA, liq + 1n]);
+
+    assert.equal(await pm.read.isLiquidatable([id]), false);
+  });
+
+  it("Puts the liquidation price for a 10x long above the floor", async function () {
+    const { pm } = await setup();
+    await open(pm, trader, { collateral: usdc(1_000), leverageBps: 100_000n });
+
+    const liq = computeLiquidationPrice(usd(999), PRICE_180, 100_000n, true);
+    // ~163.80 by hand: 180 * (99.9 - 999 + 9990) / 9990
+    assert.ok(liq > usd(163) && liq < usd(164));
+  });
+
+  it("Puts the liquidation price for a short above the entry", async function () {
+    const { pm } = await setup();
+    await open(pm, trader, { leverageBps: 100_000n, isLong: false });
+
+    const liq = computeLiquidationPrice(usd(999), PRICE_180, 100_000n, false);
+    assert.ok(liq > PRICE_180);
+  });
+
+  // ==================== LIQUIDATION ====================
+
+  it("Liquidates a position past its threshold and pays the caller", async function () {
+    const { token, oracle, pm } = await setup();
+    const id = await open(pm, trader, { collateral: usdc(1_000), leverageBps: 100_000n });
+
+    const liq = computeLiquidationPrice(usd(999), PRICE_180, 100_000n, true);
+    await oracle.write.setPrice([NVDA, liq - usd(1)]);
+
+    const before = await token.read.balanceOf([liquidator.account.address]);
+    await pm.write.liquidate([[id], []], { account: liquidator.account });
+    const after = await token.read.balanceOf([liquidator.account.address]);
+
+    assert.ok(after > before, "liquidator should be paid a bounty");
+    assert.equal(await pm.read.isOpen([id]), false);
+    assert.equal(await pm.read.reservedAssets(), 0n);
+  });
+
+  it("Rewards the liquidator the configured share of remaining equity", async function () {
+    const { token, oracle, pm } = await setup();
+    const id = await open(pm, trader, { collateral: usdc(1_000), leverageBps: 100_000n });
+
+    const liq = computeLiquidationPrice(usd(999), PRICE_180, 100_000n, true);
+    const crash = liq - usd(1);
+    await oracle.write.setPrice([NVDA, crash]);
+
+    const pnl = pnlOf(usd(999), PRICE_180, 100_000n, true, crash);
+    const equity = pnl >= 0n ? usd(999) + pnl : usd(999) - -pnl;
+    const expected = (equity * LIQ_REWARD_BPS) / BPS / 10n ** 12n;
+
+    const before = await token.read.balanceOf([liquidator.account.address]);
+    await pm.write.liquidate([[id], []], { account: liquidator.account });
+    const gained = (await token.read.balanceOf([liquidator.account.address])) - before;
+
+    // Allow a 1-unit tolerance for the truncation chain (USD -> USDC).
+    const diff = gained > expected ? gained - expected : expected - gained;
+    assert.ok(diff <= 1n, `reward ${gained} should be within 1 of ${expected}`);
+  });
+
+  it("Refuses to liquidate a healthy position", async function () {
+    const { pm } = await setup();
+    const id = await open(pm, trader, { collateral: usdc(1_000), leverageBps: 100_000n });
+
+    // Price is still 180, far from the ~163.8 threshold. The batch silently skips
+    // rather than reverting, so assert on the resulting state.
+    await pm.write.liquidate([[id], []], { account: liquidator.account });
+
+    assert.equal(await pm.read.isOpen([id]), true);
+  });
+
+  // ==================== BATCH LIQUIDATION ====================
+
+  it("Liquidates only the eligible positions in a mixed batch", async function () {
+    const { oracle, pm } = await setup();
+
+    // Two longs, one short — a price drop kills the longs and spares the short.
+    const long1 = await open(pm, trader, { collateral: usdc(1_000), leverageBps: 100_000n, isLong: true });
+    const long2 = await open(pm, trader, { collateral: usdc(1_000), leverageBps: 100_000n, isLong: true });
+    const short1 = await open(pm, trader, { collateral: usdc(1_000), leverageBps: 100_000n, isLong: false });
+
+    const liq = computeLiquidationPrice(usd(999), PRICE_180, 100_000n, true);
+    await oracle.write.setPrice([NVDA, liq - usd(1)]);
+
+    await pm.write.liquidate([[long1, long2, short1], []], { account: liquidator.account });
+
+    assert.equal(await pm.read.isOpen([long1]), false);
+    assert.equal(await pm.read.isOpen([long2]), false);
+    assert.equal(await pm.read.isOpen([short1]), true, "short profits from a drop");
+  });
+
+  it("Reaches the same verdicts regardless of order within the batch", async function () {
+    const { oracle, pm } = await setup();
+
+    const a = await open(pm, trader, { collateral: usdc(1_000), leverageBps: 100_000n, isLong: true });
+    const b = await open(pm, trader, { collateral: usdc(1_000), leverageBps: 100_000n, isLong: true });
+
+    const liq = computeLiquidationPrice(usd(999), PRICE_180, 100_000n, true);
+    await oracle.write.setPrice([NVDA, liq - usd(1)]);
+
+    // Reversed order — the snapshot is taken before any state changes, so the
+    // second position is judged against the same price as the first.
+    await pm.write.liquidate([[b, a], []], { account: liquidator.account });
+
+    assert.equal(await pm.read.isOpen([a]), false);
+    assert.equal(await pm.read.isOpen([b]), false);
+  });
+
+  it("Ignores unknown ids in a batch instead of reverting", async function () {
+    const { oracle, pm } = await setup();
+    const id = await open(pm, trader, { collateral: usdc(1_000), leverageBps: 100_000n });
+
+    const liq = computeLiquidationPrice(usd(999), PRICE_180, 100_000n, true);
+    await oracle.write.setPrice([NVDA, liq - usd(1)]);
+
+    await pm.write.liquidate([[999n, id, 998n], []], { account: liquidator.account });
+
+    assert.equal(await pm.read.isOpen([id]), false);
+  });
+
+  it("Handles an empty batch as a no-op", async function () {
+    const { pm } = await setup();
+
+    await pm.write.liquidate([[], []], { account: liquidator.account });
+  });
+
+  it("Liquidates across two feeds in one call", async function () {
+    const { oracle, pm } = await setup();
+
+    const nvda = await open(pm, trader, { feedId: NVDA, collateral: usdc(1_000), leverageBps: 100_000n });
+    const btc = await open(pm, trader, { feedId: BTC, collateral: usdc(1_000), leverageBps: 100_000n });
+
+    const liqNvda = computeLiquidationPrice(usd(999), PRICE_180, 100_000n, true);
+    await oracle.write.setPrice([NVDA, liqNvda - usd(1)]);
+    // BTC halving region, well past a 10x long's threshold.
+    await oracle.write.setPrice([BTC, usd(50_000)]);
+
+    await pm.write.liquidate([[nvda, btc], []], { account: liquidator.account });
+
+    assert.equal(await pm.read.isOpen([nvda]), false);
+    assert.equal(await pm.read.isOpen([btc]), false);
+  });
+
+  // ==================== PARAMETER GETTERS ====================
+
+  it("Exposes the deployed parameters to off-chain consumers", async function () {
+    const { pm } = await setup();
+
+    assert.equal(await pm.read.openFeeBps(), OPEN_FEE_BPS);
+    assert.equal(await pm.read.closeFeeBps(), CLOSE_FEE_BPS);
+    assert.equal(await pm.read.maintenanceMarginBps(), MMR_BPS);
+    assert.equal(await pm.read.liquidatorRewardBps(), LIQ_REWARD_BPS);
+    assert.equal(await pm.read.maxLeverageBps(), 500_000n);
+  });
+
+  // ==================== PRICE UPDATER ====================
+
+  it("Accepts empty update data when no price updater is wired", async function () {
+    const { pm } = await setup();
+
+    // DemoOracle needs no push; the frozen `bytes[]` argument must still be tolerated.
+    assert.equal(await pm.read.priceUpdater(), "0x0000000000000000000000000000000000000000");
+    await open(pm, trader);
+  });
+
+  it("Only the owner may set the price updater", async function () {
+    const { pm } = await setup();
+
+    await assert.rejects(
+      pm.write.setPriceUpdater([otherTrader.account.address], { account: otherTrader.account })
+    );
+    await pm.write.setPriceUpdater([otherTrader.account.address]);
+    assert.equal(
+      (await pm.read.priceUpdater()).toLowerCase(),
+      otherTrader.account.address.toLowerCase()
+    );
+  });
+
+  it("Does not block a close when the price updater reverts", async function () {
+    const { pm } = await setup();
+    const id = await open(pm, trader);
+
+    // Point the updater at an address with no such function — every push fails.
+    await pm.write.setPriceUpdater([otherTrader.account.address]);
+
+    // Best-effort push means a failed update must not brick closes.
+    await pm.write.closePosition([id, ["0xdeadbeef"]], { account: trader.account });
+    assert.equal(await pm.read.isOpen([id]), false);
+  });
+});
