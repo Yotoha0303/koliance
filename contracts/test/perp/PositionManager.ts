@@ -541,4 +541,100 @@ describe("PositionManager", async function () {
     await pm.write.closePosition([id, ["0xdeadbeef"]], { account: trader.account });
     assert.equal(await pm.read.isOpen([id]), false);
   });
+
+  // ==================== PYTH ADAPTER INTEGRATION ====================
+  // The one place the two halves of the oracle story meet: PositionManager driving
+  // PythOracleAdapter as both price source and price pusher. Everything else uses
+  // DemoOracle, so a wiring mistake would otherwise only surface in production.
+
+  it("Trades against a PythOracleAdapter and pushes updates before reading", async function () {
+    const token = await viem.deployContract("MockUSDC");
+    const pyth = await viem.deployContract("MockPyth");
+    const adapter = await viem.deployContract("PythOracleAdapter", [
+      pyth.address,
+      60n,
+      deployer.account.address,
+    ]);
+    const vault = await viem.deployContract("Vault", [token.address, deployer.account.address]);
+    const pm = await viem.deployContract("PositionManager", [
+      vault.address,
+      adapter.address,
+      token.address,
+      deployer.account.address,
+    ]);
+    await vault.write.setPositionManager([pm.address]);
+
+    // Wire the adapter as the pusher. PositionManager reaches it through
+    // abi.encodeWithSignature("updatePriceFeeds(bytes[])", data) — if that
+    // signature drifted from the adapter's, the call would silently miss and
+    // updateCallCount would stay zero.
+    await pm.write.setPriceUpdater([adapter.address]);
+    await pyth.write.setUpdateFee([0n]);
+
+    const publicClient = await viem.getPublicClient();
+    const now = await publicClient.getBlock().then((b) => b.timestamp);
+    // expo -8, i.e. $180.00
+    await pyth.write.setPrice([BTC, 18_000_000_000n, -8, now, 0n]);
+
+    await token.write.mint([lp.account.address, usdc(10_000)]);
+    await token.write.approve([vault.address, usdc(10_000)], { account: lp.account });
+    await vault.write.addLiquidity([usdc(10_000)], { account: lp.account });
+
+    await token.write.mint([trader.account.address, usdc(1_000)]);
+    await token.write.approve([pm.address, usdc(1_000)], { account: trader.account });
+
+    await pm.write.openPosition([BTC, usdc(1_000), 100_000n, true, ["0xdeadbeef"]], {
+      account: trader.account,
+    });
+
+    // The push actually reached Pyth.
+    assert.equal(await pyth.read.updateCallCount(), 1n);
+
+    // And the entry price came through the adapter's normalization: $180 at
+    // expo -8 is 18e18, not 18e15.
+    const position = await pm.read.getPosition([1n]);
+    assert.equal(position.entryPrice, usd(180));
+  });
+
+  it("Survives a push the adapter cannot fund, and still opens at the last price", async function () {
+    const token = await viem.deployContract("MockUSDC");
+    const pyth = await viem.deployContract("MockPyth");
+    const adapter = await viem.deployContract("PythOracleAdapter", [
+      pyth.address,
+      60n,
+      deployer.account.address,
+    ]);
+    const vault = await viem.deployContract("Vault", [token.address, deployer.account.address]);
+    const pm = await viem.deployContract("PositionManager", [
+      vault.address,
+      adapter.address,
+      token.address,
+      deployer.account.address,
+    ]);
+    await vault.write.setPositionManager([pm.address]);
+    await pm.write.setPriceUpdater([adapter.address]);
+
+    // Fee is non-zero and the adapter holds no MON, so every push reverts.
+    await pyth.write.setUpdateFee([1_000_000n]);
+
+    const publicClient = await viem.getPublicClient();
+    const now = await publicClient.getBlock().then((b) => b.timestamp);
+    await pyth.write.setPrice([BTC, 18_000_000_000n, -8, now, 0n]);
+
+    await token.write.mint([lp.account.address, usdc(10_000)]);
+    await token.write.approve([vault.address, usdc(10_000)], { account: lp.account });
+    await vault.write.addLiquidity([usdc(10_000)], { account: lp.account });
+
+    await token.write.mint([trader.account.address, usdc(1_000)]);
+    await token.write.approve([pm.address, usdc(1_000)], { account: trader.account });
+
+    // A funding shortfall on the push must not block opening — the price is still
+    // fresh enough to read, which is what actually matters.
+    await pm.write.openPosition([BTC, usdc(1_000), 100_000n, true, ["0xdeadbeef"]], {
+      account: trader.account,
+    });
+
+    assert.equal(await pyth.read.updateCallCount(), 0n);
+    assert.equal((await pm.read.getPosition([1n])).entryPrice, usd(180));
+  });
 });
