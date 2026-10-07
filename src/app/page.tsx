@@ -28,6 +28,7 @@ import {
   Database,
   Lock,
   CreditCard,
+  Coins,
 } from "lucide-react";
 import { BrandIcon } from "@/components/BrandIcon";
 import { Navbar, NavView } from "@/components/Navbar";
@@ -40,6 +41,7 @@ import { IdentityCard } from "@/components/IdentityCard";
 import { TrustAttestationCard } from "@/components/TrustAttestationCard";
 import { TrustStream } from "@/components/TrustStream";
 import { NetworkModal } from "@/components/NetworkModal";
+import { TokenStudio } from "@/components/TokenStudio";
 import {
   monadTestnet,
   KOLIANCE_ADDRESS,
@@ -347,7 +349,7 @@ function MainContent() {
                   </h2>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-2">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 pt-2">
                   {/* Card 1 */}
                   <div
                     onClick={() => setCurrentView("DETAIL")}
@@ -416,8 +418,54 @@ function MainContent() {
                       <span>&rarr;</span>
                     </div>
                   </div>
+
+                  {/* Card 4: KOL Token & Mining */}
+                  <div
+                    onClick={() => setCurrentView("TOKEN")}
+                    className="rounded-3xl p-6 bg-[#131722]/80 border border-purple-500/30 hover:border-purple-400 hover:scale-[1.05] hover:-translate-y-2.5 hover:shadow-[0_20px_45px_rgba(168,85,247,0.35)] transition-all duration-300 cursor-pointer group space-y-4 relative overflow-hidden shadow-lg"
+                  >
+                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-purple-500 via-indigo-600 to-amber-500 flex items-center justify-center text-white shadow-glow group-hover:scale-110 transition-transform">
+                      <Coins className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <div className="flex items-center gap-1.5">
+                          <h3 className="font-bold text-lg text-white">KOL Token</h3>
+                          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                            ICON
+                          </span>
+                        </div>
+                        <ArrowRight className="w-4 h-4 text-purple-400 group-hover:translate-x-1 transition-transform" />
+                      </div>
+                      <p className="text-xs text-slate-400 font-mono">
+                        2^30 Max Supply · 2-year halving · Monad block claiming &amp; transfer.
+                      </p>
+                    </div>
+                    <div className="pt-2 flex items-center gap-2 text-[11px] font-mono text-amber-400">
+                      <span>Open Token Hub</span>
+                      <span>&rarr;</span>
+                    </div>
+                  </div>
                 </div>
               </div>
+            </motion.div>
+          )}
+
+          {/* TAB: TOKEN (KolToken ICON on Monad Testnet) */}
+          {currentView === "TOKEN" && (
+            <motion.div
+              key="view-token"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.35, ease: "easeInOut" }}
+              className="pt-20 max-w-7xl mx-auto px-2 sm:px-6 py-4"
+            >
+              <TokenStudio
+                account={account}
+                nativeBalance={balance}
+                onRefreshBalance={fetchData}
+              />
             </motion.div>
           )}
 

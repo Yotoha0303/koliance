@@ -30,6 +30,105 @@ export const monadTestnet = defineChain({
 export const KOLIANCE_ADDRESS = (process.env.NEXT_PUBLIC_KOLIANCE_ADDRESS ||
   "0x32fDd6B096EE14246b5b6971135286Bad01F4928") as `0x${string}`;
 
+// KolToken (ICON) deployed on Monad Testnet
+export const KOL_TOKEN_ADDRESS = (process.env.NEXT_PUBLIC_KOL_TOKEN_ADDRESS ||
+  "0xe18e18604ebe9b7692ac67d2c0f1d5af3aa6cca4") as `0x${string}`;
+
+export const KOL_TOKEN_ABI = [
+  {
+    type: "function",
+    name: "name",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ name: "", type: "string" }],
+  },
+  {
+    type: "function",
+    name: "symbol",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ name: "", type: "string" }],
+  },
+  {
+    type: "function",
+    name: "decimals",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ name: "", type: "uint8" }],
+  },
+  {
+    type: "function",
+    name: "totalSupply",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ name: "", type: "uint256" }],
+  },
+  {
+    type: "function",
+    name: "MAX_SUPPLY",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ name: "", type: "uint256" }],
+  },
+  {
+    type: "function",
+    name: "balanceOf",
+    stateMutability: "view",
+    inputs: [{ name: "", type: "address" }],
+    outputs: [{ name: "", type: "uint256" }],
+  },
+  {
+    type: "function",
+    name: "claimBlockReward",
+    stateMutability: "nonpayable",
+    inputs: [],
+    outputs: [{ name: "reward", type: "uint256" }],
+  },
+  {
+    type: "function",
+    name: "transfer",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "to", type: "address" },
+      { name: "amount", type: "uint256" },
+    ],
+    outputs: [{ name: "", type: "bool" }],
+  },
+  {
+    type: "function",
+    name: "currentEra",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ name: "", type: "uint256" }],
+  },
+  {
+    type: "function",
+    name: "currentRewardRatePerSecond",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ name: "", type: "uint256" }],
+  },
+  {
+    type: "event",
+    name: "Transfer",
+    inputs: [
+      { name: "from", type: "address", indexed: true },
+      { name: "to", type: "address", indexed: true },
+      { name: "value", type: "uint256", indexed: false },
+    ],
+  },
+  {
+    type: "event",
+    name: "BlockClaimed",
+    inputs: [
+      { name: "miner", type: "address", indexed: true },
+      { name: "reward", type: "uint256", indexed: false },
+      { name: "timestamp", type: "uint256", indexed: false },
+    ],
+  },
+] as const;
+
+
 // Koliance Contract ABI
 export const KOLIANCE_ABI = [
   {

@@ -8,11 +8,12 @@ import {
   Network,
   CreditCard,
   TrendingUp,
+  Coins,
 } from "lucide-react";
 import { BrandIcon } from "@/components/BrandIcon";
 import { NavAuthBadges } from "@/components/NavAuthBadges";
 
-export type NavView = "INDEX" | "DETAIL" | "PRODUCT" | "MARKET" | "AGENTCARD";
+export type NavView = "INDEX" | "DETAIL" | "PRODUCT" | "MARKET" | "AGENTCARD" | "TOKEN";
 
 interface NavbarProps {
   currentView: NavView;
@@ -34,6 +35,7 @@ export function Navbar({
 
   const navItems: Array<{ id: NavView; label: string; icon: React.ReactNode; badge?: string }> = [
     { id: "INDEX", label: "INDEX", icon: <Zap className="w-3.5 h-3.5" /> },
+    { id: "TOKEN", label: "TOKEN", icon: <Coins className="w-3.5 h-3.5" />, badge: "ICON" },
     { id: "DETAIL", label: "DETAIL", icon: <Network className="w-3.5 h-3.5" />, badge: "AGENT" },
     { id: "PRODUCT", label: "PRODUCT", icon: <Shield className="w-3.5 h-3.5" /> },
     { id: "MARKET", label: "MARKET", icon: <TrendingUp className="w-3.5 h-3.5" />, badge: "LIVE" },
