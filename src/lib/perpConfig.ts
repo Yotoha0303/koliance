@@ -110,21 +110,41 @@ export const USDC_DECIMALS = 6;
 export const USD_DECIMALS = 18;
 
 /**
- * Pyth feed ids on Monad.
+ * Pyth feed ids used by the perp module.
  *
- * The `Index` variants are 24/7: outside traditional market hours they follow a
- * defined Pyth methodology rather than tracking the last exchange print. Use them
- * for the demo so prices keep moving at night and on weekends. The `Equity.US.*`
- * feeds only update during the US session.
+ * ⚠️ These are NOT usable on Monad Testnet today. Read this before wiring them
+ * to `PythOracleAdapter`.
  *
- * Verified against Pyth Hermes on 2026-10-05.
+ * The `Index` variants are 24/7 in Pyth's off-chain metadata — outside market
+ * hours they follow a defined methodology rather than the last exchange print.
+ * That metadata is what made them look like the right choice, and it is
+ * misleading: Pyth lists feeds it has not deployed to every chain. Probed
+ * directly on Monad (`cast call <pyth> "priceFeedExists(bytes32)(bool)"`):
+ *
+ *   Equity.Index.NVDA/USD  -> false   absent on Monad
+ *   Equity.Index.TSLA/USD  -> false   absent on Monad
+ *   Equity.US.NVDA/USD     -> true    present, but 143 days stale
+ *   Crypto.BTC/USD         -> true    live
+ *   Crypto.ETH/USD         -> true    live
+ *
+ * So equity feeds are unusable on this chain and only the crypto feeds work.
+ * The full probe and its lesson are in `docs/执行方案-后端与合约.md` §0.2.
+ *
+ * These ids are still what the module uses, because `DemoOracle` treats a feed
+ * id as an opaque key — it is seeded with whatever id the caller passes, so the
+ * demo works regardless of whether Pyth has the feed. That is the point of the
+ * `IPriceOracle` abstraction: the demo path and the production path share an
+ * interface, not a dependency.
+ *
+ * Verify with `priceFeedExists` on the target chain before pointing a real
+ * oracle at any id here. Do not trust Hermes metadata for availability.
  */
 export const FEEDS = {
-  /** Equity.Index.NVDA/USD — "PYTH PRICE IN USD FOR NVDA 24/7" */
+  /** Equity.Index.NVDA/USD — 24/7 per Pyth metadata, but ABSENT on Monad. */
   NVDA: "0xa470c4ac46f44b547b2cba52338f311fb642b79375ce5f0cfd5cb5b99227b852",
-  /** Equity.Index.TSLA/USD — 24/7 */
+  /** Equity.Index.TSLA/USD — 24/7 per Pyth metadata, but ABSENT on Monad. */
   TSLA: "0xe6da44bff5b8b06897a3739dd331b440d6662595bb862e37046892c568ae3fc0",
-  /** Crypto.BTC/USD — 24/7 */
+  /** Crypto.BTC/USD — 24/7 AND present on Monad. The only usable real feed. */
   BTC: "0xe62df6c8b4a85fe1a67db44dc12de5db330f7ac66b72dc658afedf0f4a415b43",
 } as const;
 

@@ -11,17 +11,21 @@
 
 ---
 
-## 0. 归档位置说明（GAP-31）
+## 0. 归档位置说明（GAP-31 ✅ 已修）
 
-本仓库的文档分居两处，这是**既有结构问题**：
+本仓库的文档原先分居两处，规划类文档**不在 git 下**，协作者 clone 后看不到。
+**已修正**：规划文档迁入 `docs/planning/`，并附 `docs/planning/README.md` 索引。
 
-| 位置 | 内容 | 是否版本控制 |
-| --- | --- | --- |
-| `koliance/docs/`（仓库内） | `adr/`、`changes/`、**本台账** | ✅ 随代码 |
-| `D:\MyDocuments\koliance\docs\`（仓库外） | 项目目标、推进方案、执行方案、推荐方案、缺陷分析、竞品分析 | ❌ **不在 git 下** |
+当前结构：
 
-**后果**：协作者 clone 仓库后看不到规划类文档，只能看到 ADR 与变更记录。
-**建议**：把仓库外的规划文档迁入 `koliance/docs/planning/`。**未做，见 GAP-31。**
+| 位置 | 内容 |
+| --- | --- |
+| `docs/adr/` | 架构决策（ADR-002 / ADR-003） |
+| `docs/changes/` | 每次代码变更的记录（001~005） |
+| `docs/planning/` | 目标、方案、审计、情报等规划类文档 + 索引 |
+| `docs/GAP台账.md` | **本文件**，活的未竟事项台账 |
+
+仓库外的 `D:\MyDocuments\koliance\docs\` 仍保留原件，但**以仓库内为准**——它跟着代码走。
 
 ---
 
@@ -44,7 +48,7 @@
 | GAP-06 | 前端/链上清算价同源无一致性测试 | 🟠 P1 | 🟠 | 需链上对拍 |
 | GAP-07 | `closePosition` 无价格时效/滑点约束 | 🟠 P1 | 🟠 | — |
 | GAP-08 | `_pushPrices` 字符串签名 + 失败无观测 | 🟡 P2 | 🟠 | — |
-| GAP-09 | `perpConfig.ts` 的 FEEDS 与链上实测矛盾 | 🟡 P2 | 🟠 | — |
+| GAP-09 | `perpConfig.ts` 的 FEEDS 与链上实测矛盾 | 🟡 P2 | ✅ | 本分支 |
 | GAP-10 | 无 CI，全部用例是"门外用例" | 🟡 P2 | ✅ | `2b05f05` |
 | GAP-11 | 缺工程骨架目录 | 🟡 P2 | 🟠 | 部分完成 |
 | GAP-12 | 凭证硬编码（6 处，含 README 明文） | 🟡 P2 | 🔴 | **需人工轮换密钥** |
@@ -66,7 +70,7 @@
 | GAP-28 | 双 lockfile，`npm ci` 装过期树 | 🟡 P2 | 🟠 | — |
 | GAP-29 | 缺 `deploy/` 目录 | 🟡 P2 | 🟠 | — |
 | GAP-30 | Redis 额度池 | 🟡 P2 | ⬜ | 需先修 GAP-18~21 |
-| GAP-31 | 规划文档在仓库外，协作者看不到 | 🟡 P2 | 🟠 | 见 §0 |
+| GAP-31 | 规划文档在仓库外，协作者看不到 | 🟡 P2 | ✅ | 本分支（`docs/planning/`） |
 | GAP-32 | 覆盖率阈值未配 | 🟡 P2 | 🟠 | — |
 
 ---
@@ -183,8 +187,6 @@ RFC-001（`自治 Agent 交易与链下高性能清结算系统技术架构设�
 
 | 编号 | 事项 | 起点 | 预估 |
 | --- | --- | --- | --- |
-| GAP-09 | `src/lib/perpConfig.ts:59-76` 称 `Equity.Index.*` 可用于演示，与链上实测（`priceFeedExists=false`）矛盾 | 改注释或拆分 `AVAILABLE_FEEDS` / `UNAVAILABLE_FEEDS` | 15 分钟 |
-| GAP-31 | 规划文档迁入仓库 `docs/planning/` | 复制 6 个文件 | 15 分钟 |
 | GAP-28 | 删 `package-lock.json`（陈旧），README 钉死 `pnpm install --frozen-lockfile` | 删除 + 文档 | 15 分钟 |
 | GAP-32 | 覆盖率阈值：合约侧 `solidity-coverage`，前端 `vitest --coverage` | 配置 + CI 步骤 | 半天 |
 | GAP-29 | `deploy/` 目录（若确需；Render 已够用则可标 ⬜） | — | — |
