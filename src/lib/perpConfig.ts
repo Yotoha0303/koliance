@@ -52,6 +52,42 @@ export const MAX_LEVERAGE_BPS = 500_000n;
 /** 1x floor — below this it is not a leveraged position. */
 export const MIN_LEVERAGE_BPS = 10_000n;
 
+/**
+ * Profit ceiling, in basis points of notional size.
+ *
+ * A position's payout never exceeds `collateral + size * MAX_PROFIT_BPS / 1e4`.
+ * Mirrors `PerpConstants.MAX_PROFIT_BPS`; read `IPositionManager.maxProfitBps()`
+ * for the authoritative deployed value.
+ *
+ * This is load-bearing for the UI, not just a display constant: the pool must
+ * reserve each position's full payout cap, so opening needs a pool at least as
+ * deep as the sum of the caps. `payoutCapUsd()` in `perp.ts` computes the same
+ * figure the contract will enforce.
+ */
+export const MAX_PROFIT_BPS = 10_000n;
+
+/**
+ * Deployed perp contract addresses.
+ *
+ * Populated from the environment, which `scripts/demo-seed.ts` prints after it
+ * runs. Empty strings mean "not deployed yet" — the UI must treat that as a
+ * hard error rather than falling back to mock data, so a misconfigured deploy
+ * fails loudly instead of showing numbers that are not on chain.
+ */
+export const PERP_ADDRESSES = {
+  usdc: (process.env.NEXT_PUBLIC_PERP_USDC || "") as `0x${string}`,
+  oracle: (process.env.NEXT_PUBLIC_PERP_ORACLE || "") as `0x${string}`,
+  vault: (process.env.NEXT_PUBLIC_PERP_VAULT || "") as `0x${string}`,
+  positionManager: (process.env.NEXT_PUBLIC_PERP_POSITION_MANAGER || "") as `0x${string}`,
+} as const;
+
+/** True once every perp address is configured. */
+export const PERP_IS_CONFIGURED =
+  PERP_ADDRESSES.usdc.length > 0 &&
+  PERP_ADDRESSES.oracle.length > 0 &&
+  PERP_ADDRESSES.vault.length > 0 &&
+  PERP_ADDRESSES.positionManager.length > 0;
+
 /** USDC has 6 decimals; all USD values in the contracts use 18. */
 export const USDC_DECIMALS = 6;
 export const USD_DECIMALS = 18;

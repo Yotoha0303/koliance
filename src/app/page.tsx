@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback, Suspense } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import {
   createPublicClient,
   createWalletClient,
@@ -53,6 +53,7 @@ import { checkBackendHealth } from "@/lib/api";
 
 function MainContent() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const initialView =
     (searchParams.get("view") as NavView) ||
     (searchParams.get("openid.claimed_id") || searchParams.get("status") || searchParams.get("code") ? "DETAIL" : "INDEX");
@@ -315,7 +316,19 @@ function MainContent() {
       {/* Top Fixed Navigation: INDEX | DETAIL | PRODUCT | AGENTCARD */}
       <Navbar
         currentView={currentView}
-        onSelectView={setCurrentView}
+        onSelectView={(view) => {
+          // PERP and MARKET are separate routes, not tabs on this page. Without
+          // this redirect the nav item would select a view that renders nothing.
+          if (view === "PERP") {
+            router.push("/perp");
+            return;
+          }
+          if (view === "MARKET") {
+            router.push("/market");
+            return;
+          }
+          setCurrentView(view);
+        }}
         account={account}
         balance={balance}
         onConnect={handleConnect}

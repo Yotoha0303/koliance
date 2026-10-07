@@ -17,8 +17,11 @@ import {
   LIQUIDATOR_REWARD_BPS,
   MAINTENANCE_MARGIN_BPS,
   MAX_LEVERAGE_BPS,
+  MAX_PROFIT_BPS,
   MIN_LEVERAGE_BPS,
   OPEN_FEE_BPS,
+  PERP_ADDRESSES,
+  PERP_IS_CONFIGURED,
   SESSION_FEEDS,
   USD_DECIMALS,
   USDC_DECIMALS,
@@ -32,8 +35,11 @@ export {
   LIQUIDATOR_REWARD_BPS,
   MAINTENANCE_MARGIN_BPS,
   MAX_LEVERAGE_BPS,
+  MAX_PROFIT_BPS,
   MIN_LEVERAGE_BPS,
   OPEN_FEE_BPS,
+  PERP_ADDRESSES,
+  PERP_IS_CONFIGURED,
   SESSION_FEEDS,
   USD_DECIMALS,
   USDC_DECIMALS,
@@ -88,6 +94,51 @@ export interface PositionMath {
 /** Notional size in USD: collateral * leverage. */
 export function positionSizeUsd(p: PositionMath): bigint {
   return applyBps(p.collateralUsd, p.leverageBps);
+}
+
+/**
+ * Collateral credited to a position, in 18-decimal USD: the gross amount after
+ * the open fee. Mirrors `PositionManager._netCollateralUsd`.
+ *
+ * The fee is charged on the GROSS deposit, and size is derived from the net —
+ * so a UI that computes size from the raw deposit will disagree with the chain
+ * by the fee.
+ */
+export function netCollateralUsd(grossUsd: bigint): bigint {
+  return grossUsd - applyBps(grossUsd, OPEN_FEE_BPS);
+}
+
+/**
+ * The most a position can ever be paid out, in 18-decimal USD.
+ *
+ * Mirrors `PositionManager._payoutCapUsd`. Must agree with the contract: the
+ * pool reserves this full amount, so it drives both whether an open will be
+ * accepted (`PoolCapacity`) and how much liquidity a demo needs.
+ *
+ *   cap = netCollateral + size * MAX_PROFIT_BPS / BPS
+ */
+export function payoutCapUsd(p: PositionMath): bigint {
+  return p.collateralUsd + applyBps(positionSizeUsd(p), MAX_PROFIT_BPS);
+}
+
+/**
+ * Whether the pool is deep enough to accept this position.
+ *
+ * Mirrors the `InsufficientPoolCapacity` check in `openPosition`. The contract
+ * compares against `totalAssets()`, which already includes the collateral being
+ * deposited, so that is added here too.
+ *
+ * Returns the numbers rather than a bare boolean so the UI can explain the
+ * shortfall instead of just disabling a button.
+ */
+export function poolCapacityCheck(
+  p: PositionMath,
+  poolAssetsUsd: bigint,
+  currentReservedUsd: bigint
+): { ok: boolean; requiredUsd: bigint; availableUsd: bigint } {
+  const requiredUsd = currentReservedUsd + payoutCapUsd(p);
+  const availableUsd = poolAssetsUsd + p.collateralUsd;
+  return { ok: availableUsd >= requiredUsd, requiredUsd, availableUsd };
 }
 
 /** Entry fee deducted from collateral on open. */

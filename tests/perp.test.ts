@@ -4,6 +4,9 @@ import {
   usdToUsdc,
   applyBps,
   positionSizeUsd,
+  netCollateralUsd,
+  payoutCapUsd,
+  poolCapacityCheck,
   openFee,
   closeFee,
   unrealizedPnl,
@@ -13,6 +16,7 @@ import {
   validateOpenPosition,
   BPS_DENOMINATOR,
   MAINTENANCE_MARGIN_BPS,
+  MAX_PROFIT_BPS,
 } from "@/lib/perp";
 
 describe("Koliance Perp Math & Risk Engine", () => {
@@ -95,5 +99,82 @@ describe("Koliance Perp Math & Risk Engine", () => {
       /Leverage above maximum/
     );
     expect(validateOpenPosition({ collateralUsd: 100n, leverageBps: 50_000n })).toBeNull();
+  });
+
+  // ==================== PAYOUT CAP (ADR-002) ====================
+  //
+  // These mirror PositionManager._netCollateralUsd / _payoutCapUsd /
+  // _assertPoolCapacity. If they drift, the UI will offer positions the chain
+  // refuses, or under-report the liquidity a demo needs.
+
+  it("should charge the open fee on the gross deposit, then size from the net", () => {
+    const gross = 1_000n * 10n ** 18n; // 1000 USD deposited
+    const net = netCollateralUsd(gross);
+
+    // 0.1% of 1000 is 1, so 999 USD of collateral. Size derives from 999, not
+    // 1000 — matching the contract's ordering.
+    expect(net).toBe(999n * 10n ** 18n);
+    expect(openFee({ collateralUsd: gross, entryPrice: 1n, leverageBps: 1n, isLong: true })).toBe(
+      1n * 10n ** 18n
+    );
+  });
+
+  it("should cap a payout at collateral plus 100% of notional", () => {
+    const collateral = 999n * 10n ** 18n;
+    const pos = {
+      collateralUsd: collateral,
+      entryPrice: 180n * 10n ** 18n,
+      leverageBps: 100_000n, // 10x
+      isLong: true,
+    };
+
+    // size = 9,990; cap = 999 + 9,990 = 10,989
+    expect(positionSizeUsd(pos)).toBe(9_990n * 10n ** 18n);
+    expect(payoutCapUsd(pos)).toBe(10_989n * 10n ** 18n);
+    expect(MAX_PROFIT_BPS).toBe(10_000n);
+  });
+
+  it("should scale the payout cap with leverage", () => {
+    const collateral = 999n * 10n ** 18n;
+    const base = { collateralUsd: collateral, entryPrice: 180n * 10n ** 18n, isLong: true };
+
+    // 1x => 999 + 999 = 1,998; 50x => 999 + 49,950 = 50,949
+    expect(payoutCapUsd({ ...base, leverageBps: 10_000n })).toBe(1_998n * 10n ** 18n);
+    expect(payoutCapUsd({ ...base, leverageBps: 500_000n })).toBe(50_949n * 10n ** 18n);
+  });
+
+  it("should refuse a position the pool cannot cover, and allow one it can", () => {
+    const pos = {
+      collateralUsd: 999n * 10n ** 18n,
+      entryPrice: 180n * 10n ** 18n,
+      leverageBps: 500_000n, // 50x -> cap 50,949
+      isLong: true,
+    };
+
+    // 1,000 USDC pool, nothing reserved: needs 50,949, has 1,999. Refused.
+    const small = poolCapacityCheck(pos, 1_000n * 10n ** 18n, 0n);
+    expect(small.ok).toBe(false);
+    expect(small.requiredUsd).toBe(50_949n * 10n ** 18n);
+    expect(small.availableUsd).toBe(1_999n * 10n ** 18n);
+
+    // 100,000 USDC pool with 10,989 already reserved. Allowed.
+    const large = poolCapacityCheck(pos, 100_000n * 10n ** 18n, 10_989n * 10n ** 18n);
+    expect(large.ok).toBe(true);
+  });
+
+  it("should size a 20-position 50x demo the way the seed script does", () => {
+    // The rehearsal number, derived rather than hardcoded. demo-seed.ts adds 20%
+    // headroom on top of this.
+    const pos = {
+      collateralUsd: netCollateralUsd(1_000n * 10n ** 18n),
+      entryPrice: 180n * 10n ** 18n,
+      leverageBps: 500_000n,
+      isLong: true,
+    };
+    const perPosition = payoutCapUsd(pos);
+    const total = perPosition * 20n;
+
+    expect(perPosition).toBe(50_949n * 10n ** 18n);
+    expect(total).toBe(1_018_980n * 10n ** 18n);
   });
 });
