@@ -35,7 +35,7 @@ export function Navbar({
 
   const navItems: Array<{ id: NavView; label: string; icon: React.ReactNode; badge?: string }> = [
     { id: "INDEX", label: "INDEX", icon: <Zap className="w-3.5 h-3.5" /> },
-    { id: "TOKEN", label: "TOKEN", icon: <Coins className="w-3.5 h-3.5" />, badge: "ICON" },
+    { id: "TOKEN", label: "TOKEN", icon: <Coins className="w-3.5 h-3.5" />, badge: "KOL" },
     { id: "DETAIL", label: "DETAIL", icon: <Network className="w-3.5 h-3.5" />, badge: "AGENT" },
     { id: "PRODUCT", label: "PRODUCT", icon: <Shield className="w-3.5 h-3.5" /> },
     { id: "MARKET", label: "MARKET", icon: <TrendingUp className="w-3.5 h-3.5" />, badge: "LIVE" },
@@ -55,17 +55,9 @@ export function Navbar({
             <div className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-400 rounded-full border-2 border-[#0d1017] animate-pulse" />
           </div>
           <div>
-            <div className="flex items-center gap-2">
-              <span className="font-extrabold text-base sm:text-lg tracking-wider text-white">
-                KOLIANCE
-              </span>
-              <span className="hidden md:inline-block text-[10px] text-slate-400 font-mono">
-                {"//"} TRUST ARCHITECTURE
-              </span>
-              <span className="text-[9px] uppercase font-mono px-1.5 py-0.2 rounded bg-[#1e2436] text-slate-200 border border-white/20">
-                10k TPS
-              </span>
-            </div>
+            <span className="font-extrabold text-base sm:text-lg tracking-wider text-white">
+              KOLIANCE
+            </span>
           </div>
         </div>
 

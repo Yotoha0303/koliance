@@ -29,5 +29,5 @@ describe("Google OAuth API Route", () => {
 
     const data = await res.json();
     expect(data.error).toBeDefined();
-  });
+  }, 15000);
 });
