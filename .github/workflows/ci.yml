@@ -55,13 +55,25 @@ jobs:
 
       - run: npm ci
 
-      # Hardhat 3 only compiles .sol, so a separate tsc pass is required to catch
-      # cross-module type errors in the test and ignition files.
-      - name: Typecheck
-        run: npx tsc --noEmit
-
+      # Compile BEFORE typechecking. This order is load-bearing and was wrong in
+      # the first version of this workflow.
+      #
+      # `artifacts/` is gitignored, and Hardhat's viem plugin derives the contract
+      # types from it. Typecheck a fresh checkout with no artifacts and every
+      # `viem.deployContract(...)` returns `unknown`, producing 110 type errors
+      # across files nobody touched. Compiling first generates the types and the
+      # same tree typechecks clean.
+      #
+      # It looked fine locally only because a working tree accumulates artifacts
+      # on its own. That is precisely the class of "works on my machine" this
+      # workflow exists to catch — and it caught it on its first real run.
       - name: Compile contracts
         run: npx hardhat compile
+
+      # Hardhat 3 only compiles .sol, so a separate tsc pass is still required to
+      # catch cross-module type errors in the test, script and ignition files.
+      - name: Typecheck
+        run: npx tsc --noEmit
 
       # --coverage is Hardhat 3's built-in flag; unlike solidity-coverage it
       # needs no extra dependency (and the third-party tools declare a
