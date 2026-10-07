@@ -172,69 +172,85 @@ export function NavAuthBadges({ walletAddress }: NavAuthBadgesProps) {
         onClick={() => setDropdownOpen(!dropdownOpen)}
         className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.12] hover:border-white/25 text-xs font-mono text-slate-200 transition-all select-none shadow-sm active:scale-95"
       >
-        {/* Google Status Icon/Avatar */}
+        {/* If User is Logged In (Google / Platform User) -> Prominent User Avatar & Profile Chip */}
         {googleUser ? (
-          <div className="w-5 h-5 rounded-full overflow-hidden border border-blue-400 relative">
-            {googleUser.picture ? (
-              <Image
-                src={googleUser.picture}
-                alt={googleUser.name}
-                width={20}
-                height={20}
-                className="w-full h-full object-cover"
-              />
-            ) : (
-              <div className="w-full h-full bg-blue-500/30 flex items-center justify-center text-[10px] text-blue-300 font-bold">
-                G
-              </div>
-            )}
+          <div className="flex items-center gap-2">
+            <div className="w-6 h-6 rounded-full overflow-hidden border border-blue-400/80 shadow-[0_0_8px_rgba(59,130,246,0.35)] relative bg-blue-500/20 flex items-center justify-center shrink-0">
+              {googleUser.picture ? (
+                <Image
+                  src={googleUser.picture}
+                  alt={googleUser.name}
+                  width={24}
+                  height={24}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <User className="w-3.5 h-3.5 text-blue-300" />
+              )}
+            </div>
+            <div className="flex flex-col text-left leading-tight">
+              <span className="font-sans font-semibold text-white text-xs truncate max-w-[90px] sm:max-w-[120px]">
+                {googleUser.name || "开发者"}
+              </span>
+              <span className="text-[9px] font-mono text-emerald-400 flex items-center gap-0.5">
+                <CheckCircle2 className="w-2.5 h-2.5" /> 已认证
+              </span>
+            </div>
           </div>
         ) : (
-          <div className="w-5 h-5 rounded-full bg-white/[0.06] flex items-center justify-center">
-            <svg className="w-3 h-3" viewBox="0 0 24 24">
-              <path
-                fill="#EA4335"
-                d="M12 5c1.6 0 3 .6 4.1 1.6l3.1-3.1C17.3 1.8 14.8 1 12 1 7.5 1 3.7 3.6 1.9 7.3l3.7 2.9C6.5 7.4 9 5 12 5z"
-              />
-              <path
-                fill="#4285F4"
-                d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.5h6.5c-.3 1.5-1.1 2.8-2.4 3.7l3.7 2.9c2.2-2 3.7-5 3.7-8.8z"
-              />
-              <path
-                fill="#FBBC05"
-                d="M5.6 14.8c-.2-.7-.4-1.5-.4-2.3s.2-1.6.4-2.3L1.9 7.3C.7 9.7 0 12.3 0 15.1c0 2.8.7 5.4 1.9 7.8l3.7-2.9z"
-              />
-              <path
-                fill="#34A853"
-                d="M12 23.2c3.2 0 6-1.1 8-3l-3.7-2.9c-1.1.7-2.5 1.2-4.3 1.2-3 0-5.5-2.4-6.4-5.2L1.9 16.2C3.7 20 7.5 23.2 12 23.2z"
-              />
-            </svg>
+          /* When NOT logged in: Prominent User Icon + Platform Badges */
+          <div className="flex items-center gap-1.5">
+            <div className="w-5 h-5 rounded-full bg-white/[0.08] border border-white/20 flex items-center justify-center text-slate-300">
+              <User className="w-3 h-3 text-white" />
+            </div>
+
+            {/* Google Status Icon */}
+            <div className="w-4 h-4 rounded-full bg-white/[0.06] flex items-center justify-center">
+              <svg className="w-2.5 h-2.5" viewBox="0 0 24 24">
+                <path
+                  fill="#EA4335"
+                  d="M12 5c1.6 0 3 .6 4.1 1.6l3.1-3.1C17.3 1.8 14.8 1 12 1 7.5 1 3.7 3.6 1.9 7.3l3.7 2.9C6.5 7.4 9 5 12 5z"
+                />
+                <path
+                  fill="#4285F4"
+                  d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.5h6.5c-.3 1.5-1.1 2.8-2.4 3.7l3.7 2.9c2.2-2 3.7-5 3.7-8.8z"
+                />
+                <path
+                  fill="#FBBC05"
+                  d="M5.6 14.8c-.2-.7-.4-1.5-.4-2.3s.2-1.6.4-2.3L1.9 7.3C.7 9.7 0 12.3 0 15.1c0 2.8.7 5.4 1.9 7.8l3.7-2.9z"
+                />
+                <path
+                  fill="#34A853"
+                  d="M12 23.2c3.2 0 6-1.1 8-3l-3.7-2.9c-1.1.7-2.5 1.2-4.3 1.2-3 0-5.5-2.4-6.4-5.2L1.9 16.2C3.7 20 7.5 23.2 12 23.2z"
+                />
+              </svg>
+            </div>
+
+            {/* GitHub Status Icon */}
+            <div
+              className={`w-4 h-4 rounded-full flex items-center justify-center ${
+                githubUser ? "bg-indigo-500/20 text-indigo-300 border border-indigo-400/40" : "bg-white/[0.06] text-slate-400"
+              }`}
+            >
+              <Github className="w-2.5 h-2.5" />
+            </div>
+
+            {/* Steam Status Icon */}
+            <div
+              className={`w-4 h-4 rounded-full flex items-center justify-center ${
+                steamUser ? "bg-cyan-500/20 text-cyan-300 border border-cyan-400/40" : "bg-white/[0.06] text-slate-400"
+              }`}
+            >
+              <Gamepad2 className="w-2.5 h-2.5" />
+            </div>
+
+            <span className="hidden md:inline font-sans font-medium text-xs text-slate-200 ml-0.5">
+              {hasAnyAuth ? "已认证背书" : "登录 / 背书"}
+            </span>
           </div>
         )}
 
-        {/* GitHub Status Icon */}
-        <div
-          className={`w-5 h-5 rounded-full flex items-center justify-center ${
-            githubUser ? "bg-indigo-500/20 text-indigo-300 border border-indigo-400/40" : "bg-white/[0.06] text-slate-400"
-          }`}
-        >
-          <Github className="w-3 h-3" />
-        </div>
-
-        {/* Steam Status Icon */}
-        <div
-          className={`w-5 h-5 rounded-full flex items-center justify-center ${
-            steamUser ? "bg-cyan-500/20 text-cyan-300 border border-cyan-400/40" : "bg-white/[0.06] text-slate-400"
-          }`}
-        >
-          <Gamepad2 className="w-3 h-3" />
-        </div>
-
-        <span className="hidden md:inline font-sans font-medium ml-1">
-          {hasAnyAuth ? "已认证背书" : "身份背书"}
-        </span>
-
-        <ChevronDown className="w-3 h-3 text-slate-400 ml-0.5" />
+        <ChevronDown className="w-3.5 h-3.5 text-slate-400 ml-0.5" />
       </button>
 
       {/* Floating Identity & Login Menu */}
@@ -247,6 +263,58 @@ export function NavAuthBadges({ walletAddress }: NavAuthBadgesProps) {
             transition={{ duration: 0.15 }}
             className="absolute right-0 mt-2 w-72 sm:w-80 rounded-2xl bg-[#141824]/95 backdrop-blur-xl border border-white/15 p-3 shadow-2xl z-50 text-white space-y-2.5"
           >
+            {/* If Google User is logged in: Dedicated Profile Overview Card */}
+            {googleUser && (
+              <div className="p-3 rounded-xl bg-gradient-to-r from-blue-950/40 via-indigo-950/30 to-purple-950/20 border border-blue-500/25 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-9 h-9 rounded-full overflow-hidden border border-blue-400/80 bg-blue-500/20 flex items-center justify-center shrink-0">
+                      {googleUser.picture ? (
+                        <Image
+                          src={googleUser.picture}
+                          alt={googleUser.name}
+                          width={36}
+                          height={36}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <User className="w-5 h-5 text-blue-300" />
+                      )}
+                    </div>
+                    <div>
+                      <div className="text-xs font-bold text-white flex items-center gap-1">
+                        <span>{googleUser.name || "Koliance 开发者"}</span>
+                        <CheckCircle2 className="w-3.5 h-3.5 text-blue-400" />
+                      </div>
+                      <div className="text-[10px] font-mono text-slate-300 truncate max-w-[150px]">
+                        {googleUser.email}
+                      </div>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setDropdownOpen(false);
+                      setEditModalOpen(true);
+                    }}
+                    className="px-2.5 py-1 rounded-lg bg-blue-500/20 hover:bg-blue-500/30 border border-blue-400/40 text-[11px] font-mono text-blue-200 flex items-center gap-1 transition shadow-sm active:scale-95"
+                  >
+                    <Edit3 className="w-3 h-3 text-blue-300" />
+                    <span>编辑资料</span>
+                  </button>
+                </div>
+
+                {/* Bound Wallet Badge & Bio */}
+                <div className="pt-1.5 border-t border-white/10 flex items-center justify-between text-[10px] font-mono">
+                  <span className="text-slate-400">已绑定钱包:</span>
+                  <span className="text-blue-300 font-bold">
+                    {googleUser.walletAddress || walletAddress
+                      ? `${(googleUser.walletAddress || walletAddress)?.slice(0, 6)}...${(googleUser.walletAddress || walletAddress)?.slice(-4)}`
+                      : "未绑定 (点击编辑绑定)"}
+                  </span>
+                </div>
+              </div>
+            )}
+
             {/* Header info */}
             <div className="flex items-center justify-between pb-2 border-b border-white/10">
               <span className="text-xs font-mono text-slate-300 flex items-center gap-1.5">
