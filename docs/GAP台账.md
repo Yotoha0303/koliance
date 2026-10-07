@@ -74,6 +74,7 @@
 | GAP-32 | 覆盖率阈值未配 | 🟡 P2 | ✅ | `506c4ef`（合约侧；前端见 GAP-33） |
 | GAP-33 | 前端覆盖率未配 | 🟡 P2 | 🟠 | `@vitest/coverage-v8` 可用 |
 | GAP-34 | `closePosition` 破坏冻结后未重新冻结 | 🟠 P1 | 🟠 | 见 §3.1 |
+| GAP-35 | 全库行尾未重规范化（CRLF/LF 混用） | 🟡 P2 | 🟠 | 见 §3.3 |
 
 ---
 
@@ -206,6 +207,27 @@ GAP-07 加了 `minOutUsd` 与 `deadline`（`c7da777`），**冻结被破坏**。
 
 ---
 
+### 3.3 GAP-35：全库行尾未重规范化
+
+**问题**：`.gitattributes` 是本次才加的（`f6ec42d`），此前仓库对行尾没有任何约束，
+Windows 工作树是 CRLF、CI 是 LF。
+
+**已经造成的实际伤害**：覆盖率门禁的阈值**基于本机的 CRLF 读数**定成了 93%，
+而 CI 在 LF 下读到 89.22% —— **首次真实 CI 运行因此失败**。
+详见 `docs/changes/007-覆盖率门禁.md`。
+
+**已修的部分**：`.gitattributes` 把 `*.sol` / `*.ts` 等固定为 `eol=lf`，
+**只对后续**检出生效；覆盖率阈值改以 LF 口径为准（88%）。
+
+**未做的部分**：现有文件在工作树里仍是 CRLF。重规范化需要
+`git add --renormalize . && git checkout -- .`，会在这个已经很宽的 PR 里
+**混入成千上万行行尾噪声，使真正的改动无法评审**。因此留给独立的小 PR。
+
+**风险**：任何在旧 Windows 检出上做覆盖率读数的人仍会读到偏高约 5 个点的值。
+脚本注释已写明这一点。
+
+---
+
 ## 4. 设计决策类未竟项（GAP-22~25）
 
 RFC-001（`自治 Agent 交易与链下高性能清结算系统技术架构设计全案.md`）与本仓库现状的冲突。
@@ -250,12 +272,12 @@ RFC-001（`自治 Agent 交易与链下高性能清结算系统技术架构设�
 
 ## 7. 当前质量基线（用于回归）
 
-分支 `feat/perp-solvency-and-panel`，全部实测：
+分支 `feat/perp-solvency-and-panel`，**本地与 CI 均已实测**：
 
 | 指标 | 数值 | 命令 |
 | --- | --- | --- |
 | 合约测试 | **146 passing**（3 solidity, 143 nodejs） | `cd contracts && npx hardhat test` |
-| 合约覆盖率 | **94.37% 行**（门禁 93%） | `cd contracts && npx hardhat test --coverage && npx tsx scripts/check-coverage.ts` |
+| 合约覆盖率 | **89.22% 行**（LF 口径；门禁 88%） | `cd contracts && npx hardhat test --coverage && npx tsx scripts/check-coverage.ts` |
 | 合约类型检查 | exit 0 | `cd contracts && npx tsc --noEmit` |
 | 前端单测 | **23 passing**（3 files） | `npx vitest run` |
 | 前端类型检查 | exit 0 | `npx tsc --noEmit` |
@@ -264,8 +286,13 @@ RFC-001（`自治 Agent 交易与链下高性能清结算系统技术架构设�
 | 后端构建/静态检查 | exit 0 | `cd backend && go build ./... && go vet ./...` |
 | 后端测试 | **29 passing**，`-race` | `cd backend && go test -race ./...` |
 
+**CI 状态**：`.github/workflows/ci.yml` 三个 job **全部通过**（run `37623974490`）。
+
+> ⚠️ **覆盖率读数必须取自 LF 检出**（重新 clone 或在 `.gitattributes` 生效后重新检出）。
+> 长期存在的 Windows 工作树会读到**偏高约 5 个点**的值——这正是首次 CI 失败的原因（GAP-35）。
+
 **本轮基线变化**：合约 111 → **146**（+35），前端单测 9 → **23**（+14），后端 0 → **29**。
-覆盖率从 0 → **94.37%**（带门禁）。
+覆盖率从 0 → **89.22%（LF）**，带门禁。
 
 ---
 
@@ -283,6 +310,13 @@ RFC-001（`自治 Agent 交易与链下高性能清结算系统技术架构设�
 | `50c51d8` | 删陈旧 lockfile（GAP-28）+ README 去明文凭证（GAP-12 部分） |
 | `506c4ef` | 覆盖率门禁（GAP-32） |
 | `c7da777` | 平仓退出保护（GAP-07）+ 推送可观测（GAP-08） |
+| `8f69995` | 台账更新（新开 GAP-33/34） |
+| `42e41fc` | 修 14 处失效文档路径 |
+| `1ac689a` | CI 改为**所有分支**触发（原来只 main，导致 fork 分支无 CI） |
+| `e48ed61` | **CI 步骤顺序**：先 compile 再 tsc（artifacts 被 gitignore，否则 110 个类型错误） |
+| `f6ec42d` | 覆盖率按 **LF 口径** + 新增 `.gitattributes`（GAP-35） |
+
+**PR**：[moonhotline/koliance#5](https://github.com/moonhotline/koliance/pull/5)
 
 ---
 
@@ -296,7 +330,11 @@ RFC-001（`自治 Agent 交易与链下高性能清结算系统技术架构设�
 | `1e85092` | `_equityAfterFunding` 漏了 `collateral` | `Pays a winning long out of the pool` | 权益凭空少一整个抵押品 |
 | `506c4ef` | 覆盖率脚本在**无分支数据**的报告上打印"branches 100%" | 自己怀疑那个 100% 并 grep 原始文件 | 空分母被当成 100% |
 | `c7da777` | 类型化调用打到无代码地址 → **每笔平仓 revert** | `Does not block a close when the price updater is not a contract` | `try/catch` **不捕获**"目标无代码" |
+| `e48ed61` | CI 先 tsc 后 compile → **110 个类型错误**（本地却全绿） | 首次真实 CI 运行 | `artifacts/` 被 gitignore，viem 的合约类型从它推导 |
+| `f6ec42d` | 覆盖率阈值按 CRLF 本机读数定 → **CI 失败** | 首次真实 CI 运行 | 覆盖率插桩按字节偏移，行尾改变测量结果 |
 
-**共性**：四条都不是逻辑想错，而是**对一个库/语言行为的错误假设**
-（整数除法舍入、try/catch 的边界、空分母、返回值的字段顺序）。
-这正是不写测试就一定会在演示现场暴露的那类问题。
+**共性**：五条都不是逻辑想错，而是**对一个库/语言/环境行为的错误假设**
+（整数除法舍入、try/catch 的边界、空分母、返回值的字段顺序、构建产物与行尾对测量的影响）。
+**其中两条只有真实 CI 才能发现**——本机怎么跑都是绿的。
+
+> 这正是不写测试、不接 CI 就一定会在演示现场暴露的那类问题。
