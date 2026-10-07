@@ -3,16 +3,25 @@
  *
  * SINGLE SOURCE OF TRUTH for fee / margin / leverage basis points and Pyth feed ids.
  *
- * This file mirrors the parameters the contracts are deployed with. It is NOT the
- * runtime authority — the deployment is. `IPositionManager` exposes
- * `openFeeBps()` / `maintenanceMarginBps()` and friends; reconcile against those
- * on load so a redeploy with different parameters cannot silently desync the UI.
+ * Where the numbers actually come from
+ * ------------------------------------
+ * Solidity cannot import this file, so values the CONTRACTS consume at compile
+ * time also exist in `contracts/contracts/perp/PerpConstants.sol`. The two are
+ * mirrors; the deployment is the tiebreaker.
  *
- * It lives under `src/` because `.vercelignore` excludes `contracts/` from the
- * Vercel build, so anything the frontend imports must sit inside the deployed
- * tree. Contracts must NOT import this file back: `contracts/` is ESM
- * (`type: module`) while the root package is not, and the cross-boundary import
- * produces a module-system conflict. Read the getters instead.
+ *   - fee / margin / leverage bps -> defined in PerpConstants.sol, mirrored here.
+ *     At runtime, read the getters on IPositionManager: they report what was
+ *     actually deployed, so they cannot go stale.
+ *   - Pyth feed ids               -> defined HERE only. They are passed into the
+ *     contracts as call arguments and never need to be hardcoded on chain, so
+ *     there is nothing to mirror.
+ *
+ * Contracts must NOT import this file back: `contracts/` is ESM (`type: module`)
+ * while the root package is not, and the cross-boundary import breaks `tsc`.
+ *
+ * This file lives under `src/` because `.vercelignore` excludes `contracts/` from
+ * the Vercel build, so anything the frontend imports must sit inside the deployed
+ * tree.
  *
  * If the frontend's estimated liquidation price drifts from the on-chain
  * liquidation price, the demo loses all credibility on stage. Sharing one file
