@@ -432,7 +432,7 @@ function MainContent() {
                         <div className="flex items-center gap-1.5">
                           <h3 className="font-bold text-lg text-white">KOL Token</h3>
                           <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30">
-                            ICON
+                            KOL
                           </span>
                         </div>
                         <ArrowRight className="w-4 h-4 text-purple-400 group-hover:translate-x-1 transition-transform" />
@@ -451,7 +451,7 @@ function MainContent() {
             </motion.div>
           )}
 
-          {/* TAB: TOKEN (KolToken ICON on Monad Testnet) */}
+          {/* TAB: TOKEN (KolToken KOL on Monad Testnet) */}
           {currentView === "TOKEN" && (
             <motion.div
               key="view-token"
