@@ -9,11 +9,19 @@ import {
   CreditCard,
   TrendingUp,
   Coins,
+  Activity,
 } from "lucide-react";
 import { BrandIcon } from "@/components/BrandIcon";
 import { NavAuthBadges } from "@/components/NavAuthBadges";
 
-export type NavView = "INDEX" | "DETAIL" | "PRODUCT" | "MARKET" | "AGENTCARD" | "TOKEN";
+export type NavView =
+  | "INDEX"
+  | "DETAIL"
+  | "PRODUCT"
+  | "MARKET"
+  | "AGENTCARD"
+  | "TOKEN"
+  | "PERP";
 
 interface NavbarProps {
   currentView: NavView;
@@ -39,6 +47,7 @@ export function Navbar({
     { id: "DETAIL", label: "DETAIL", icon: <Network className="w-3.5 h-3.5" />, badge: "AGENT" },
     { id: "PRODUCT", label: "PRODUCT", icon: <Shield className="w-3.5 h-3.5" /> },
     { id: "MARKET", label: "MARKET", icon: <TrendingUp className="w-3.5 h-3.5" />, badge: "LIVE" },
+    { id: "PERP", label: "PERP", icon: <Activity className="w-3.5 h-3.5" />, badge: "ONCHAIN" },
     { id: "AGENTCARD", label: "AGENTCARD", icon: <CreditCard className="w-3.5 h-3.5" />, badge: "AI" },
   ];
 
@@ -61,7 +70,7 @@ export function Navbar({
           </div>
         </div>
 
-        {/* 5-Tab Navigation Switcher (Solid dark contrast pill, zero scrollbar) */}
+        {/* Navigation Switcher (Solid dark contrast pill, zero scrollbar) */}
         <nav className="flex items-center p-1 rounded-2xl bg-[#141824] border border-white/15 shadow-inner overflow-x-auto no-scrollbar [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
           {navItems.map((item) => {
             const isActive = currentView === item.id;

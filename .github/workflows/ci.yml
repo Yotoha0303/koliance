@@ -1,0 +1,141 @@
+name: CI
+
+# Every test in this repository was, until now, an "outside-the-door" test: 134
+# of them ran only on whoever's laptop happened to remember. The gate matrix in
+# 提示词.md requires 100% of new cases to execute in CI, so this workflow is what
+# turns the suite into something that can actually fail a change.
+#
+# Three independent jobs rather than one, because the three toolchains install
+# differently and a broken frontend install should not mask a broken contract:
+#
+#   contracts/  its own npm project (package-lock.json, npm ci)
+#   root        pnpm (pnpm-lock.yaml v9)
+#   backend/    go modules
+#
+# Note the split deliberately: `contracts/` is NOT part of the pnpm install, and
+# the root `package-lock.json` is stale (it predates @supabase/supabase-js), so
+# `npm ci` at the root would install a tree that fails `tsc`. Root uses pnpm.
+
+on:
+  # Every branch, not just main.
+  #
+  # `branches: [main]` was the first version, and it was wrong for how this repo
+  # actually works: contributors push feature branches to their fork, and the PR
+  # comes from the fork. A main-only push trigger means a feature branch gets NO
+  # CI until the PR lands upstream, so the contributor never sees the result of
+  # their own change and the maintainer is the first to find out.
+  #
+  # Worse, a fork's pull_request run needs the upstream repo to have Actions
+  # enabled and the workflow present on the base branch - neither of which holds
+  # here. Running on every push removes that dependency for the contributor.
+  push:
+    branches: ["**"]
+  pull_request:
+
+# A superseded run on the same ref is wasted work; cancel it.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  contracts:
+    name: contracts (hardhat + solc)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: contracts
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: contracts/package-lock.json
+
+      - run: npm ci
+
+      # Compile BEFORE typechecking. This order is load-bearing and was wrong in
+      # the first version of this workflow.
+      #
+      # `artifacts/` is gitignored, and Hardhat's viem plugin derives the contract
+      # types from it. Typecheck a fresh checkout with no artifacts and every
+      # `viem.deployContract(...)` returns `unknown`, producing 110 type errors
+      # across files nobody touched. Compiling first generates the types and the
+      # same tree typechecks clean.
+      #
+      # It looked fine locally only because a working tree accumulates artifacts
+      # on its own. That is precisely the class of "works on my machine" this
+      # workflow exists to catch — and it caught it on its first real run.
+      - name: Compile contracts
+        run: npx hardhat compile
+
+      # Hardhat 3 only compiles .sol, so a separate tsc pass is still required to
+      # catch cross-module type errors in the test, script and ignition files.
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      # --coverage is Hardhat 3's built-in flag; unlike solidity-coverage it
+      # needs no extra dependency (and the third-party tools declare a
+      # hardhat ^2 peer, so they do not work here at all).
+      - name: Test with coverage
+        run: npx hardhat test --coverage
+
+      # Hardhat's coverage config accepts only `skipFiles` - there is no
+      # threshold option, so the report alone would let a regression pass
+      # silently. This reads the lcov the run just produced and fails below the
+      # floor. See scripts/check-coverage.ts for what is in scope and why.
+      - name: Enforce coverage floor
+        run: npx tsx scripts/check-coverage.ts
+
+  frontend:
+    name: frontend (next + vitest)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Unit tests
+        run: npx vitest run
+
+      - name: Lint
+        run: npx next lint
+
+      # A build is the only thing that catches a route that typechecks but does
+      # not render, e.g. a client component reaching for a browser global.
+      - name: Build
+        run: npx next build
+
+  backend:
+    name: backend (go)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+          cache-dependency-path: backend/go.sum
+
+      - run: go build ./...
+      - run: go vet ./...
+      # -race because the position table and the nonce manager are both shared
+      # between the event subscription and the price loop. A race there is
+      # silent under normal runs and fatal under load.
+      - run: go test -race ./...

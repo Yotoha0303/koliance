@@ -1,0 +1,347 @@
+# Koliance 质量缺口台账（GAP）
+
+> **用途**：本项目**所有未完成事项的唯一台账**。任何"还没做"的东西都必须出现在这里，
+> 否则它就不存在。协作者据此判断现状，不要依赖口头同步。
+>
+> **编号规则**（`提示词.md` 纪律 §4）：`ADR-` 架构决策 · `MIG-` 数据库迁移 · **`GAP-` 质量缺口** · `INC-` 线上故障 · `DEFER-` 延期债务
+>
+> **维护要求**：新增缺口立刻编号入表；修完把状态改为 ✅ 并附提交号；**不要删除已完成项**（它们是回归基线）。
+>
+> **最后更新**：2026-10-07 · 分支 `feat/perp-solvency-and-panel`
+
+---
+
+## 0. 归档位置说明（GAP-31 ✅ 已修）
+
+本仓库的文档原先分居两处，规划类文档**不在 git 下**，协作者 clone 后看不到。
+**已修正**：规划文档迁入 `docs/planning/`，并附 `docs/planning/README.md` 索引。
+
+当前结构：
+
+| 位置 | 内容 |
+| --- | --- |
+| `docs/adr/` | 架构决策（ADR-002 / ADR-003） |
+| `docs/changes/` | 每次代码变更的记录（001~005） |
+| `docs/planning/` | 目标、方案、审计、情报等规划类文档 + 索引 |
+| `docs/GAP台账.md` | **本文件**，活的未竟事项台账 |
+
+仓库外的 `D:\MyDocuments\koliance\docs\` 仍保留原件，但**以仓库内为准**——它跟着代码走。
+
+---
+
+## 1. 状态总览
+
+| 状态 | 含义 |
+| --- | --- |
+| ✅ | 已修复，有测试或命令可验证 |
+| 🔴 | 未修复，**有明确阻塞**（见"阻塞"列） |
+| 🟠 | 未修复，无阻塞，只是没做 |
+| ⬜ | 明确不做（有理由） |
+
+| 编号 | 标题 | 严重度 | 状态 | 提交 / 阻塞 |
+| --- | --- | --- | --- | --- |
+| GAP-01 | 平仓/清算付款失败致头寸永久卡死 | 🔴 P0 | ✅ | `0193e3a` |
+| GAP-02 | 单笔不可付款污染整批清算 | 🔴 P0 | ✅ | `0193e3a` |
+| GAP-03 | LP 抽干本金致盈利交易者被拒付 | 🔴 P0 | ✅ | `0193e3a` |
+| GAP-04 | `maxPnlCap` 未实现 + 开仓无偿付护栏 | 🔴 P0 | ✅ | `0193e3a` |
+| GAP-05 | 破产头寸清算赏金为 0（激励反向） | 🟠 P1 | ✅ | `0193e3a` |
+| GAP-06 | 前端/链上清算价同源无一致性测试 | 🟠 P1 | 🟠 | 需链上对拍 |
+| GAP-07 | `closePosition` 无价格时效/滑点约束 | 🟠 P1 | ✅ | `c7da777` |
+| GAP-08 | `_pushPrices` 字符串签名 + 失败无观测 | 🟡 P2 | ✅ | `c7da777` |
+| GAP-09 | `perpConfig.ts` 的 FEEDS 与链上实测矛盾 | 🟡 P2 | ✅ | `df227bf` |
+| GAP-10 | 无 CI，全部用例是"门外用例" | 🟡 P2 | ✅ | `2b05f05` |
+| GAP-11 | 缺工程骨架目录 | 🟡 P2 | 🟠 | 部分完成 |
+| GAP-12 | 凭证硬编码（6 处，含 README 明文） | 🟡 P2 | 🔴 | **需人工轮换密钥**；README 已清理 |
+| GAP-13 | 后端零链上交互 + `/health` 伪指标 | 🟡 P2 | 🟠 | — |
+| GAP-14 | 合成随机行情以"实时数据"形态返回 | 🟡 P2 | 🟠 | — |
+| GAP-15 | `docs/changes` 先写后填纪律从未执行 | 🟠 P1 | ✅ | `0193e3a` 起 |
+| GAP-16 | `项目目标.md` 交付缺口 | 🔴 P0 | 🟠 | 部分；见 §3 |
+| GAP-17 | 负向证伪用例未常驻化 | 🟠 P1 | ✅ | `0193e3a` |
+| GAP-18 | RFC `reserve` 无幂等键 → 重复预扣 | 🔴 P0 | ⬜ | 仅采纳 Redis 时激活 |
+| GAP-19 | RFC 冻结 TTL 过期 → 资金永久卡死 | 🔴 P0 | ⬜ | 同上 |
+| GAP-20 | RFC `HINCRBYFLOAT` 浮点账本漂移 | 🔴 P0 | ⬜ | 同上 |
+| GAP-21 | RFC `daily_spent` 无重置机制 | 🟠 P1 | ⬜ | 同上 |
+| GAP-22 | RFC 未引用仓库已有 `agentcard` 委托模块 | 🟠 P1 | ⬜ | 设计决策 |
+| GAP-23 | RFC 架构与仓库分层不兼容 + 4 处内部矛盾 | 🔴 P0 | ⬜ | 设计决策 |
+| GAP-24 | 三套 Session Key 模型互不兼容 | 🟠 P1 | ⬜ | 设计决策 |
+| GAP-25 | 全局锁串行化 vs 10,000 TPS 目标 | 🟠 P1 | ⬜ | 无基准测试 |
+| GAP-26 | perp 未部署 / 未接线 / 无 Bot | 🔴 P0 | 🟠 | 部分；见 §3 |
+| GAP-27 | 逐块资金费率未实现（赛道靶心） | 🟠 P1 | ✅ | 本分支 |
+| GAP-28 | 双 lockfile，`npm ci` 装过期树 | 🟡 P2 | 🟠 | — |
+| GAP-29 | 缺 `deploy/` 目录 | 🟡 P2 | 🟠 | — |
+| GAP-30 | Redis 额度池 | 🟡 P2 | ⬜ | 需先修 GAP-18~21 |
+| GAP-31 | 规划文档在仓库外，协作者看不到 | 🟡 P2 | ✅ | `df227bf`（`docs/planning/`） |
+| GAP-32 | 覆盖率阈值未配 | 🟡 P2 | ✅ | `506c4ef`（合约侧；前端见 GAP-33） |
+| GAP-33 | 前端覆盖率未配 | 🟡 P2 | 🟠 | `@vitest/coverage-v8` 可用 |
+| GAP-34 | `closePosition` 破坏冻结后未重新冻结 | 🟠 P1 | 🟠 | 见 §3.1 |
+| GAP-35 | 全库行尾未重规范化（CRLF/LF 混用） | 🟡 P2 | 🟠 | 见 §3.3 |
+
+---
+
+## 2. 已修复项的验证方式（回归基线）
+
+这些**不要删**。它们是"曾经真实坏过"的证据。
+
+### GAP-01~05 + GAP-17 → `contracts/test/perp/SolvencyGuards.ts`（8 条）
+
+其中 **6 条在修复前实测为红**（另 2 条是控制组）：
+
+| 用例 | 修复前失败原因 |
+| --- | --- |
+| LP 不能抽干池子（PROBE-F） | `reserve 999e18 must cover the obligation 2197.8e18` |
+| 容量不足拒绝开仓（PROBE2） | `Missing expected rejection` |
+| 权益截断为 0 USDC 仍能平仓（PROBE-A） | `writeContract` revert |
+| 超上限利润封顶而非卡死 | `a payout cap must exist` |
+| 单笔不污染整批（PROBE-C） | revert 于 `PositionManager.sol:276` |
+| 破产头寸仍有赏金 | `got 0` |
+
+**验证命令**：
+```powershell
+cd contracts; npx hardhat test test/perp/SolvencyGuards.ts   # 期望 8 passing
+```
+
+### GAP-27 → `contracts/test/perp/Funding.ts`（18 条）
+
+核心一条：`can push a position through its maintenance margin on its own` ——
+50x 多单、**价格完全不动**，1,500 块后仅凭持仓成本跌破维持保证金。
+
+**验证命令**：
+```powershell
+cd contracts; npx hardhat test test/perp/Funding.ts          # 期望 18 passing
+```
+
+### GAP-10 → `.github/workflows/ci.yml`
+
+三个 job（contracts / frontend / backend），135 个合约用例 + 23 个 vitest + Go 全部入矩阵。
+
+**验证命令**：
+```powershell
+Test-Path .github/workflows/ci.yml    # 期望 True
+```
+
+> ⚠️ **workflow 本身尚未在 GitHub Actions 上跑过**（本地只验证了它调用的每条命令）。
+> 首次真实运行才能确认，尤其 `forge-std` 从 GitHub 拉取这一步。
+> **另需在仓库设置里手动开启分支保护（required check）**，无法用代码提交完成。
+
+---
+
+## 3. 🔴 有明确阻塞的未竟项
+
+### GAP-16 / GAP-26：perp 模块的交付缺口
+
+`docs/项目目标.md` 要求的五件事，逐项现状：
+
+| 目标要求 | 现状 | 阻塞 |
+| --- | --- | --- |
+| `Vault.sol` / `PositionManager.sol` | ✅ 已实现，138 用例通过 | — |
+| Pyth 拉取式预言机 | ✅ `PythOracleAdapter` 已实现；**美股 feed 在 Monad 上不可用**（`执行方案-后端与合约.md:29-46` 实测） | 外部事实，非缺陷 |
+| 前端交易面板 | ✅ `/perp` 页面 + `PositionPanel`，读链不读 mock | — |
+| **Go 清算 Bot** | 🟠 **核心已做**（`internal/perp/{position,nonce}`，29 测试 `-race` 通过）；**接链部分未做** | ⛔ **需要 RPC + 已部署的 `PositionManager` 地址** |
+| **链上部署** | 🔴 **未做** | ⛔ **需要 `PRIVATE_KEY` + Monad 测试币** |
+| `GET /api/v1/liquidations` | 🟠 未做 | ⛔ 依赖 Bot |
+
+**为什么接链部分没写**：写了也无法验证，只会变成"看起来完成了"的代码。
+按 `提示词.md` 纪律 §1「读到才算，严禁推断」，**在能跑通之前不写**。
+
+**解除阻塞后要做的**（命令已备好）：
+
+```powershell
+cd contracts
+npx hardhat ignition deploy ignition/modules/PerpStack.ts --network monadTestnet
+npx hardhat run scripts/demo-seed.ts --network monadTestnet
+# 把输出的 4 个地址填入根 .env.local
+```
+
+然后才轮到：`eth_getLogs` 回填 → WebSocket 订阅 → `abigen` 绑定 → `cmd/liquidator/main.go`。
+
+> **注意**：在地址配置前，`/perp` 页面会显示"Perp 模块未配置"提示。
+> **这是设计行为，不是 bug** —— 面板拒绝显示任何数字，因为没有真实数据可显示。
+
+### GAP-12：凭证硬编码
+
+6 处：`config.go:38-44`、`render.yaml:17-28`、`README.md:16-33`、
+`src/app/api/auth/github/exchange/route.ts:29,33`。
+
+**阻塞**：轮换密钥需要外部后台操作（Steam / Alpaca / Stripe / GitHub），无法用代码完成。
+
+**已完成的部分**（`50c51d8`）：`README.md` 的明文凭证已移除，改为环境变量清单表。
+**但 git 历史无法清理**，所以泄露已成事实，**必须轮换**。
+
+**建议顺序**（不可颠倒）：
+1. 轮换四组密钥（**外部操作**）
+2. 再改 `config.go` / `render.yaml`，把默认值改为空串（缺失即启动失败）
+3. 最后处理 `exchange/route.ts` 的 OAuth secret fallback
+
+顺序颠倒会得到"用一个缺失的配置换掉了一个已泄露的密钥"，服务直接挂。
+
+---
+
+### 3.1 GAP-34：`closePosition` 破坏冻结后未重新冻结
+
+`推进方案.md:40` 把 `closePosition(uint256, bytes[])` 定为**冻结接口**，
+目的是让前端与 Go Bot 能并行开发。
+
+GAP-07 加了 `minOutUsd` 与 `deadline`（`c7da777`），**冻结被破坏**。
+
+**核查过的代价**（所以是可接受的）：
+- 消费方只有本仓库的测试与前端面板，均已同批更新；
+- Go Bot 的接链部分不存在（GAP-26）；
+- **perp 模块从未部署**（`deployed_addresses.json` 只有身份合约）。
+
+**未竟**：接口现在处于"**已破冻结、未重新冻结**"的状态。
+`IPositionManager.sol` 的 natspec 已写明这一点，并警告消费方"预期它还会变"。
+
+**要做的事**：若 Go Bot 接链要与前端并行开发，**先按现在的签名重新冻结**，
+并更新 `推进方案.md:40`。在此之前不要对外承诺接口稳定性。
+
+---
+
+### 3.2 GAP-33：前端覆盖率未配
+
+合约侧已有门禁（GAP-32 ✅）。前端侧 `@vitest/coverage-v8@4.1.11` 已确认可安装。
+
+**要做的事**：装 provider → `vitest.config.mts` 加 `coverage.thresholds` →
+`vitest run --coverage` 加进 CI frontend job。
+注意前端单测目前只有 23 条且集中在 `src/lib/perp.ts`，覆盖率会很低——
+**先量化再定阈值**，不要拍一个数字上去然后被删掉。
+
+---
+
+### 3.3 GAP-35：全库行尾未重规范化
+
+**问题**：`.gitattributes` 是本次才加的（`f6ec42d`），此前仓库对行尾没有任何约束，
+Windows 工作树是 CRLF、CI 是 LF。
+
+**已经造成的实际伤害**：覆盖率门禁的阈值**基于本机的 CRLF 读数**定成了 93%，
+而 CI 在 LF 下读到 89.22% —— **首次真实 CI 运行因此失败**。
+详见 `docs/changes/007-覆盖率门禁.md`。
+
+**已修的部分**：`.gitattributes` 把 `*.sol` / `*.ts` 等固定为 `eol=lf`，
+**只对后续**检出生效；覆盖率阈值改以 LF 口径为准（88%）。
+
+**未做的部分**：现有文件在工作树里仍是 CRLF。重规范化需要
+`git add --renormalize . && git checkout -- .`，会在这个已经很宽的 PR 里
+**混入成千上万行行尾噪声，使真正的改动无法评审**。因此留给独立的小 PR。
+
+**风险**：任何在旧 Windows 检出上做覆盖率读数的人仍会读到偏高约 5 个点的值。
+脚本注释已写明这一点。
+
+---
+
+## 4. 设计决策类未竟项（GAP-22~25）
+
+RFC-001（`自治 Agent 交易与链下高性能清结算系统技术架构设计全案.md`）与本仓库现状的冲突。
+**结论：不按 RFC 原样落地**，理由见仓库外 `docs/推荐方案-自治Agent清结算.md` §3。
+
+| GAP | 冲突 | 需要谁决策 |
+| --- | --- | --- |
+| GAP-22 | RFC 把"从零建委托系统"当前提，但 `backend/internal/agentcard` 已有约 70% 的 P0（限额/日限/白名单/冻结/批次归集） | 架构 |
+| GAP-23 | RFC 要求 Redis + gRPC + proto + Docker；仓库只有 `net/http` + pgx。且 RFC 内部 4 处自相矛盾 | 架构 |
+| GAP-24 | 三套 Session Key 模型（`sk_sess_` 字符串 / PG 地址 / EIP-712）互不兼容，**无代码把内存态写入 PG** | 架构 |
+| GAP-25 | `agentcard/service.go:95` 全程持全局锁 → 所有用户授权全局串行化；RFC 要 10,000 TPS | 需先写基准测试 |
+
+**GAP-18~21（RFC 的 Lua 脚本缺陷）** 已实测复现（重复预扣致资金卡死、TTL 丢账、浮点漂移 5e-12、`daily_spent` 永不重置）。
+**本次不采纳 Redis，故这四条不激活**；若将来采纳，**必须先修**。
+
+---
+
+## 5. 无阻塞但未做（可直接开工）
+
+| 编号 | 事项 | 起点 | 预估 |
+| --- | --- | --- | --- |
+| GAP-33 | 前端覆盖率阈值 | 装 `@vitest/coverage-v8`，**先量化再定阈值** | 半天 |
+| GAP-29 | `deploy/` 目录（若确需；Render 已够用则可标 ⬜） | — | — |
+| GAP-11 | 补 `deploy/` 与顶层 `tests/` 的骨架 | — | 30 分钟 |
+| GAP-25 | `agentcard` 全局锁 → 需先写基准测试量化 | `backend/internal/agentcard` | 1 天 |
+| GAP-06 | 前端强平价与链上对拍测试 | 需要链上部署 | 依赖 GAP-16 |
+| GAP-13 | 后端接 go-ethereum，`/health` 改为真实探活 | `backend/` | 1 天 |
+| GAP-14 | `/api/market` 的 `Math.random` 路径标注为合成数据并在 UI 明示 | `src/app/api/market/route.ts` | 半天 |
+| GAP-34 | 重新冻结 `closePosition` 并更新 `推进方案.md:40` | `IPositionManager.sol` | 30 分钟 |
+
+---
+
+## 6. 明确不做（⬜，附理由）
+
+| 编号 | 事项 | 理由 |
+| --- | --- | --- |
+| GAP-30 | Redis 额度池 | `想法记录.md:4` 划定范围为"只完成立项/需求/设计/开发/测试和发布"；且 RFC 的 Lua 有 4 个实测缺陷（GAP-18~21），本次不值得引入 |
+| GAP-18~21 | 修 RFC Lua 缺陷 | 不采纳 Redis 即不激活。**若将来采纳，必须先修这四条** |
+| 05~10 环 | 运维/故障/迭代/自动化 | `想法记录.md:4` 明确不做，"交由平台处理" |
+
+---
+
+## 7. 当前质量基线（用于回归）
+
+分支 `feat/perp-solvency-and-panel`，**本地与 CI 均已实测**：
+
+| 指标 | 数值 | 命令 |
+| --- | --- | --- |
+| 合约测试 | **146 passing**（3 solidity, 143 nodejs） | `cd contracts && npx hardhat test` |
+| 合约覆盖率 | **89.22% 行**（LF 口径；门禁 88%） | `cd contracts && npx hardhat test --coverage && npx tsx scripts/check-coverage.ts` |
+| 合约类型检查 | exit 0 | `cd contracts && npx tsc --noEmit` |
+| 前端单测 | **23 passing**（3 files） | `npx vitest run` |
+| 前端类型检查 | exit 0 | `npx tsc --noEmit` |
+| 前端 lint | exit 0 | `npx next lint` |
+| 前端构建 | ✓ 成功，含 `○ /perp` | `npx next build` |
+| 后端构建/静态检查 | exit 0 | `cd backend && go build ./... && go vet ./...` |
+| 后端测试 | **29 passing**，`-race` | `cd backend && go test -race ./...` |
+
+**CI 状态**：`.github/workflows/ci.yml` 三个 job **全部通过**（run `37623974490`）。
+
+> ⚠️ **覆盖率读数必须取自 LF 检出**（重新 clone 或在 `.gitattributes` 生效后重新检出）。
+> 长期存在的 Windows 工作树会读到**偏高约 5 个点**的值——这正是首次 CI 失败的原因（GAP-35）。
+
+**本轮基线变化**：合约 111 → **146**（+35），前端单测 9 → **23**（+14），后端 0 → **29**。
+覆盖率从 0 → **89.22%（LF）**，带门禁。
+
+---
+
+## 8. 本轮提交
+
+| 提交 | 内容 |
+| --- | --- |
+| `0193e3a` | 修 GAP-01~05：出金上限 + 逐笔容错 + 赏金基数（ADR-002） |
+| `2c0e353` | `scripts/demo-seed.ts` 按出金上限定容 |
+| `36fc5be` | 前端接线：`/perp` + `PositionPanel` + `perpAbi` |
+| `2b05f05` | CI 门禁（GAP-10）+ 修 3 个既有类型错误（2 个非本人引入） |
+| `8d9c715` | 清算 Bot 核心：头寸数学镜像 + 本地 nonce 管理器（GAP-26 部分） |
+| `1e85092` | 逐块资金费率（GAP-27，ADR-003）+ 本台账 |
+| `df227bf` | 规划文档迁入仓库（GAP-31）+ 修 FEEDS 矛盾（GAP-09） |
+| `50c51d8` | 删陈旧 lockfile（GAP-28）+ README 去明文凭证（GAP-12 部分） |
+| `506c4ef` | 覆盖率门禁（GAP-32） |
+| `c7da777` | 平仓退出保护（GAP-07）+ 推送可观测（GAP-08） |
+| `8f69995` | 台账更新（新开 GAP-33/34） |
+| `42e41fc` | 修 14 处失效文档路径 |
+| `1ac689a` | CI 改为**所有分支**触发（原来只 main，导致 fork 分支无 CI） |
+| `e48ed61` | **CI 步骤顺序**：先 compile 再 tsc（artifacts 被 gitignore，否则 110 个类型错误） |
+| `f6ec42d` | 覆盖率按 **LF 口径** + 新增 `.gitattributes`（GAP-35） |
+| `822488e` | 台账记录 GAP-35 与两个"只有 CI 能发现"的失败 |
+
+**详细复盘见 `docs/changes/009-CI首跑修复.md`** —— 三个问题**本机全部是绿的**。
+
+**PR**：[moonhotline/koliance#5](https://github.com/moonhotline/koliance/pull/5)
+（16 提交，52 文件，CI 三 job 全绿）
+
+---
+
+## 9. 修复过程中引入又修掉的真实回归（供参考）
+
+这些是**修 A 引入 B** 的案例，值得记下来，因为它们都是"读代码看不出来、跑测试才暴露"的：
+
+| 提交 | 引入的回归 | 抓到它的测试 | 根因 |
+| --- | --- | --- | --- |
+| `1e85092` | 资金费无侧向符号 → 两侧被收同样的费，空头永远收不到钱 | `charges the crowded side and pays the thin side` | 资金费退化为手续费 |
+| `1e85092` | `_equityAfterFunding` 漏了 `collateral` | `Pays a winning long out of the pool` | 权益凭空少一整个抵押品 |
+| `506c4ef` | 覆盖率脚本在**无分支数据**的报告上打印"branches 100%" | 自己怀疑那个 100% 并 grep 原始文件 | 空分母被当成 100% |
+| `c7da777` | 类型化调用打到无代码地址 → **每笔平仓 revert** | `Does not block a close when the price updater is not a contract` | `try/catch` **不捕获**"目标无代码" |
+| `e48ed61` | CI 先 tsc 后 compile → **110 个类型错误**（本地却全绿） | 首次真实 CI 运行 | `artifacts/` 被 gitignore，viem 的合约类型从它推导 |
+| `f6ec42d` | 覆盖率阈值按 CRLF 本机读数定 → **CI 失败** | 首次真实 CI 运行 | 覆盖率插桩按字节偏移，行尾改变测量结果 |
+| `1ac689a` | workflow 从未被触发（`branches: [main]` 不覆盖 feature 分支） | `gh pr checks` 零 check-run | fork 的 PR 运行需要 base 分支已有 workflow |
+
+**共性**：六条都不是逻辑想错，而是**对一个库/语言/环境行为的错误假设**
+（整数除法舍入、try/catch 的边界、空分母、返回值的字段顺序、
+构建产物被 gitignore、行尾对测量结果的影响）。
+
+**其中三条只有真实 CI 才能发现** —— 本机怎么跑都是绿的。
+**这是"CI 到底值不值"这个问题的答案，由 CI 自己给出。**
+详见 `docs/changes/009-CI首跑修复.md`。

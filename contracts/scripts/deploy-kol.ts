@@ -1,10 +1,10 @@
 import { network } from "hardhat";
 
 async function main() {
-  const { viem } = await network.getOrCreate();
+  const { viem, networkName } = await network.getOrCreate();
   const [deployer] = await viem.getWalletClients();
 
-  console.log(`\n🚀 准备在网络 [${network.name}] 部署 KolToken...`);
+  console.log(`\n🚀 准备在网络 [${networkName}] 部署 KolToken...`);
   console.log(`👤 部署账户: ${deployer.account.address}`);
 
   const publicClient = await viem.getPublicClient();

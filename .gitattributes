@@ -1,0 +1,53 @@
+# Normalize line endings so measurements are reproducible across platforms.
+#
+# This is not cosmetic. Hardhat's coverage instrumentation maps executed bytecode
+# back to source by BYTE OFFSET, so a CRLF checkout and an LF checkout do not
+# produce the same coverage numbers from identical code. Measured on this repo:
+#
+#   CRLF checkout (Windows default)   94.37% line coverage
+#   LF checkout   (Linux, CI)         89.22% line coverage
+#
+# Same source, same solc, same tests. A five-point difference with no code change.
+#
+# That gap is how a coverage floor calibrated on one developer's machine becomes
+# a red build on CI — which is exactly what happened: the floor was set to 93%
+# from a local reading of 94.37%, and CI failed on its first real run at 89.22%.
+#
+# Forcing LF for Solidity makes the two agree, so the number means the same thing
+# everywhere and a floor can be trusted.
+#
+# Nothing here is about how the files are *edited* — editors may still write CRLF.
+# Git normalizes on commit and checkout.
+#
+# Note this only re-normalizes going forward. Existing files with CRLF in the
+# working tree stay CRLF until re-checked out:
+#
+#   git add --renormalize . && git checkout -- .
+#
+# Solidity is what coverage measures, so it is what must be pinned. The rest are
+# listed for consistency and to stop the "LF will be replaced by CRLF" warnings
+# on every commit.
+
+*.sol text eol=lf
+*.ts text eol=lf
+*.tsx text eol=lf
+*.js text eol=lf
+*.json text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.md text eol=lf
+*.css text eol=lf
+*.html text eol=lf
+*.sh text eol=lf
+
+# Windows-only scripts must keep CRLF or cmd.exe will not run them.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Binary — never normalized.
+*.png binary
+*.jpg binary
+*.ico binary
+*.webp binary
+*.woff binary
+*.woff2 binary

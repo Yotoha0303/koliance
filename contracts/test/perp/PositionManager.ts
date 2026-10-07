@@ -1,4 +1,4 @@
-import assert from "node:assert/strict";
+﻿import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { network } from "hardhat";
 
@@ -220,23 +220,54 @@ describe("PositionManager", async function () {
   });
 
   // ==================== RESERVED ASSETS ====================
+  //
+  // The reserve is the sum of each position's PAYOUT CAP, not the sum of open
+  // collateral. Collateral is only a lower bound on what the pool may owe: it is
+  // exact for a losing position and short for a winning one, and the shortfall is
+  // what let an LP drain a pool out from under a profitable trader. See ADR-002.
 
-  it("Reports open collateral as reserved assets", async function () {
+  it("Reports the sum of payout caps as reserved assets", async function () {
     const { pm } = await setup();
 
     await open(pm, trader, { collateral: usdc(1_000) });
     await open(pm, trader, { collateral: usdc(500) });
 
-    // 999 USD from the first (1000 less the 0.1% fee) plus 499.5 from the second.
+    // Each cap is `collateral + size * MAX_PROFIT_BPS / BPS`. With 10x leverage
+    // that is `collateral + 10 * collateral` = 11x, courtesy of the default
+    // `open()` leverage of 100_000.
+    //   position 1: 999   + 9990   = 10,989
+    //   position 2: 499.5 + 4995   = 5,494.5
     const halfUsd = (5n * E18) / 10n;
-    assert.equal(await pm.read.reservedAssets(), usd(999) + usd(499) + halfUsd);
+    const cap1 = usd(999) + usd(9_990);
+    const cap2 = usd(499) + halfUsd + usd(4_995);
+
+    assert.equal(await pm.read.reservedAssets(), cap1 + cap2);
+  });
+
+  it("Caps a high-leverage position at a larger reserve than a low-leverage one", async function () {
+    const { pm } = await setup();
+
+    await open(pm, trader, { collateral: usdc(1_000), leverageBps: 10_000n }); // 1x
+    const oneX = await pm.read.reservedAssets();
+
+    await open(pm, trader, { collateral: usdc(1_000), leverageBps: 500_000n }); // 50x
+    const fiftyX = (await pm.read.reservedAssets()) - oneX;
+
+    // cap = collateral + size, since MAX_PROFIT_BPS is 10_000 (100% of notional).
+    //   1x : 999 +    999 =  1,998
+    //   50x: 999 + 49,950 = 50,949
+    // A 50x position can be owed 50x its notional in profit, so it consumes ~25x
+    // the pool capacity of a 1x one. That is the price of capping instead of
+    // reverting: bigger limits need a bigger pool behind them.
+    assert.equal(oneX, usd(999) + usd(999));
+    assert.equal(fiftyX, usd(999) + usd(49_950));
   });
 
   it("Releases the reserve when a position closes", async function () {
     const { pm } = await setup();
     const id = await open(pm, trader, { collateral: usdc(1_000) });
 
-    await pm.write.closePosition([id, []], { account: trader.account });
+    await pm.write.closePosition([id, 0n, 0n, []], { account: trader.account });
 
     assert.equal(await pm.read.reservedAssets(), 0n);
   });
@@ -246,30 +277,47 @@ describe("PositionManager", async function () {
 
     await open(pm, trader, { collateral: usdc(1_000) });
 
-    // Pool holds 101,000 USDC; 999 USD is reserved, so 100,001 is withdrawable.
-    assert.equal(await vault.read.reservedAssets(), usd(999));
-    assert.equal(await vault.read.availableAssets(), usd(100_001));
+    // Pool holds 101,000 USDC. The position's payout cap is 999 + 9,990 = 10,989,
+    // so the reserve is that (not the 999 of principal it used to be) and only
+    // 100,001 − (10,989 − 999) is withdrawable.
+    const cap = usd(999) + usd(9_990);
+    assert.equal(await vault.read.reservedAssets(), cap);
+    assert.equal(await vault.read.availableAssets(), usd(101_000) - cap);
 
-    // Redeeming the LP's entire claim would return 101,000 USD (the pool grew by
-    // the trader's collateral), which exceeds what is available — must revert.
+    // Redeeming the LP's entire claim would return 101,000 USD, far above what is
+    // available — must revert.
     await assert.rejects(
       vault.write.removeLiquidity([usd(100_000)], { account: lp.account })
     );
 
-    // Within the limit it goes through.
-    await vault.write.removeLiquidity([usd(99_000)], { account: lp.account });
-    assert.equal(await vault.read.reservedAssets(), usd(999));
+    // Within the limit it goes through. `grossUsd` is the pro-rata share of the
+    // pool, so burning 85,000 of 100,000 shares against 101,000 of assets takes
+    // 85,850 — inside the 90,011 that is available.
+    await vault.write.removeLiquidity([usd(85_000)], { account: lp.account });
+    assert.equal(await vault.read.reservedAssets(), cap);
   });
 
   // ==================== CLOSE ====================
+  //
+  // These two assert the payout arithmetic, so funding must be neutral: a lone
+  // long is a 100%-skewed book and accrues funding the moment it opens, which
+  // would subtract from the expected payout. An equal-sized short from a
+  // different account flattens the skew to zero without touching the trader's
+  // balance. Funding itself is covered in test/perp/Funding.ts.
+
+  /** Open a long and an offsetting short so the feed's skew is exactly zero. */
+  async function hedgeFeed(pm: any, trader: any, other: any) {
+    await open(pm, other, { collateral: usdc(1_000), leverageBps: 100_000n, isLong: false });
+    return await open(pm, trader, { collateral: usdc(1_000), leverageBps: 100_000n });
+  }
 
   it("Pays a winning long out of the pool", async function () {
     const { token, oracle, pm } = await setup();
-    const id = await open(pm, trader, { collateral: usdc(1_000), leverageBps: 100_000n });
+    const id = await hedgeFeed(pm, trader, otherTrader);
 
     // 180 -> 200 is +11.1% on 9990 notional = +1110 USD.
     await oracle.write.setPrice([NVDA, usd(200)]);
-    await pm.write.closePosition([id, []], { account: trader.account });
+    await pm.write.closePosition([id, 0n, 0n, []], { account: trader.account });
 
     const expectedPnl = pnlOf(usd(999), PRICE_180, 100_000n, true, usd(200));
     const equity = usd(999) + expectedPnl;
@@ -285,12 +333,12 @@ describe("PositionManager", async function () {
 
   it("Leaves a losing long's remainder in the pool", async function () {
     const { token, oracle, vault, pm } = await setup();
-    const id = await open(pm, trader, { collateral: usdc(1_000), leverageBps: 100_000n });
+    const id = await hedgeFeed(pm, trader, otherTrader);
     const poolBefore = await vault.read.totalAssets();
 
     // 180 -> 170 is -5.55% on 9990 notional = -555 USD.
     await oracle.write.setPrice([NVDA, usd(170)]);
-    await pm.write.closePosition([id, []], { account: trader.account });
+    await pm.write.closePosition([id, 0n, 0n, []], { account: trader.account });
 
     const pnl = pnlOf(usd(999), PRICE_180, 100_000n, true, usd(170));
     const equity = usd(999) + pnl; // pnl is negative
@@ -309,7 +357,7 @@ describe("PositionManager", async function () {
     // 50x long, price halves — the position is far past liquidation. Closing must
     // still succeed and simply pay nothing, not underflow.
     await oracle.write.setPrice([NVDA, usd(90)]);
-    await pm.write.closePosition([id, []], { account: trader.account });
+    await pm.write.closePosition([id, 0n, 0n, []], { account: trader.account });
 
     assert.equal(await token.read.balanceOf([trader.account.address]), usdc(9_000));
   });
@@ -319,7 +367,7 @@ describe("PositionManager", async function () {
     const id = await open(pm, trader);
 
     await assert.rejects(
-      pm.write.closePosition([id, []], { account: otherTrader.account })
+      pm.write.closePosition([id, 0n, 0n, []], { account: otherTrader.account })
     );
   });
 
@@ -327,17 +375,124 @@ describe("PositionManager", async function () {
     const { pm } = await setup();
     const id = await open(pm, trader);
 
-    await pm.write.closePosition([id, []], { account: trader.account });
+    await pm.write.closePosition([id, 0n, 0n, []], { account: trader.account });
 
     await assert.rejects(
-      pm.write.closePosition([id, []], { account: trader.account })
+      pm.write.closePosition([id, 0n, 0n, []], { account: trader.account })
     );
   });
 
+  // ==================== EXIT PROTECTION (GAP-07) ====================
+  //
+  // The exit price is whatever the oracle reports when the transaction lands. On
+  // a public mempool that means a close can be held and included against a worse
+  // print than the one the trader simulated, and on the Pyth path the price comes
+  // from caller-supplied update data outright. These two parameters are the
+  // caller's defence; without them a close is a blind market order.
+
+  it("Refuses a close whose payout falls below minOut", async function () {
+    const { oracle, pm } = await setup();
+    const id = await open(pm, trader, { collateral: usdc(1_000), leverageBps: 100_000n });
+
+    // +11.1%: equity ≈ 999 + 1110 = 2109, less the 0.1% close fee.
+    await oracle.write.setPrice([NVDA, usd(200)]);
+    const equity = usd(999) + pnlOf(usd(999), PRICE_180, 100_000n, true, usd(200));
+    const afterFee = equity - (equity * CLOSE_FEE_BPS) / BPS;
+
+    await assert.rejects(
+      pm.write.closePosition([id, afterFee + usd(1), 0n, []], { account: trader.account }),
+      "a payout below the caller's floor must revert"
+    );
+
+    // The position must be untouched: both checks run before any state change,
+    // so a rejected close leaves it open rather than half-settled.
+    assert.equal(await pm.read.isOpen([id]), true);
+  });
+
+  it("Allows a close whose payout meets minOut", async function () {
+    const { oracle, pm } = await setup();
+    // Hedge the feed first so funding is zero and the payout is exactly the
+    // PnL-derived figure. Without this the boundary is off by a few wei of
+    // accrued funding and the test would be asserting the wrong arithmetic.
+    await open(pm, otherTrader, { collateral: usdc(1_000), leverageBps: 100_000n, isLong: false });
+    const id = await open(pm, trader, { collateral: usdc(1_000), leverageBps: 100_000n });
+
+    await oracle.write.setPrice([NVDA, usd(200)]);
+    const equity = usd(999) + pnlOf(usd(999), PRICE_180, 100_000n, true, usd(200));
+    const afterFee = equity - (equity * CLOSE_FEE_BPS) / BPS;
+
+    // Exactly at the floor is acceptable — the guard is `<`, not `<=`.
+    await pm.write.closePosition([id, afterFee, 0n, []], { account: trader.account });
+    assert.equal(await pm.read.isOpen([id]), false);
+  });
+
+  it("Refuses a close one wei below the floor", async function () {
+    const { oracle, pm } = await setup();
+    await open(pm, otherTrader, { collateral: usdc(1_000), leverageBps: 100_000n, isLong: false });
+    const id = await open(pm, trader, { collateral: usdc(1_000), leverageBps: 100_000n });
+
+    await oracle.write.setPrice([NVDA, usd(200)]);
+    const equity = usd(999) + pnlOf(usd(999), PRICE_180, 100_000n, true, usd(200));
+    const afterFee = equity - (equity * CLOSE_FEE_BPS) / BPS;
+
+    // One wei tighter must revert. This is the case that pins the comparison
+    // down: without it, `<` and `<=` would both pass the test above.
+    await assert.rejects(
+      pm.write.closePosition([id, afterFee + 1n, 0n, []], { account: trader.account })
+    );
+    assert.equal(await pm.read.isOpen([id]), true);
+  });
+
+  it("Treats a minOut of zero as no protection", async function () {
+    const { pm } = await setup();
+    const id = await open(pm, trader);
+    await pm.write.closePosition([id, 0n, 0n, []], { account: trader.account });
+    assert.equal(await pm.read.isOpen([id]), false);
+  });
+
+  it("Refuses a close past its deadline", async function () {
+    const { pm } = await setup();
+    const id = await open(pm, trader);
+    const publicClient = await viem.getPublicClient();
+    const now = await publicClient.getBlock().then((b) => b.timestamp);
+
+    await assert.rejects(
+      pm.write.closePosition([id, 0n, now - 1n, []], { account: trader.account }),
+      "a close after its deadline must revert"
+    );
+    assert.equal(await pm.read.isOpen([id]), true);
+  });
+
+  it("Treats a deadline of zero as no deadline", async function () {
+    const { pm } = await setup();
+    const id = await open(pm, trader);
+    await pm.write.closePosition([id, 0n, 0n, []], { account: trader.account });
+    assert.equal(await pm.read.isOpen([id]), false);
+  });
+
+  it("Accepts a close well inside its deadline", async function () {
+    const { pm } = await setup();
+    const id = await open(pm, trader);
+    const publicClient = await viem.getPublicClient();
+    const now = await publicClient.getBlock().then((b) => b.timestamp);
+
+    await pm.write.closePosition([id, 0n, now + 3_600n, []], { account: trader.account });
+    assert.equal(await pm.read.isOpen([id]), false);
+  });
+
   // ==================== LIQUIDATION THRESHOLD ====================
+  //
+  // These two land exactly on the PnL-derived threshold, so they need funding
+  // to be neutral. With a single long the book is 100% skewed and funding
+  // accrues immediately, which would shift the verdict by a few wei and make the
+  // ±1 assertions test the wrong thing. Opening an equal-sized short first
+  // flattens the skew to zero, so the threshold is purely `collateral + pnl`.
+  //
+  // Funding itself is covered in test/perp/Funding.ts.
 
   it("Is liquidatable exactly at the computed liquidation price", async function () {
     const { oracle, pm } = await setup();
+    await open(pm, trader, { collateral: usdc(1_000), leverageBps: 100_000n, isLong: false });
     const id = await open(pm, trader, { collateral: usdc(1_000), leverageBps: 100_000n });
 
     const liq = computeLiquidationPrice(usd(999), PRICE_180, 100_000n, true);
@@ -348,6 +503,7 @@ describe("PositionManager", async function () {
 
   it("Is not liquidatable one wei above the liquidation price", async function () {
     const { oracle, pm } = await setup();
+    await open(pm, trader, { collateral: usdc(1_000), leverageBps: 100_000n, isLong: false });
     const id = await open(pm, trader, { collateral: usdc(1_000), leverageBps: 100_000n });
 
     const liq = computeLiquidationPrice(usd(999), PRICE_180, 100_000n, true);
@@ -391,7 +547,7 @@ describe("PositionManager", async function () {
     assert.equal(await pm.read.reservedAssets(), 0n);
   });
 
-  it("Rewards the liquidator the configured share of remaining equity", async function () {
+  it("Rewards the liquidator the configured share of the position's collateral", async function () {
     const { token, oracle, pm } = await setup();
     const id = await open(pm, trader, { collateral: usdc(1_000), leverageBps: 100_000n });
 
@@ -399,9 +555,10 @@ describe("PositionManager", async function () {
     const crash = liq - usd(1);
     await oracle.write.setPrice([NVDA, crash]);
 
-    const pnl = pnlOf(usd(999), PRICE_180, 100_000n, true, crash);
-    const equity = pnl >= 0n ? usd(999) + pnl : usd(999) - -pnl;
-    const expected = (equity * LIQ_REWARD_BPS) / BPS / 10n ** 12n;
+    // The base is COLLATERAL, not remaining equity. Paying a share of equity made
+    // the bounty shrink toward zero exactly as a position approached bankruptcy —
+    // the case where a liquidator is most needed. See ADR-002 and GAP-05.
+    const expected = (usd(999) * LIQ_REWARD_BPS) / BPS / 10n ** 12n;
 
     const before = await token.read.balanceOf([liquidator.account.address]);
     await pm.write.liquidate([[id], []], { account: liquidator.account });
@@ -414,6 +571,10 @@ describe("PositionManager", async function () {
 
   it("Refuses to liquidate a healthy position", async function () {
     const { pm } = await setup();
+    // A matching short flattens the skew so funding does not nibble the margin
+    // between open and liquidate — otherwise this becomes a test of funding
+    // rather than of the healthy-position path.
+    await open(pm, trader, { collateral: usdc(1_000), leverageBps: 100_000n, isLong: false });
     const id = await open(pm, trader, { collateral: usdc(1_000), leverageBps: 100_000n });
 
     // Price is still 180, far from the ~163.8 threshold. The batch silently skips
@@ -530,16 +691,82 @@ describe("PositionManager", async function () {
     );
   });
 
-  it("Does not block a close when the price updater reverts", async function () {
+  it("Does not block a close when the price updater is not a contract", async function () {
     const { pm } = await setup();
     const id = await open(pm, trader);
+    const publicClient = await viem.getPublicClient();
 
-    // Point the updater at an address with no such function — every push fails.
+    // An EOA: no code at the address. A typed call to it reverts with "function
+    // call to a non-contract account", and that revert is NOT caught by a
+    // try/catch — the code-existence check happens before the call. Without the
+    // `code.length` guard in _pushPrices, a misconfigured updater would brick
+    // every close, which is GAP-01 arriving by a new route.
     await pm.write.setPriceUpdater([otherTrader.account.address]);
 
-    // Best-effort push means a failed update must not brick closes.
-    await pm.write.closePosition([id, ["0xdeadbeef"]], { account: trader.account });
-    assert.equal(await pm.read.isOpen([id]), false);
+    await pm.write.closePosition([id, 0n, 0n, ["0xdeadbeef"]], { account: trader.account });
+    assert.equal(await pm.read.isOpen([id]), false, "a bad updater must not brick a close");
+
+    // And the failure must be visible on chain rather than silent. This is the
+    // half that did not exist before: the old low-level call swallowed the
+    // result with no event, so a dead updater looked identical to a working one.
+    const failed = await publicClient.getContractEvents({
+      address: pm.address,
+      abi: pm.abi,
+      eventName: "PricePushFailed",
+      fromBlock: 0n,
+    });
+    assert.equal(failed.length, 1, "a skipped push must emit PricePushFailed");
+    assert.equal(
+      (failed[0].args.updater as string).toLowerCase(),
+      otherTrader.account.address.toLowerCase()
+    );
+    assert.equal(failed[0].args.updateCount, 1n);
+  });
+
+  it("Emits PricePushSucceeded when a push reaches the updater", async function () {
+    const token = await viem.deployContract("MockUSDC");
+    const pyth = await viem.deployContract("MockPyth");
+    const adapter = await viem.deployContract("PythOracleAdapter", [
+      pyth.address,
+      60n,
+      deployer.account.address,
+    ]);
+    const vault = await viem.deployContract("Vault", [token.address, deployer.account.address]);
+    const pm = await viem.deployContract("PositionManager", [
+      vault.address,
+      adapter.address,
+      token.address,
+      deployer.account.address,
+    ]);
+    await vault.write.setPositionManager([pm.address]);
+    await pm.write.setPriceUpdater([adapter.address]);
+    await pyth.write.setUpdateFee([0n]);
+
+    const publicClient = await viem.getPublicClient();
+    const now = await publicClient.getBlock().then((b) => b.timestamp);
+    await pyth.write.setPrice([BTC, 18_000_000_000n, -8, now, 0n]);
+
+    await token.write.mint([lp.account.address, usdc(10_000)]);
+    await token.write.approve([vault.address, usdc(10_000)], { account: lp.account });
+    await vault.write.addLiquidity([usdc(10_000)], { account: lp.account });
+
+    await token.write.mint([trader.account.address, usdc(1_000)]);
+    await token.write.approve([pm.address, usdc(1_000)], { account: trader.account });
+
+    await pm.write.openPosition([BTC, usdc(1_000), 100_000n, true, ["0xdeadbeef"]], {
+      account: trader.account,
+    });
+
+    // Positive evidence that the oracle's staleness window is being refreshed,
+    // which the old design could not show at all.
+    const ok = await publicClient.getContractEvents({
+      address: pm.address,
+      abi: pm.abi,
+      eventName: "PricePushSucceeded",
+      fromBlock: 0n,
+    });
+    assert.equal(ok.length, 1);
+    assert.equal((ok[0].args.updater as string).toLowerCase(), adapter.address.toLowerCase());
   });
 
   // ==================== PYTH ADAPTER INTEGRATION ====================
