@@ -80,7 +80,26 @@ CREATE TABLE IF NOT EXISTS google_accounts (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- 7. Koliance User Accounts
+CREATE TABLE IF NOT EXISTS users (
+    id VARCHAR(128) PRIMARY KEY,
+    email VARCHAR(256) UNIQUE NOT NULL,
+    name VARCHAR(128) NOT NULL,
+    picture VARCHAR(512),
+    bio TEXT,
+    wallet_address VARCHAR(128),
+    trust_tier VARCHAR(64) NOT NULL DEFAULT 'GOOGLE VERIFIED CITIZEN',
+    credit_allowance_usd NUMERIC(12, 2) NOT NULL DEFAULT 600.00,
+    steam_id VARCHAR(64),
+    github_username VARCHAR(128),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
 -- ==================== COMPOSITE INDEXES ====================
+-- 0. User composite indexes
+CREATE INDEX IF NOT EXISTS idx_users_email_wallet ON users(email, wallet_address);
+CREATE INDEX IF NOT EXISTS idx_users_wallet_address ON users(wallet_address);
 -- 1. Cards lookup by wallet and status
 CREATE INDEX IF NOT EXISTS idx_cards_wallet_status ON cards(wallet_address, status);
 

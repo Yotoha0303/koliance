@@ -15,9 +15,11 @@ import {
   User,
   Mail,
   Loader2,
+  Edit3,
 } from "lucide-react";
 import Image from "next/image";
 import { GOOGLE_CLIENT_ID, GITHUB_CLIENT_ID } from "@/lib/authConfig";
+import { EditProfileModal, UserProfileData } from "@/components/EditProfileModal";
 
 interface NavAuthBadgesProps {
   walletAddress?: string | null;
@@ -26,12 +28,18 @@ interface NavAuthBadgesProps {
 export function NavAuthBadges({ walletAddress }: NavAuthBadgesProps) {
   const [dropdownOpen, setDropdownOpen] = useState(false);
 
+  const [editModalOpen, setEditModalOpen] = useState(false);
+
   // Auth states stored in localStorage
   const [googleUser, setGoogleUser] = useState<{
+    id: string;
     name: string;
     email: string;
     picture?: string | null;
+    bio?: string | null;
+    walletAddress?: string | null;
     tier: string;
+    creditAllowanceUSD?: number;
   } | null>(null);
 
   const [githubUser, setGithubUser] = useState<{
@@ -53,10 +61,14 @@ export function NavAuthBadges({ walletAddress }: NavAuthBadgesProps) {
       if (gRaw) {
         const g = JSON.parse(gRaw);
         setGoogleUser({
+          id: g.id || `did:koliance:google:${g.googleId || "user"}`,
           name: g.name,
           email: g.email,
           picture: g.picture,
+          bio: g.bio,
+          walletAddress: g.walletAddress || g.wallet_address,
           tier: g.trustTier || "GOOGLE ARCHITECT",
+          creditAllowanceUSD: g.creditAllowanceUSD || 1200,
         });
       } else {
         setGoogleUser(null);
@@ -280,15 +292,27 @@ export function NavAuthBadges({ walletAddress }: NavAuthBadgesProps) {
                 </div>
 
                 {googleUser ? (
-                  <button
-                    onClick={() => {
-                      localStorage.removeItem("koliance_google_profile");
-                      syncAuthState();
-                    }}
-                    className="text-[10px] font-mono px-2 py-1 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-300 border border-red-500/20 transition"
-                  >
-                    解除
-                  </button>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      onClick={() => {
+                        setDropdownOpen(false);
+                        setEditModalOpen(true);
+                      }}
+                      className="text-[10px] font-mono px-2 py-1 rounded-lg bg-blue-500/10 hover:bg-blue-500/20 text-blue-300 border border-blue-500/20 transition flex items-center gap-1"
+                    >
+                      <Edit3 className="w-3 h-3" />
+                      <span>资料</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        localStorage.removeItem("koliance_google_profile");
+                        syncAuthState();
+                      }}
+                      className="text-[10px] font-mono px-2 py-1 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-300 border border-red-500/20 transition"
+                    >
+                      解除
+                    </button>
+                  </div>
                 ) : (
                   <div className="flex items-center gap-1">
                     <button
@@ -396,6 +420,37 @@ export function NavAuthBadges({ walletAddress }: NavAuthBadgesProps) {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Edit Profile Modal for Google / Platform User */}
+      {googleUser && (
+        <EditProfileModal
+          isOpen={editModalOpen}
+          onClose={() => setEditModalOpen(false)}
+          profile={{
+            id: googleUser.id,
+            email: googleUser.email,
+            name: googleUser.name,
+            picture: googleUser.picture,
+            bio: googleUser.bio,
+            walletAddress: googleUser.walletAddress || walletAddress,
+            trustTier: googleUser.tier,
+            creditAllowanceUSD: googleUser.creditAllowanceUSD,
+          }}
+          walletAddress={walletAddress}
+          onProfileUpdated={(updated) => {
+            setGoogleUser({
+              id: updated.id,
+              name: updated.name,
+              email: updated.email,
+              picture: updated.picture,
+              bio: updated.bio,
+              walletAddress: updated.walletAddress,
+              tier: updated.trustTier || "GOOGLE ARCHITECT",
+              creditAllowanceUSD: updated.creditAllowanceUSD,
+            });
+          }}
+        />
+      )}
     </div>
   );
 }

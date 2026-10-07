@@ -12,6 +12,7 @@ describe("TypeORM Entity Models & Composite Indexes", () => {
     expect(tableNames).toContain("session_keys");
     expect(tableNames).toContain("game_proofs");
     expect(tableNames).toContain("google_accounts");
+    expect(tableNames).toContain("users");
   });
 
   it("should have correct SQL composite indexes configured on entities", () => {
@@ -47,5 +48,10 @@ describe("TypeORM Entity Models & Composite Indexes", () => {
     const googleIndex = indices.find((idx) => idx.name === "idx_google_accounts_email_wallet");
     expect(googleIndex).toBeDefined();
     expect(googleIndex?.columns).toEqual(["email", "walletAddress"]);
+
+    // 7. idx_users_email_wallet (email, wallet_address)
+    const userIndex = indices.find((idx) => idx.name === "idx_users_email_wallet");
+    expect(userIndex).toBeDefined();
+    expect(userIndex?.columns).toEqual(["email", "walletAddress"]);
   });
 });

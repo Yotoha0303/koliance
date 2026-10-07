@@ -12,11 +12,13 @@ import {
   Loader2,
   RefreshCw,
   Mail,
-  User,
   Award,
+  Edit3,
+  User,
 } from "lucide-react";
 import Image from "next/image";
 import { GOOGLE_CLIENT_ID } from "@/lib/authConfig";
+import { EditProfileModal } from "@/components/EditProfileModal";
 
 export interface GoogleProfile {
   googleId: string;
@@ -39,6 +41,7 @@ export function GoogleAuthWall({ walletAddress, onProfileSynced }: GoogleAuthWal
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [syncSuccess, setSyncSuccess] = useState(false);
+  const [editModalOpen, setEditModalOpen] = useState(false);
 
   // Read saved profile from localStorage if present
   useEffect(() => {
@@ -249,13 +252,22 @@ export function GoogleAuthWall({ walletAddress, onProfileSynced }: GoogleAuthWal
               </button>
             </>
           ) : (
-            <button
-              onClick={handleDisconnect}
-              className="px-3.5 py-2 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400 font-mono text-xs transition border border-red-500/30 flex items-center gap-1.5"
-            >
-              <RefreshCw className="w-3.5 h-3.5" />
-              <span>解除绑定</span>
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setEditModalOpen(true)}
+                className="px-3.5 py-2 rounded-xl bg-blue-500/10 hover:bg-blue-500/20 text-blue-300 font-mono text-xs transition border border-blue-500/30 flex items-center gap-1.5"
+              >
+                <Edit3 className="w-3.5 h-3.5" />
+                <span>编辑资料</span>
+              </button>
+              <button
+                onClick={handleDisconnect}
+                className="px-3.5 py-2 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400 font-mono text-xs transition border border-red-500/30 flex items-center gap-1.5"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+                <span>解除绑定</span>
+              </button>
+            </div>
           )}
         </div>
       </div>
@@ -347,6 +359,34 @@ export function GoogleAuthWall({ walletAddress, onProfileSynced }: GoogleAuthWal
             </div>
           </div>
         </motion.div>
+      )}
+
+      {/* Edit Profile Modal */}
+      {profile && (
+        <EditProfileModal
+          isOpen={editModalOpen}
+          onClose={() => setEditModalOpen(false)}
+          profile={{
+            id: `did:koliance:google:${profile.googleId}`,
+            email: profile.email,
+            name: profile.name,
+            picture: profile.picture,
+            walletAddress: profile.walletAddress || walletAddress,
+            trustTier: profile.trustTier,
+            creditAllowanceUSD: profile.creditAllowanceUSD,
+          }}
+          walletAddress={walletAddress}
+          onProfileUpdated={(updated) => {
+            const updatedProfile = {
+              ...profile,
+              name: updated.name,
+              picture: updated.picture,
+              walletAddress: updated.walletAddress,
+            };
+            setProfile(updatedProfile);
+            if (onProfileSynced) onProfileSynced(updatedProfile);
+          }}
+        />
       )}
     </div>
   );
