@@ -220,16 +220,47 @@ describe("PositionManager", async function () {
   });
 
   // ==================== RESERVED ASSETS ====================
+  //
+  // The reserve is the sum of each position's PAYOUT CAP, not the sum of open
+  // collateral. Collateral is only a lower bound on what the pool may owe: it is
+  // exact for a losing position and short for a winning one, and the shortfall is
+  // what let an LP drain a pool out from under a profitable trader. See ADR-002.
 
-  it("Reports open collateral as reserved assets", async function () {
+  it("Reports the sum of payout caps as reserved assets", async function () {
     const { pm } = await setup();
 
     await open(pm, trader, { collateral: usdc(1_000) });
     await open(pm, trader, { collateral: usdc(500) });
 
-    // 999 USD from the first (1000 less the 0.1% fee) plus 499.5 from the second.
+    // Each cap is `collateral + size * MAX_PROFIT_BPS / BPS`. With 10x leverage
+    // that is `collateral + 10 * collateral` = 11x, courtesy of the default
+    // `open()` leverage of 100_000.
+    //   position 1: 999   + 9990   = 10,989
+    //   position 2: 499.5 + 4995   = 5,494.5
     const halfUsd = (5n * E18) / 10n;
-    assert.equal(await pm.read.reservedAssets(), usd(999) + usd(499) + halfUsd);
+    const cap1 = usd(999) + usd(9_990);
+    const cap2 = usd(499) + halfUsd + usd(4_995);
+
+    assert.equal(await pm.read.reservedAssets(), cap1 + cap2);
+  });
+
+  it("Caps a high-leverage position at a larger reserve than a low-leverage one", async function () {
+    const { pm } = await setup();
+
+    await open(pm, trader, { collateral: usdc(1_000), leverageBps: 10_000n }); // 1x
+    const oneX = await pm.read.reservedAssets();
+
+    await open(pm, trader, { collateral: usdc(1_000), leverageBps: 500_000n }); // 50x
+    const fiftyX = (await pm.read.reservedAssets()) - oneX;
+
+    // cap = collateral + size, since MAX_PROFIT_BPS is 10_000 (100% of notional).
+    //   1x : 999 +    999 =  1,998
+    //   50x: 999 + 49,950 = 50,949
+    // A 50x position can be owed 50x its notional in profit, so it consumes ~25x
+    // the pool capacity of a 1x one. That is the price of capping instead of
+    // reverting: bigger limits need a bigger pool behind them.
+    assert.equal(oneX, usd(999) + usd(999));
+    assert.equal(fiftyX, usd(999) + usd(49_950));
   });
 
   it("Releases the reserve when a position closes", async function () {
@@ -246,19 +277,24 @@ describe("PositionManager", async function () {
 
     await open(pm, trader, { collateral: usdc(1_000) });
 
-    // Pool holds 101,000 USDC; 999 USD is reserved, so 100,001 is withdrawable.
-    assert.equal(await vault.read.reservedAssets(), usd(999));
-    assert.equal(await vault.read.availableAssets(), usd(100_001));
+    // Pool holds 101,000 USDC. The position's payout cap is 999 + 9,990 = 10,989,
+    // so the reserve is that (not the 999 of principal it used to be) and only
+    // 100,001 − (10,989 − 999) is withdrawable.
+    const cap = usd(999) + usd(9_990);
+    assert.equal(await vault.read.reservedAssets(), cap);
+    assert.equal(await vault.read.availableAssets(), usd(101_000) - cap);
 
-    // Redeeming the LP's entire claim would return 101,000 USD (the pool grew by
-    // the trader's collateral), which exceeds what is available — must revert.
+    // Redeeming the LP's entire claim would return 101,000 USD, far above what is
+    // available — must revert.
     await assert.rejects(
       vault.write.removeLiquidity([usd(100_000)], { account: lp.account })
     );
 
-    // Within the limit it goes through.
-    await vault.write.removeLiquidity([usd(99_000)], { account: lp.account });
-    assert.equal(await vault.read.reservedAssets(), usd(999));
+    // Within the limit it goes through. `grossUsd` is the pro-rata share of the
+    // pool, so burning 85,000 of 100,000 shares against 101,000 of assets takes
+    // 85,850 — inside the 90,011 that is available.
+    await vault.write.removeLiquidity([usd(85_000)], { account: lp.account });
+    assert.equal(await vault.read.reservedAssets(), cap);
   });
 
   // ==================== CLOSE ====================
@@ -391,7 +427,7 @@ describe("PositionManager", async function () {
     assert.equal(await pm.read.reservedAssets(), 0n);
   });
 
-  it("Rewards the liquidator the configured share of remaining equity", async function () {
+  it("Rewards the liquidator the configured share of the position's collateral", async function () {
     const { token, oracle, pm } = await setup();
     const id = await open(pm, trader, { collateral: usdc(1_000), leverageBps: 100_000n });
 
@@ -399,9 +435,10 @@ describe("PositionManager", async function () {
     const crash = liq - usd(1);
     await oracle.write.setPrice([NVDA, crash]);
 
-    const pnl = pnlOf(usd(999), PRICE_180, 100_000n, true, crash);
-    const equity = pnl >= 0n ? usd(999) + pnl : usd(999) - -pnl;
-    const expected = (equity * LIQ_REWARD_BPS) / BPS / 10n ** 12n;
+    // The base is COLLATERAL, not remaining equity. Paying a share of equity made
+    // the bounty shrink toward zero exactly as a position approached bankruptcy —
+    // the case where a liquidator is most needed. See ADR-002 and GAP-05.
+    const expected = (usd(999) * LIQ_REWARD_BPS) / BPS / 10n ** 12n;
 
     const before = await token.read.balanceOf([liquidator.account.address]);
     await pm.write.liquidate([[id], []], { account: liquidator.account });

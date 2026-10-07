@@ -29,8 +29,30 @@ library PerpConstants {
     /// 1% maintenance margin.
     uint256 internal constant MAINTENANCE_MARGIN_BPS = 100;
 
-    /// 5% of remaining collateral paid to the liquidator.
+    /// 5% of the position's collateral paid to the liquidator.
+    /// @dev Based on COLLATERAL, not on remaining equity. Paying 5% of equity
+    ///      meant a bankrupt position (equity == 0) paid nothing, which inverts
+    ///      the incentive: the positions most in need of liquidation were the
+    ///      ones no rational bot would touch. At liquidation `equity` is always
+    ///      below `collateral` (maintenance margin is 1% of size while collateral
+    ///      is at least 2% of size), so this base is strictly larger and is never
+    ///      zero for a real position.
     uint256 internal constant LIQUIDATOR_REWARD_BPS = 500;
+
+    /// Profit ceiling, in basis points of notional size.
+    ///
+    /// A position's payout is capped at `collateral + size * MAX_PROFIT_BPS / 1e4`,
+    /// fixed at open time and reported from there on. This is what makes the
+    /// pool's liability a finite, computable number instead of an unbounded one.
+    ///
+    /// Without it `Vault.payOut` reverts whenever profit exceeds the pool, and
+    /// because the revert rolls back `_close` the position becomes permanently
+    /// un-closeable with its margin stranded. Capping is the fix; see ADR-002.
+    ///
+    /// 10_000 = profit capped at 100% of notional (a 10x position can at most
+    /// return 11x its collateral). Raising it widens the liability the pool must
+    /// carry, and the open-time capacity gate widens with it.
+    uint256 internal constant MAX_PROFIT_BPS = 10_000;
 
     /// 50x ceiling.
     uint256 internal constant MAX_LEVERAGE_BPS = 500_000;

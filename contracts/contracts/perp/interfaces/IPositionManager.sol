@@ -13,6 +13,10 @@ interface IPositionManager {
         bytes32 feedId;
         uint256 collateralUsd; // 18 decimals
         uint256 sizeUsd;       // collateralUsd * leverageBps / 1e4
+        /// Upper bound on what this position can ever be paid out, 18 decimals.
+        /// Fixed at open as `collateralUsd + sizeUsd * MAX_PROFIT_BPS / 1e4`.
+        /// Summed into `reservedAssets()`, so the Vault can always cover it.
+        uint256 payoutCapUsd;
         uint256 entryPrice;    // 18 decimals
         bool    isLong;
         uint256 openedAt;
@@ -81,14 +85,24 @@ interface IPositionManager {
     function liquidatorRewardBps() external view returns (uint256);
     function maxLeverageBps() external view returns (uint256);
 
+    /// @notice Profit ceiling as basis points of notional size.
+    /// @dev A position's payout never exceeds `collateral + size * this / 1e4`.
+    function maxProfitBps() external view returns (uint256);
+
     /// @notice 18-decimal USD the Vault must keep in reserve to honour open positions.
     ///
     /// Without this, LPs could withdraw the collateral backing live positions and
     /// winning traders would have nothing to be paid from. `Vault.removeLiquidity`
     /// subtracts this from available assets before allowing a withdrawal.
     ///
-    /// Implementations should report the amount that could realistically be owed —
-    /// open collateral plus uncapped profit would be unbounded, so reporting open
-    /// collateral is the conservative floor.
+    /// This is the SUM OF EACH OPEN POSITION'S PAYOUT CAP, not the sum of open
+    /// collateral. Collateral alone is only a lower bound on the obligation (it
+    /// is exact for a losing position and short for a winning one), and the gap
+    /// is exactly what let an LP drain a pool out from under a profitable trader.
+    /// Because the cap is finite, this value is both conservative and O(1).
+    ///
+    /// Invariant: `Vault.totalAssets() >= reservedAssets()` after every
+    /// operation. `openPosition` enforces it at admission, which is what makes
+    /// payouts unable to revert for insufficient liquidity.
     function reservedAssets() external view returns (uint256);
 }
