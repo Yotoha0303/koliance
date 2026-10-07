@@ -16,6 +16,7 @@ import {
   Award,
 } from "lucide-react";
 import Image from "next/image";
+import { GOOGLE_CLIENT_ID } from "@/lib/authConfig";
 
 export interface GoogleProfile {
   googleId: string;
@@ -106,7 +107,8 @@ export function GoogleAuthWall({ walletAddress, onProfileSynced }: GoogleAuthWal
 
   const handleLaunchGoogleLogin = () => {
     const clientId =
-      process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || "";
+      process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ||
+      GOOGLE_CLIENT_ID;
     if (!clientId) {
       setErrorMsg("未配置 NEXT_PUBLIC_GOOGLE_CLIENT_ID 环境变量");
       return;

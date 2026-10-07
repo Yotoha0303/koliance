@@ -20,6 +20,7 @@ import {
 import { truncateAddress } from "@/lib/utils";
 import { BrandIcon } from "@/components/BrandIcon";
 import { monadTestnet } from "@/lib/contract";
+import { NavAuthBadges } from "@/components/NavAuthBadges";
 
 export type NavView = "INDEX" | "DETAIL" | "PRODUCT" | "MARKET" | "AGENTCARD";
 
@@ -120,10 +121,13 @@ export function Navbar({
           })}
         </nav>
 
-        {/* Network & High-End Contrast Wallet Button */}
-        <div className="flex items-center gap-2.5 shrink-0">
+        {/* Network & High-End Contrast Wallet Button & Web2 Auth Badges */}
+        <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
+          {/* Identity & Social Login Badges (Google, GitHub, Steam) */}
+          <NavAuthBadges walletAddress={account} />
+
           {/* Monad Testnet Pill */}
-          <div className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/[0.04] border border-white/[0.08] text-xs font-mono text-slate-300">
+          <div className="hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/[0.04] border border-white/[0.08] text-xs font-mono text-slate-300">
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
             <span className="w-2 h-2 -ml-4 rounded-full bg-emerald-400" />
             <span>Monad Testnet</span>
