@@ -19,6 +19,8 @@ import {
   createWalletClient,
   custom,
   http,
+  fallback,
+  encodeFunctionData,
   isAddress,
 } from "viem";
 import {
@@ -64,7 +66,10 @@ export function TransferModal({
       try {
         const publicClient = createPublicClient({
           chain: monadTestnet,
-          transport: http("https://testnet-rpc.monad.xyz"),
+          transport: fallback([
+            http("https://monad-testnet.drpc.org"),
+            http("https://testnet-rpc.monad.xyz"),
+          ]),
         });
 
         const bal = await publicClient.readContract({
@@ -119,19 +124,23 @@ export function TransferModal({
       let hash: `0x${string}`;
 
       if (currency === "KOL") {
-        // Transfer ERC-20 KOL Token
-        const walletClient = createWalletClient({
-          account: senderAddress as `0x${string}`,
-          chain: monadTestnet,
-          transport: custom(window.ethereum),
-        });
-
-        hash = await walletClient.writeContract({
-          address: KOL_TOKEN_ADDRESS,
+        // Transfer ERC-20 KOL Token directly via MetaMask to avoid RPC rate limit
+        const data = encodeFunctionData({
           abi: KOL_TOKEN_ABI,
           functionName: "transfer",
           args: [cleanRecipient as `0x${string}`, parseEther(amount.trim())],
         });
+
+        hash = (await window.ethereum.request({
+          method: "eth_sendTransaction",
+          params: [
+            {
+              from: senderAddress,
+              to: KOL_TOKEN_ADDRESS,
+              data,
+            },
+          ],
+        })) as `0x${string}`;
       } else {
         // Transfer Native MON
         const valueHex = "0x" + parseEther(amount.trim()).toString(16);

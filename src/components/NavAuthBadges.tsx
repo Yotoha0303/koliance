@@ -22,7 +22,7 @@ import {
   Coins,
 } from "lucide-react";
 import Image from "next/image";
-import { createPublicClient, http, formatEther } from "viem";
+import { createPublicClient, http, fallback, formatEther } from "viem";
 import { GOOGLE_CLIENT_ID, GITHUB_CLIENT_ID } from "@/lib/authConfig";
 import { EditProfileModal, UserProfileData } from "@/components/EditProfileModal";
 import { TransferModal } from "@/components/TransferModal";
@@ -59,7 +59,10 @@ export function NavAuthBadges({
       try {
         const client = createPublicClient({
           chain: monadTestnet,
-          transport: http("https://testnet-rpc.monad.xyz"),
+          transport: fallback([
+            http("https://monad-testnet.drpc.org"),
+            http("https://testnet-rpc.monad.xyz"),
+          ]),
         });
         const bal = await client.readContract({
           address: KOL_TOKEN_ADDRESS,
@@ -73,7 +76,7 @@ export function NavAuthBadges({
       }
     };
     fetchBalance();
-    const interval = setInterval(fetchBalance, 10000);
+    const interval = setInterval(fetchBalance, 30000);
     return () => clearInterval(interval);
   }, [walletAddress]);
 

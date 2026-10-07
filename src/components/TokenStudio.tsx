@@ -24,6 +24,8 @@ import {
   formatEther,
   parseEther,
   http,
+  fallback,
+  encodeFunctionData,
   isAddress,
 } from "viem";
 import {
@@ -64,7 +66,10 @@ export function TokenStudio({
       setLoadingStats(true);
       const publicClient = createPublicClient({
         chain: monadTestnet,
-        transport: http("https://testnet-rpc.monad.xyz"),
+        transport: fallback([
+          http("https://monad-testnet.drpc.org"),
+          http("https://testnet-rpc.monad.xyz"),
+        ]),
       });
 
       const [supply, era, rate] = await Promise.all([
@@ -107,7 +112,7 @@ export function TokenStudio({
 
   useEffect(() => {
     fetchTokenData();
-    const interval = setInterval(fetchTokenData, 10000);
+    const interval = setInterval(fetchTokenData, 30000);
     return () => clearInterval(interval);
   }, [account]);
 
@@ -149,17 +154,22 @@ export function TokenStudio({
       setIsClaiming(true);
       setFeedback(null);
 
-      const walletClient = createWalletClient({
-        account,
-        chain: monadTestnet,
-        transport: custom(window.ethereum),
-      });
-
-      const hash = await walletClient.writeContract({
-        address: KOL_TOKEN_ADDRESS,
+      // Encode claimBlockReward call
+      const data = encodeFunctionData({
         abi: KOL_TOKEN_ABI,
         functionName: "claimBlockReward",
       });
+
+      const hash = (await window.ethereum.request({
+        method: "eth_sendTransaction",
+        params: [
+          {
+            from: account,
+            to: KOL_TOKEN_ADDRESS,
+            data,
+          },
+        ],
+      })) as `0x${string}`;
 
       setFeedback({
         type: "success",
@@ -205,12 +215,6 @@ export function TokenStudio({
 
     try {
       setIsTransferring(true);
-      const walletClient = createWalletClient({
-        account,
-        chain: monadTestnet,
-        transport: custom(window.ethereum),
-      });
-
       let hash: `0x${string}`;
 
       if (transferType === "KOL") {
@@ -220,12 +224,22 @@ export function TokenStudio({
           return;
         }
 
-        hash = await walletClient.writeContract({
-          address: KOL_TOKEN_ADDRESS,
+        const data = encodeFunctionData({
           abi: KOL_TOKEN_ABI,
           functionName: "transfer",
           args: [cleanRecipient as `0x${string}`, parseEther(amount.trim())],
         });
+
+        hash = (await window.ethereum.request({
+          method: "eth_sendTransaction",
+          params: [
+            {
+              from: account,
+              to: KOL_TOKEN_ADDRESS,
+              data,
+            },
+          ],
+        })) as `0x${string}`;
       } else {
         if (numAmount > parseFloat(nativeBalance)) {
           setFeedback({ type: "error", msg: `MON 余额不足 (当前: ${nativeBalance} MON)` });
@@ -233,10 +247,17 @@ export function TokenStudio({
           return;
         }
 
-        hash = await walletClient.sendTransaction({
-          to: cleanRecipient as `0x${string}`,
-          value: parseEther(amount.trim()),
-        });
+        const valueHex = "0x" + parseEther(amount.trim()).toString(16);
+        hash = (await window.ethereum.request({
+          method: "eth_sendTransaction",
+          params: [
+            {
+              from: account,
+              to: cleanRecipient,
+              value: valueHex,
+            },
+          ],
+        })) as `0x${string}`;
       }
 
       setFeedback({
