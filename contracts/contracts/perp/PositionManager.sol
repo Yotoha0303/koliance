@@ -66,6 +66,35 @@ contract PositionManager is IPositionManager, Ownable {
     ///      parameter exist without coupling this contract to Pyth.
     address public priceUpdater;
 
+    // ==================== FUNDING STATE ====================
+    //
+    // Funding is accrued lazily: the index advances on whichever transaction
+    // touches a feed first in a block, and every state-changing entry point
+    // accrues before it reads. No keeper, no timer, no cron — the chain's own
+    // block production is the clock. See `accrueFunding`.
+
+    /// @notice Cumulative funding index per feed, WAD-scaled, signed.
+    /// @dev A trader's funding owed is `size * (index - entryFundingIndex) / WAD`.
+    ///      Positive means the trader pays. Longs pay when this rises.
+    mapping(bytes32 => int256) public cumulativeFundingIndex;
+
+    /// @notice Last block in which a feed's funding was accrued. Zero means never.
+    mapping(bytes32 => uint256) public lastFundingBlock;
+
+    /// @notice Funding accrued per block at full skew, WAD-scaled.
+    /// @dev Seeded from `PerpConstants.DEFAULT_FUNDING_RATE_PER_BLOCK_WAD` and
+    ///      retunable by the owner up to `MAX_FUNDING_RATE_PER_BLOCK_WAD`.
+    ///      Mutable because the realistic rate is invisible over a demo-length
+    ///      run; see the constant's comment and ADR-003.
+    int256 public fundingRatePerBlockWad;
+
+    /// @notice Open interest per feed, 18-decimal USD notional.
+    /// @dev Drives the skew. Maintained as O(1) accumulators on open and close,
+    ///      because `accrueFunding` runs inside every entry point and cannot
+    ///      afford to walk the position set.
+    mapping(bytes32 => uint256) public longOpenInterestUsd;
+    mapping(bytes32 => uint256) public shortOpenInterestUsd;
+
     error ZeroAmount();
     error InvalidLeverage(uint256 leverageBps);
     error PositionNotOpen(uint256 positionId);
@@ -73,8 +102,12 @@ contract PositionManager is IPositionManager, Ownable {
     error NotLiquidatable(uint256 positionId);
     error InsufficientCollateral();
     error InsufficientPoolCapacity(uint256 requiredUsd, uint256 availableUsd);
+    error InvalidFundingRate(int256 rate);
 
     event PriceUpdaterSet(address indexed priceUpdater);
+
+    /// @notice The per-block funding rate was set.
+    event FundingRateSet(int256 ratePerBlockWad);
 
     /// @notice Emitted when a single position's bounty cannot be paid during a
     ///         batch liquidation. The position is still closed; only the bounty
@@ -97,6 +130,9 @@ contract PositionManager is IPositionManager, Ownable {
 
         uint8 dec = IERC20(collateralToken_).decimals();
         usdcToUsdScale = 10 ** (PerpConstants.USD_DECIMALS - dec);
+
+        fundingRatePerBlockWad = PerpConstants.DEFAULT_FUNDING_RATE_PER_BLOCK_WAD;
+        emit FundingRateSet(fundingRatePerBlockWad);
 
         if (owner_ != msg.sender) {
             if (owner_ == address(0)) revert ZeroAddress();
@@ -133,12 +169,92 @@ contract PositionManager is IPositionManager, Ownable {
         return PerpConstants.MAX_PROFIT_BPS;
     }
 
+    // ==================== FUNDING ====================
+
+    /// @inheritdoc IPositionManager
+    /// @dev Lazily advances the index to the current block. Idempotent within a
+    ///      block: a second call in the same block finds `elapsed == 0` and does
+    ///      nothing, so calling it from every entry point costs one SLOAD in the
+    ///      common case and never double-charges.
+    ///
+    ///      This is what makes funding "per block" rather than "per hour": the
+    ///      index advances once for each block that contains at least one
+    ///      transaction touching the feed, and the size of the step is
+    ///      proportional to the blocks elapsed.
+    function accrueFunding(bytes32 feedId) public returns (int256) {
+        uint256 last = lastFundingBlock[feedId];
+        if (last == block.number) return cumulativeFundingIndex[feedId];
+
+        int256 delta = 0;
+        int256 skewWad = 0;
+
+        // First accrual for a feed only seeds the clock. Accruing from block 0
+        // would multiply the rate by the whole chain height.
+        if (last != 0) {
+            uint256 elapsed = block.number - last;
+            (int256 fundingDelta, int256 skew) = _fundingDelta(feedId, elapsed);
+            delta = fundingDelta;
+            skewWad = skew;
+            cumulativeFundingIndex[feedId] += delta;
+        }
+
+        lastFundingBlock[feedId] = block.number;
+        emit FundingAccrued(feedId, cumulativeFundingIndex[feedId], block.number, skewWad);
+        return cumulativeFundingIndex[feedId];
+    }
+
+    /// @inheritdoc IPositionManager
+    /// @dev Projects the index to the current block rather than reading the
+    ///      stored one. Reading storage would report zero until somebody called
+    ///      `accrueFunding`, which makes the view useless for exactly the
+    ///      consumer it exists for: a bot deciding whether a position is about
+    ///      to become liquidatable. Mirrors `_isLiquidatable`'s projection so the
+    ///      two never disagree.
+    function fundingOwed(uint256 positionId) external view returns (int256) {
+        Position memory p = _positions[positionId];
+        return _fundingFor(p, _projectedFundingIndex(p.feedId));
+    }
+
+    /// @inheritdoc IPositionManager
+    function openInterest(bytes32 feedId) external view returns (uint256 longUsd, uint256 shortUsd) {
+        return (longOpenInterestUsd[feedId], shortOpenInterestUsd[feedId]);
+    }
+
+    /// @notice Signed skew of a feed in WAD, in [-WAD, WAD].
+    ///
+    /// Positive means longs dominate and therefore pay; zero means the book is
+    /// balanced and funding is zero. Returned separately from the accrual so the
+    /// frontend can display the current rate without a second implementation.
+    function fundingSkewWad(bytes32 feedId) external view returns (int256) {
+        return _skewWad(feedId);
+    }
+
     // ==================== WIRING ====================
 
     function setPriceUpdater(address priceUpdater_) external onlyOwner {
         if (priceUpdater_ == address(0)) revert ZeroAddress();
         priceUpdater = priceUpdater_;
         emit PriceUpdaterSet(priceUpdater_);
+    }
+
+    /// @notice Retune the per-block funding rate, bounded by the constant ceiling.
+    ///
+    /// @dev The realistic default (1e11) moves a 9,990 USD position by 0.001 USD
+    ///      per block — correct, and invisible in a demo. This exists so a demo
+    ///      deployment can raise it to something a 100-block run can show,
+    ///      WITHOUT changing the mechanism. The cap is what stops that escape
+    ///      hatch from becoming a way to strip collateral in a few blocks.
+    ///
+    ///      Changing the rate does not retroactively re-price accrued funding:
+    ///      the index is already banked, and only future blocks accrue at the
+    ///      new rate. That is the conservative behaviour.
+    function setFundingRatePerBlockWad(int256 rate) external onlyOwner {
+        if (rate < 0) revert InvalidFundingRate(rate);
+        if (rate > PerpConstants.MAX_FUNDING_RATE_PER_BLOCK_WAD) {
+            revert InvalidFundingRate(rate);
+        }
+        fundingRatePerBlockWad = rate;
+        emit FundingRateSet(rate);
     }
 
     // ==================== OPEN ====================
@@ -157,6 +273,11 @@ contract PositionManager is IPositionManager, Ownable {
         }
 
         _pushPrices(pythUpdateData);
+
+        // Accrue before reading the index we are about to store. Skipping this
+        // would let a position open against a stale index and immediately owe
+        // (or be owed) the whole gap since the last accrual.
+        int256 indexAtOpen = accrueFunding(feedId);
 
         (uint256 price, ) = oracle.getPrice(feedId);
         if (price == 0) revert ZeroAmount();
@@ -186,10 +307,19 @@ contract PositionManager is IPositionManager, Ownable {
             payoutCapUsd: payoutCapUsd,
             entryPrice: price,
             isLong: isLong,
-            openedAt: block.timestamp
+            openedAt: block.timestamp,
+            entryFundingIndex: indexAtOpen
         });
         isOpen[positionId] = true;
         totalPayoutCapUsd += payoutCapUsd;
+
+        // This position's notional now counts toward the feed's skew, which is
+        // what the next accrual will charge against.
+        if (isLong) {
+            longOpenInterestUsd[feedId] += sizeUsd;
+        } else {
+            shortOpenInterestUsd[feedId] += sizeUsd;
+        }
 
         // The fee is already sitting in the Vault (it was part of the transfer);
         // this records it so the indexer can attribute it.
@@ -217,10 +347,18 @@ contract PositionManager is IPositionManager, Ownable {
 
         _pushPrices(pythUpdateData);
 
+        // Accrue first so funding is charged for the blocks this position was
+        // open, including the current one.
+        int256 indexNow = accrueFunding(p.feedId);
+
         (uint256 exitPrice, ) = oracle.getPrice(p.feedId);
         int256 pnl = _pnl(p, exitPrice);
+        int256 funding = _fundingFor(p, indexNow);
 
-        uint256 equity = _equityAfter(p, pnl);
+        // Funding is subtracted from equity: positive funding means the trader
+        // pays. The floor at zero comes after, so a crowded side can be pushed
+        // through its margin by the cost of carry alone.
+        uint256 equity = _clampToZero(p.collateralUsd.toInt256() + pnl - funding).toUint256();
 
         // Cap profit at the value committed to at open.
         if (equity > p.payoutCapUsd) {
@@ -236,6 +374,7 @@ contract PositionManager is IPositionManager, Ownable {
             vault.payOut(p.owner, equity);
         }
 
+        emit FundingSettled(positionId, funding);
         emit PositionClosed(positionId, p.owner, exitPrice, pnl);
     }
 
@@ -268,6 +407,12 @@ contract PositionManager is IPositionManager, Ownable {
             }
             if (cached) continue;
 
+            // Accrue before snapshotting the price. Funding is part of the
+            // liquidation verdict, so settling a position without first banking
+            // the blocks it was open would charge it for the wrong interval.
+            // Once per distinct feed, same as the price read.
+            accrueFunding(feedId);
+
             (uint256 price, ) = oracle.getPrice(feedId);
             feeds[feedCount] = feedId;
             prices[feedCount] = price;
@@ -290,6 +435,11 @@ contract PositionManager is IPositionManager, Ownable {
 
             if (!_isLiquidatable(p, exitPrice)) continue;
 
+            // Funding is part of the verdict, so it must be part of the close
+            // too — otherwise a position could be liquidated for funding and
+            // then settle as if it owed none.
+            int256 funding = _fundingFor(p, cumulativeFundingIndex[p.feedId]);
+
             // Bounty is a share of COLLATERAL, not of remaining equity. Equity
             // can be zero (bankrupt position) and paying 5% of zero paid nothing,
             // which left the worst positions with no liquidator incentive at all.
@@ -310,6 +460,7 @@ contract PositionManager is IPositionManager, Ownable {
                 }
             }
 
+            emit FundingSettled(positionId, funding);
             emit PositionLiquidated(positionId, p.owner, msg.sender, exitPrice, reward);
         }
     }
@@ -347,11 +498,27 @@ contract PositionManager is IPositionManager, Ownable {
     }
 
     /// @notice Unrealised PnL for a position at the current oracle price.
+    /// @dev Excludes funding. Kept as-is because the UI shows the two separately:
+    ///      a trader wants to see price PnL and cost of carry as distinct lines,
+    ///      not one net figure that hides which is eating the margin.
     function unrealizedPnl(uint256 positionId) external view returns (int256) {
         if (!isOpen[positionId]) return 0;
         Position memory p = _positions[positionId];
         (uint256 price, ) = oracle.getPrice(p.feedId);
         return _pnl(p, price);
+    }
+
+    /// @notice Equity including both PnL and funding, floored at zero.
+    /// @dev The figure `_isLiquidatable` actually compares. Exposed so the UI and
+    ///      the Go liquidator can show the real margin rather than re-deriving it.
+    ///
+    ///      Named `positionEquity` rather than `equity` because the settlement
+    ///      paths all have a local `equity`, and Solidity warns on the shadowing.
+    function positionEquity(uint256 positionId) external view returns (int256) {
+        if (!isOpen[positionId]) return 0;
+        Position memory p = _positions[positionId];
+        (uint256 price, ) = oracle.getPrice(p.feedId);
+        return _equityAfterFunding(p, price, _projectedFundingIndex(p.feedId));
     }
 
     // ==================== INTERNAL ====================
@@ -374,7 +541,125 @@ contract PositionManager is IPositionManager, Ownable {
     function _close(uint256 positionId, Position memory p) internal {
         isOpen[positionId] = false;
         totalPayoutCapUsd -= p.payoutCapUsd;
+
+        // Release this position's notional from the feed's skew, or the book
+        // would keep charging for a position that no longer exists.
+        if (p.isLong) {
+            longOpenInterestUsd[p.feedId] -= p.sizeUsd;
+        } else {
+            shortOpenInterestUsd[p.feedId] -= p.sizeUsd;
+        }
+
         delete _positions[positionId];
+    }
+
+    /// @dev The funding index as of the current block, without writing state.
+    ///
+    /// Used by views so `isLiquidatable` and `fundingOwed` report the same
+    /// verdict a transaction would produce. Without this a view would lag by one
+    /// block, and a bot reading it would submit liquidations that no longer
+    /// apply (or miss ones that now do).
+    function _projectedFundingIndex(bytes32 feedId) internal view returns (int256) {
+        uint256 last = lastFundingBlock[feedId];
+        if (last == 0 || last == block.number) return cumulativeFundingIndex[feedId];
+
+        (int256 delta, ) = _fundingDelta(feedId, block.number - last);
+        return cumulativeFundingIndex[feedId] + delta;
+    }
+
+    // ==================== FUNDING INTERNALS ====================
+
+    /// @dev Signed skew in WAD: `(long - short) / (long + short) * WAD`.
+    ///
+    /// Positive when longs dominate. Zero when the book is balanced OR when
+    /// there is no open interest at all — in both cases funding is zero, which
+    /// is the correct behaviour: a balanced book has nothing to arbitrage and an
+    /// empty one has nobody to charge.
+    function _skewWad(bytes32 feedId) internal view returns (int256) {
+        uint256 longs = longOpenInterestUsd[feedId];
+        uint256 shorts = shortOpenInterestUsd[feedId];
+        uint256 total = longs + shorts;
+        if (total == 0) return 0;
+
+        // Both branches keep the division last so the result is exact to one
+        // WAD unit; dividing first would floor away the whole skew on small books.
+        if (longs >= shorts) {
+            return (int256(longs - shorts) * PerpConstants.WAD) / int256(total);
+        }
+        return -(int256(shorts - longs) * PerpConstants.WAD) / int256(total);
+    }
+
+    /// @dev Funding delta for `elapsed` blocks, and the skew that produced it.
+    ///
+    ///   delta = elapsed * FUNDING_RATE_PER_BLOCK_WAD * skewWad / WAD
+    ///
+    /// Two truncations happen, in this order. Truncation here means a small
+    /// skew over few blocks can accrue exactly zero — that is acceptable (it
+    /// rounds against the crowded side, i.e. conservatively) and unavoidable in
+    /// integer maths. The alternative, carrying a remainder accumulator, buys
+    /// precision nobody can measure for real money.
+    function _fundingDelta(bytes32 feedId, uint256 elapsed)
+        internal
+        view
+        returns (int256 delta, int256 skewWad)
+    {
+        skewWad = _skewWad(feedId);
+        if (skewWad == 0) return (0, 0);
+
+        int256 gross = int256(elapsed) * fundingRatePerBlockWad;
+        delta = (gross * skewWad) / PerpConstants.WAD;
+    }
+
+    /// @dev Funding a position owes at `indexNow`, positive meaning it pays.
+    ///
+    /// Sign convention, and the reason for the side multiplier:
+    ///
+    ///   - the index rises when LONGS dominate, because the crowded side pays
+    ///   - a long's obligation is therefore `+size * delta`
+    ///   - a short's is `-size * delta`, since the short is the side being paid
+    ///
+    /// Without the side sign both sides are charged identically and the short
+    /// never receives anything — funding becomes a fee rather than a transfer
+    /// between the two sides, which is not what it is.
+    ///
+    /// Note this is deliberately NOT `-size` for a short followed by a sign flip
+    /// on the index. Keeping the direction in the index and the side in the
+    /// multiplier means a short-heavy book works out symmetrically: the index
+    /// falls, so `-size * negative` is positive and the crowded short pays.
+    function _fundingFor(Position memory p, int256 indexNow) internal pure returns (int256) {
+        int256 delta = indexNow - p.entryFundingIndex;
+        if (delta == 0) return 0;
+
+        int256 signedSize = p.isLong ? p.sizeUsd.toInt256() : -p.sizeUsd.toInt256();
+        return (signedSize * delta) / PerpConstants.WAD;
+    }
+
+    /// @dev Equity after collateral, PnL and accrued funding.
+    ///
+    ///   equity = collateral + pnl - funding, floored at zero
+    ///
+    /// Funding is applied BEFORE the floor, so a position can be pushed into
+    /// liquidation by the cost of carry alone. That is the point of per-block
+    /// funding: on a crowded side the cost accumulates fast enough to matter
+    /// within a single demo, which an 8-hourly rate could never do.
+    ///
+    /// The floor comes last. Applying it to PnL first would let funding revive a
+    /// bankrupt position, which is both wrong and exploitable.
+    function _equityAfterFunding(Position memory p, uint256 markPrice, int256 indexNow)
+        internal
+        pure
+        returns (int256)
+    {
+        int256 pnl = _pnl(p, markPrice);
+        int256 funding = _fundingFor(p, indexNow);
+        return _clampToZero(p.collateralUsd.toInt256() + pnl - funding);
+    }
+
+    /// @dev Floors an equity figure at zero: a position cannot owe more than it
+    ///      posted. Applied AFTER funding, so funding can drive a position into
+    ///      liquidation but can never make it negative and wrap on the way out.
+    function _clampToZero(int256 equity) internal pure returns (int256) {
+        return equity < 0 ? int256(0) : equity;
     }
 
     /// @dev Collateral credited to the position, 18-decimal USD: the gross amount
@@ -448,11 +733,15 @@ contract PositionManager is IPositionManager, Ownable {
     ///      `mm = size * MAINTENANCE_MARGIN_BPS / BPS_DENOMINATOR` and then compare
     ///      `equity <= mm`. Changing the order of those divisions in either place
     ///      desynchronises the UI's estimated liquidation price from reality.
-    function _isLiquidatable(Position memory p, uint256 price) internal pure returns (bool) {
-        int256 pnl = _pnl(p, price);
-        uint256 equity = _equityAfter(p, pnl);
+    ///
+    ///      Equity here is PnL MINUS funding, floored at zero. Funding is part of
+    ///      the verdict on purpose: on a crowded side the cost of carry alone can
+    ///      push a position through its maintenance margin, and that is the
+    ///      mechanism that makes per-block funding bite.
+    function _isLiquidatable(Position memory p, uint256 price) internal view returns (bool) {
+        int256 equity = _equityAfterFunding(p, price, _projectedFundingIndex(p.feedId));
         uint256 mm = (p.sizeUsd * PerpConstants.MAINTENANCE_MARGIN_BPS) /
             PerpConstants.BPS_DENOMINATOR;
-        return equity <= mm;
+        return equity.toUint256() <= mm;
     }
 }

@@ -298,10 +298,22 @@ describe("PositionManager", async function () {
   });
 
   // ==================== CLOSE ====================
+  //
+  // These two assert the payout arithmetic, so funding must be neutral: a lone
+  // long is a 100%-skewed book and accrues funding the moment it opens, which
+  // would subtract from the expected payout. An equal-sized short from a
+  // different account flattens the skew to zero without touching the trader's
+  // balance. Funding itself is covered in test/perp/Funding.ts.
+
+  /** Open a long and an offsetting short so the feed's skew is exactly zero. */
+  async function hedgeFeed(pm: any, trader: any, other: any) {
+    await open(pm, other, { collateral: usdc(1_000), leverageBps: 100_000n, isLong: false });
+    return await open(pm, trader, { collateral: usdc(1_000), leverageBps: 100_000n });
+  }
 
   it("Pays a winning long out of the pool", async function () {
     const { token, oracle, pm } = await setup();
-    const id = await open(pm, trader, { collateral: usdc(1_000), leverageBps: 100_000n });
+    const id = await hedgeFeed(pm, trader, otherTrader);
 
     // 180 -> 200 is +11.1% on 9990 notional = +1110 USD.
     await oracle.write.setPrice([NVDA, usd(200)]);
@@ -321,7 +333,7 @@ describe("PositionManager", async function () {
 
   it("Leaves a losing long's remainder in the pool", async function () {
     const { token, oracle, vault, pm } = await setup();
-    const id = await open(pm, trader, { collateral: usdc(1_000), leverageBps: 100_000n });
+    const id = await hedgeFeed(pm, trader, otherTrader);
     const poolBefore = await vault.read.totalAssets();
 
     // 180 -> 170 is -5.55% on 9990 notional = -555 USD.
@@ -371,9 +383,18 @@ describe("PositionManager", async function () {
   });
 
   // ==================== LIQUIDATION THRESHOLD ====================
+  //
+  // These two land exactly on the PnL-derived threshold, so they need funding
+  // to be neutral. With a single long the book is 100% skewed and funding
+  // accrues immediately, which would shift the verdict by a few wei and make the
+  // ±1 assertions test the wrong thing. Opening an equal-sized short first
+  // flattens the skew to zero, so the threshold is purely `collateral + pnl`.
+  //
+  // Funding itself is covered in test/perp/Funding.ts.
 
   it("Is liquidatable exactly at the computed liquidation price", async function () {
     const { oracle, pm } = await setup();
+    await open(pm, trader, { collateral: usdc(1_000), leverageBps: 100_000n, isLong: false });
     const id = await open(pm, trader, { collateral: usdc(1_000), leverageBps: 100_000n });
 
     const liq = computeLiquidationPrice(usd(999), PRICE_180, 100_000n, true);
@@ -384,6 +405,7 @@ describe("PositionManager", async function () {
 
   it("Is not liquidatable one wei above the liquidation price", async function () {
     const { oracle, pm } = await setup();
+    await open(pm, trader, { collateral: usdc(1_000), leverageBps: 100_000n, isLong: false });
     const id = await open(pm, trader, { collateral: usdc(1_000), leverageBps: 100_000n });
 
     const liq = computeLiquidationPrice(usd(999), PRICE_180, 100_000n, true);
@@ -451,6 +473,10 @@ describe("PositionManager", async function () {
 
   it("Refuses to liquidate a healthy position", async function () {
     const { pm } = await setup();
+    // A matching short flattens the skew so funding does not nibble the margin
+    // between open and liquidate — otherwise this becomes a test of funding
+    // rather than of the healthy-position path.
+    await open(pm, trader, { collateral: usdc(1_000), leverageBps: 100_000n, isLong: false });
     const id = await open(pm, trader, { collateral: usdc(1_000), leverageBps: 100_000n });
 
     // Price is still 180, far from the ~163.8 threshold. The batch silently skips

@@ -20,6 +20,11 @@ interface IPositionManager {
         uint256 entryPrice;    // 18 decimals
         bool    isLong;
         uint256 openedAt;
+        /// Cumulative funding index for this feed at the moment of opening.
+        /// Funding owed is `size * (indexNow - entryFundingIndex) / WAD`, which
+        /// is why the index is stored rather than an accrued amount: it makes
+        /// settlement O(1) and independent of how many blocks elapsed.
+        int256  entryFundingIndex;
     }
 
     // Frozen event signatures — the Go indexer backfills from these logs.
@@ -45,6 +50,21 @@ interface IPositionManager {
         uint256 exitPrice,
         uint256 reward
     );
+
+    /// @notice Emitted whenever a feed's cumulative funding index advances.
+    /// @dev Carries the block number so a watcher can prove the index moved once
+    ///      per block rather than in one jump — that per-block granularity is the
+    ///      property worth demonstrating.
+    event FundingAccrued(
+        bytes32 indexed feedId,
+        int256  index,
+        uint256 blockNumber,
+        int256  skewWad
+    );
+
+    /// @notice Emitted when a position settles its accrued funding.
+    /// @param amount positive means the trader PAID, negative means they received.
+    event FundingSettled(uint256 indexed positionId, int256 amount);
 
     /// @param leverageBps leverage in basis points (1x = 10000, 50x = 500000)
     function openPosition(
@@ -88,6 +108,52 @@ interface IPositionManager {
     /// @notice Profit ceiling as basis points of notional size.
     /// @dev A position's payout never exceeds `collateral + size * this / 1e4`.
     function maxProfitBps() external view returns (uint256);
+
+    // ==================== FUNDING ====================
+    //
+    // Funding is what keeps a perpetual tethered to spot. Without it a perp is
+    // just a leveraged bet whose price can drift arbitrarily far from the index;
+    // with it, the crowded side pays the thin side until the basis closes.
+    //
+    // This implementation accrues PER BLOCK. Conventional venues settle funding
+    // every 1–8 hours, which on a fast chain is an unnecessary compromise: the
+    // arbitrage that closes a basis is bounded by how often funding can be
+    // collected, so settling every block lets the perp track spot far more
+    // tightly. That is the mechanism a high-throughput chain makes possible and
+    // a slow one cannot copy — see ADR-003.
+
+    /// @notice Cumulative funding index for a feed, WAD-scaled, signed.
+    ///
+    /// Interpretation: a position's funding owed is
+    /// `sizeUsd * (indexNow - position.entryFundingIndex) / WAD`, where a
+    /// POSITIVE result means the trader pays and a negative one means they are
+    /// paid. Longs pay when the index rises.
+    ///
+    /// The index only ever moves forward in the direction of the skew, and is
+    /// monotonic between accruals because each accrual adds a signed delta.
+    function cumulativeFundingIndex(bytes32 feedId) external view returns (int256);
+
+    /// @notice Funding accrued per block at full skew, WAD-scaled.
+    function fundingRatePerBlockWad() external view returns (int256);
+
+    /// @notice Accrue funding for a feed up to the current block.
+    ///
+    /// Public and permissionless: anyone may call it, and every state-changing
+    /// entry point calls it internally first. That is what makes "per block"
+    /// real — the index advances on whichever transaction comes first in a
+    /// block, so a chain that produces blocks faster accrues funding faster.
+    ///
+    /// Returns the index after accrual.
+    function accrueFunding(bytes32 feedId) external returns (int256);
+
+    /// @notice Funding a position would owe right now, positive meaning it pays.
+    /// @dev Does NOT accrue. Read-only, so it can be called from the UI or a bot
+    ///      without spending gas, at the cost of being stale by the current
+    ///      block's un-accrued delta.
+    function fundingOwed(uint256 positionId) external view returns (int256);
+
+    /// @notice Open interest on a feed, 18-decimal USD notional.
+    function openInterest(bytes32 feedId) external view returns (uint256 longUsd, uint256 shortUsd);
 
     /// @notice 18-decimal USD the Vault must keep in reserve to honour open positions.
     ///

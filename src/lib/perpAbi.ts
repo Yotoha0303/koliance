@@ -202,8 +202,54 @@ export const POSITION_MANAGER_ABI = [
           { name: "entryPrice", type: "uint256" },
           { name: "isLong", type: "bool" },
           { name: "openedAt", type: "uint256" },
+          { name: "entryFundingIndex", type: "int256" },
         ],
       },
+    ],
+  },
+  {
+    type: "function",
+    name: "positionEquity",
+    stateMutability: "view",
+    inputs: [{ name: "positionId", type: "uint256" }],
+    outputs: [{ name: "", type: "int256" }],
+  },
+  {
+    type: "function",
+    name: "fundingOwed",
+    stateMutability: "view",
+    inputs: [{ name: "positionId", type: "uint256" }],
+    outputs: [{ name: "", type: "int256" }],
+  },
+  {
+    type: "function",
+    name: "cumulativeFundingIndex",
+    stateMutability: "view",
+    inputs: [{ name: "", type: "bytes32" }],
+    outputs: [{ name: "", type: "int256" }],
+  },
+  {
+    type: "function",
+    name: "fundingRatePerBlockWad",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ name: "", type: "int256" }],
+  },
+  {
+    type: "function",
+    name: "fundingSkewWad",
+    stateMutability: "view",
+    inputs: [{ name: "feedId", type: "bytes32" }],
+    outputs: [{ name: "", type: "int256" }],
+  },
+  {
+    type: "function",
+    name: "openInterest",
+    stateMutability: "view",
+    inputs: [{ name: "feedId", type: "bytes32" }],
+    outputs: [
+      { name: "longUsd", type: "uint256" },
+      { name: "shortUsd", type: "uint256" },
     ],
   },
   {
@@ -277,7 +323,7 @@ export const POSITION_MANAGER_ABI = [
   },
 ] as const;
 
-/** The shape `getPosition` returns, with the field added by ADR-002. */
+/** The shape `getPosition` returns, with the fields added by ADR-002 and ADR-003. */
 export interface OnChainPosition {
   owner: `0x${string}`;
   feedId: `0x${string}`;
@@ -287,4 +333,5 @@ export interface OnChainPosition {
   entryPrice: bigint;
   isLong: boolean;
   openedAt: bigint;
+  entryFundingIndex: bigint;
 }

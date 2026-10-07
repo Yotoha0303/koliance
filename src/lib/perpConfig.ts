@@ -67,6 +67,23 @@ export const MIN_LEVERAGE_BPS = 10_000n;
 export const MAX_PROFIT_BPS = 10_000n;
 
 /**
+ * Funding accrued per block at full skew, WAD-scaled. Mirrors
+ * `PerpConstants.DEFAULT_FUNDING_RATE_PER_BLOCK_WAD`.
+ *
+ * This is a DEFAULT, not what is deployed. The owner can retune it up to
+ * `MAX_FUNDING_RATE_PER_BLOCK_WAD`, so read
+ * `IPositionManager.fundingRatePerBlockWad()` for the authoritative value — the
+ * UI must use that, not this, or its displayed funding will be wrong.
+ */
+export const DEFAULT_FUNDING_RATE_PER_BLOCK_WAD = 100_000_000_000n; // 1e11
+
+/** Ceiling on the owner-settable rate. Mirrors `PerpConstants`. */
+export const MAX_FUNDING_RATE_PER_BLOCK_WAD = 10_000_000_000_000n; // 1e13
+
+/** Fixed-point denominator for WAD maths (the funding index and skew). */
+export const WAD = 10n ** 18n;
+
+/**
  * Deployed perp contract addresses.
  *
  * Populated from the environment, which `scripts/demo-seed.ts` prints after it

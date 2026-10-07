@@ -24,10 +24,7 @@ import {
   positionSizeUsd,
   payoutCapUsd,
   poolCapacityCheck,
-  unrealizedPnl,
   liquidationPrice,
-  marginRatioBps,
-  isLiquidatable,
   formatUsd,
   formatLeverage,
   validateOpenPosition,
@@ -64,8 +61,19 @@ interface PositionRow {
   id: bigint;
   pos: OnChainPosition;
   pnl: bigint;
+  /**
+   * Equity including funding, read from the contract.
+   *
+   * Read rather than computed: funding is part of the on-chain verdict, so a
+   * locally-derived figure would disagree exactly when a crowded position is
+   * being squeezed by the cost of carry. The contract is the authority.
+   */
+  equity: bigint;
+  /** Funding owed, positive meaning the trader pays. Read from the contract. */
+  funding: bigint;
   marginBps: bigint;
   liqPrice: bigint;
+  /** Read from `PositionManager.isLiquidatable`, not derived here. */
   liquidatable: boolean;
 }
 
@@ -200,6 +208,36 @@ export function PositionPanel({ account }: { account: `0x${string}` | null }) {
           args: [id],
         })) as unknown as OnChainPosition;
 
+        // Verdict, equity and funding all come from the chain. Deriving them
+        // here would be a second implementation of a rule that already exists,
+        // and it would drift the moment funding is involved.
+        const [pnl, equity, funding, liquidatable] = await Promise.all([
+          client.readContract({
+            address: PERP_ADDRESSES.positionManager,
+            abi: POSITION_MANAGER_ABI,
+            functionName: "unrealizedPnl",
+            args: [id],
+          }),
+          client.readContract({
+            address: PERP_ADDRESSES.positionManager,
+            abi: POSITION_MANAGER_ABI,
+            functionName: "positionEquity",
+            args: [id],
+          }),
+          client.readContract({
+            address: PERP_ADDRESSES.positionManager,
+            abi: POSITION_MANAGER_ABI,
+            functionName: "fundingOwed",
+            args: [id],
+          }),
+          client.readContract({
+            address: PERP_ADDRESSES.positionManager,
+            abi: POSITION_MANAGER_ABI,
+            functionName: "isLiquidatable",
+            args: [id],
+          }),
+        ]);
+
         const math = {
           collateralUsd: pos.collateralUsd,
           entryPrice: pos.entryPrice,
@@ -209,10 +247,18 @@ export function PositionPanel({ account }: { account: `0x${string}` | null }) {
         found.push({
           id,
           pos,
-          pnl: unrealizedPnl(math, markPrice),
-          marginBps: marginRatioBps(math, markPrice),
+          pnl,
+          equity,
+          funding,
+          // Margin ratio against the read equity, not a recomputed one.
+          marginBps:
+            pos.sizeUsd === 0n
+              ? 0n
+              : (equity > 0n ? equity : 0n) * BPS_DENOMINATOR / pos.sizeUsd,
+          // Still a mirror: there is no per-position getter on chain. Guarded by
+          // tests/perp.test.ts against the contract's formula.
           liqPrice: liquidationPrice(math),
-          liquidatable: isLiquidatable(math, markPrice),
+          liquidatable,
         });
       }
       setRows(found);
@@ -557,7 +603,7 @@ export function PositionPanel({ account }: { account: `0x${string}` | null }) {
                       </span>
                     </div>
 
-                    <div className="mt-2 grid grid-cols-3 gap-2 font-mono text-[10px] text-white/40">
+                    <div className="mt-2 grid grid-cols-2 gap-2 font-mono text-[10px] text-white/40 sm:grid-cols-4">
                       <div>
                         <div className="text-white/30">保证金</div>
                         <div className="text-white/70">${formatUsd(r.pos.collateralUsd)}</div>
@@ -570,6 +616,28 @@ export function PositionPanel({ account }: { account: `0x${string}` | null }) {
                         <div className="text-white/30">预估强平价</div>
                         <div className="text-white/70">${formatUsd(r.liqPrice)}</div>
                       </div>
+                      <div>
+                        <div className="text-white/30">
+                          资金费 {r.funding > 0n ? "（付）" : r.funding < 0n ? "（收）" : ""}
+                        </div>
+                        <div
+                          className={
+                            r.funding > 0n
+                              ? "text-rose-300/80"
+                              : r.funding < 0n
+                                ? "text-emerald-300/80"
+                                : "text-white/70"
+                          }
+                        >
+                          {r.funding < 0n ? "+" : "−"}$
+                          {formatUsd(r.funding < 0n ? -r.funding : r.funding)}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="mt-1 font-mono text-[10px] text-white/30">
+                      权益（含资金费） ${formatUsd(r.equity > 0n ? r.equity : 0n)} · 保证金率{" "}
+                      {(Number(r.marginBps) / 100).toFixed(2)}%
                     </div>
 
                     {mine && (

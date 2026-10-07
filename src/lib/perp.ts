@@ -12,10 +12,12 @@
 import {
   BPS_DENOMINATOR,
   CLOSE_FEE_BPS,
+  DEFAULT_FUNDING_RATE_PER_BLOCK_WAD,
   FEEDS,
   FEED_SYMBOLS,
   LIQUIDATOR_REWARD_BPS,
   MAINTENANCE_MARGIN_BPS,
+  MAX_FUNDING_RATE_PER_BLOCK_WAD,
   MAX_LEVERAGE_BPS,
   MAX_PROFIT_BPS,
   MIN_LEVERAGE_BPS,
@@ -25,15 +27,18 @@ import {
   SESSION_FEEDS,
   USD_DECIMALS,
   USDC_DECIMALS,
+  WAD,
 } from "./perpConfig";
 
 export {
   BPS_DENOMINATOR,
   CLOSE_FEE_BPS,
+  DEFAULT_FUNDING_RATE_PER_BLOCK_WAD,
   FEEDS,
   FEED_SYMBOLS,
   LIQUIDATOR_REWARD_BPS,
   MAINTENANCE_MARGIN_BPS,
+  MAX_FUNDING_RATE_PER_BLOCK_WAD,
   MAX_LEVERAGE_BPS,
   MAX_PROFIT_BPS,
   MIN_LEVERAGE_BPS,
@@ -43,6 +48,7 @@ export {
   SESSION_FEEDS,
   USD_DECIMALS,
   USDC_DECIMALS,
+  WAD,
 };
 
 export type { FeedSymbol } from "./perpConfig";
@@ -139,6 +145,118 @@ export function poolCapacityCheck(
   const requiredUsd = currentReservedUsd + payoutCapUsd(p);
   const availableUsd = poolAssetsUsd + p.collateralUsd;
   return { ok: availableUsd >= requiredUsd, requiredUsd, availableUsd };
+}
+
+// ==================== FUNDING ====================
+//
+// Mirrors PositionManager's funding maths. Same-source discipline as the
+// liquidation price: the UI's "funding owed" must equal what the contract will
+// actually charge, or the displayed margin is a lie.
+//
+// Sign convention, which is the thing to get right:
+//
+//   index rises  <=>  longs dominate  <=>  longs pay
+//   owed = signedSize * (indexNow - entryFundingIndex) / WAD
+//          signedSize = +size for a long, -size for a short
+//
+// Positive owed means the trader PAYS. A short-heavy book pushes the index down,
+// which makes a short's `-size * negative` positive — so the crowded short side
+// pays, symmetrically.
+
+/** Signed open-interest skew in WAD: `(long - short) / (long + short)`. */
+export function fundingSkewWad(longOiUsd: bigint, shortOiUsd: bigint): bigint {
+  const total = longOiUsd + shortOiUsd;
+  if (total === 0n) return 0n;
+  return ((longOiUsd - shortOiUsd) * WAD) / total;
+}
+
+/**
+ * Per-block index delta for `elapsed` blocks at `ratePerBlockWad`.
+ *
+ * Mirrors `PositionManager._fundingDelta`. Note the two truncations, in this
+ * order: elapsed*rate first, then the skew multiply. Changing the order changes
+ * the result, which is why the contract's order is repeated here rather than
+ * simplified.
+ */
+export function fundingDeltaWad(
+  elapsed: bigint,
+  ratePerBlockWad: bigint,
+  skewWad: bigint
+): bigint {
+  if (skewWad === 0n) return 0n;
+  return (elapsed * ratePerBlockWad * skewWad) / WAD;
+}
+
+/** The funding index projected forward `elapsed` blocks from `index`. */
+export function projectedFundingIndex(
+  index: bigint,
+  elapsed: bigint,
+  ratePerBlockWad: bigint,
+  skewWad: bigint
+): bigint {
+  return index + fundingDeltaWad(elapsed, ratePerBlockWad, skewWad);
+}
+
+export interface FundingMath {
+  sizeUsd: bigint;
+  isLong: boolean;
+  entryFundingIndex: bigint;
+}
+
+/**
+ * Funding a position owes, positive meaning it pays.
+ *
+ * Mirrors `PositionManager._fundingFor`. The side multiplier is not optional:
+ * without it both sides are charged identically and the thin side is never paid,
+ * so funding stops being a transfer between the two sides.
+ */
+export function fundingOwed(p: FundingMath, indexNow: bigint): bigint {
+  const delta = indexNow - p.entryFundingIndex;
+  if (delta === 0n) return 0n;
+  const signedSize = p.isLong ? p.sizeUsd : -p.sizeUsd;
+  return (signedSize * delta) / WAD;
+}
+
+/**
+ * Equity including collateral, PnL and funding, floored at zero.
+ *
+ * Mirrors `PositionManager._equityAfterFunding` and is the figure
+ * `isLiquidatable` actually compares. Ordering is load-bearing: collateral + pnl
+ * - funding, THEN the floor. Flooring the PnL first would let funding revive a
+ * bankrupt position.
+ */
+export function equityWithFunding(
+  collateralUsd: bigint,
+  pnl: bigint,
+  funding: bigint
+): bigint {
+  const equity = collateralUsd + pnl - funding;
+  return equity < 0n ? 0n : equity;
+}
+
+/**
+ * True when the position breaches maintenance margin, funding included.
+ *
+ * Supersedes `isLiquidatable` for on-chain parity: funding is part of the
+ * contract's verdict, so a UI that omits it will disagree exactly when a crowded
+ * position is being squeezed by the cost of carry — which is the case a demo is
+ * most likely to be showing.
+ *
+ * `fundingOwedUsd` is positive when the trader pays, matching `fundingOwed`.
+ */
+export function isLiquidatableWithFunding(
+  p: PositionMath,
+  markPrice: bigint,
+  fundingOwedUsd: bigint
+): boolean {
+  const size = positionSizeUsd(p);
+  if (size === 0n) return false;
+  const equity = equityWithFunding(
+    p.collateralUsd,
+    unrealizedPnl(p, markPrice),
+    fundingOwedUsd
+  );
+  return equity <= applyBps(size, MAINTENANCE_MARGIN_BPS);
 }
 
 /** Entry fee deducted from collateral on open. */
