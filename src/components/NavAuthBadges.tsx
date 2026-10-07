@@ -189,13 +189,13 @@ export function NavAuthBadges({
 
   return (
     <div className="relative">
-      {/* Top-Right Account Pill Button */}
+      {/* Top-Right Account Pill Button (Solid, 100% Opaque High-End Tech Dark) */}
       <button
         onClick={() => setDropdownOpen(!dropdownOpen)}
-        className="flex items-center gap-2 px-3 py-1.5 sm:py-2 rounded-2xl bg-[#141824]/90 hover:bg-[#1a2030] border border-white/15 hover:border-blue-400/50 text-xs font-mono text-slate-200 transition-all select-none shadow-md active:scale-95 group"
+        className="flex items-center gap-2 px-3 py-1.5 sm:py-2 rounded-2xl bg-[#141824] hover:bg-[#1a2032] border border-white/20 hover:border-blue-400 text-xs font-mono text-white transition-all select-none shadow-lg active:scale-95 group"
       >
         {/* User Avatar Circle */}
-        <div className="w-6 h-6 rounded-full overflow-hidden border border-blue-400/80 shadow-[0_0_8px_rgba(59,130,246,0.35)] relative bg-blue-500/20 flex items-center justify-center shrink-0">
+        <div className="w-6 h-6 rounded-full overflow-hidden border border-blue-400 shadow-[0_0_8px_rgba(59,130,246,0.5)] relative bg-[#1c2438] flex items-center justify-center shrink-0">
           {googleUser?.picture ? (
             <Image
               src={googleUser.picture}
@@ -214,7 +214,7 @@ export function NavAuthBadges({
           <span className="font-sans font-semibold text-white text-xs truncate max-w-[85px] sm:max-w-[110px]">
             {googleUser ? googleUser.name : "个人中心"}
           </span>
-          <span className="text-[9px] font-mono text-slate-400 flex items-center gap-1">
+          <span className="text-[9px] font-mono text-slate-300 flex items-center gap-1">
             {effectiveWallet ? (
               <span className="text-emerald-400 font-semibold">{truncateAddress(effectiveWallet)}</span>
             ) : (
@@ -224,14 +224,14 @@ export function NavAuthBadges({
         </div>
 
         {/* Small Action indicator */}
-        <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-md bg-white/[0.08] text-slate-300 border border-white/10 group-hover:bg-blue-500/20 group-hover:text-blue-200 transition hidden sm:inline">
+        <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-[#222a42] text-slate-200 border border-white/20 group-hover:bg-blue-600 group-hover:text-white transition hidden sm:inline">
           编辑资料
         </span>
 
         <ChevronDown className="w-3.5 h-3.5 text-slate-400 ml-0.5 group-hover:text-white transition" />
       </button>
 
-      {/* Floating Integrated Account & Profile Center */}
+      {/* Floating Integrated Account & Profile Center (Solid 100% Opaque #101420 Container) */}
       <AnimatePresence>
         {dropdownOpen && (
           <motion.div
@@ -239,13 +239,13 @@ export function NavAuthBadges({
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: -6 }}
             transition={{ duration: 0.15 }}
-            className="absolute right-0 mt-2 w-80 sm:w-88 rounded-2xl bg-[#141824]/98 backdrop-blur-2xl border border-white/20 p-3.5 shadow-2xl z-50 text-white space-y-3"
+            className="absolute right-0 mt-2 w-80 sm:w-88 rounded-2xl bg-[#101420] border border-white/25 p-3.5 shadow-[0_12px_40px_rgba(0,0,0,0.85)] z-50 text-white space-y-3"
           >
             {/* 1. User Header & Edit Profile Action */}
-            <div className="p-3 rounded-xl bg-gradient-to-r from-blue-950/50 via-indigo-950/40 to-purple-950/30 border border-blue-500/30 space-y-2.5">
+            <div className="p-3 rounded-xl bg-[#172036] border border-blue-500/40 space-y-2.5 shadow-md">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2.5">
-                  <div className="w-10 h-10 rounded-full overflow-hidden border border-blue-400 bg-blue-500/20 flex items-center justify-center shrink-0">
+                  <div className="w-10 h-10 rounded-full overflow-hidden border border-blue-400 bg-[#1c2438] flex items-center justify-center shrink-0">
                     {googleUser?.picture ? (
                       <Image
                         src={googleUser.picture}
@@ -275,7 +275,7 @@ export function NavAuthBadges({
                     setDropdownOpen(false);
                     setEditModalOpen(true);
                   }}
-                  className="px-2.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 border border-blue-400/40 text-[11px] font-mono text-white flex items-center gap-1 font-semibold transition shadow-sm active:scale-95"
+                  className="px-2.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 border border-blue-400/50 text-[11px] font-mono text-white flex items-center gap-1 font-semibold transition shadow-md active:scale-95"
                 >
                   <Edit3 className="w-3 h-3 text-white" />
                   <span>编辑资料</span>
@@ -291,25 +291,25 @@ export function NavAuthBadges({
             </div>
 
             {/* 2. Web3 Wallet & Onchain Transfer Section */}
-            <div className="p-3 rounded-xl bg-white/[0.04] border border-white/15 space-y-2.5">
+            <div className="p-3 rounded-xl bg-[#151a28] border border-white/20 space-y-2.5 shadow-md">
               <div className="flex items-center justify-between text-xs font-mono">
-                <span className="text-slate-300 flex items-center gap-1.5 font-bold">
+                <span className="text-white flex items-center gap-1.5 font-bold">
                   <Wallet className="w-4 h-4 text-purple-400" />
                   <span>Monad 链上钱包</span>
                 </span>
-                <span className="text-[10px] text-emerald-400 font-bold bg-emerald-500/15 border border-emerald-500/30 px-2 py-0.5 rounded-full">
+                <span className="text-[10px] text-emerald-300 font-bold bg-emerald-950/60 border border-emerald-500/50 px-2 py-0.5 rounded-full">
                   {walletAddress ? `${balance} MON` : "未连接"}
                 </span>
               </div>
 
               {walletAddress ? (
                 <div className="space-y-2">
-                  <div className="flex items-center justify-between p-2 rounded-lg bg-black/40 border border-white/10 text-xs font-mono">
-                    <span className="text-slate-200">{truncateAddress(walletAddress)}</span>
+                  <div className="flex items-center justify-between p-2 rounded-lg bg-[#0d1018] border border-white/15 text-xs font-mono">
+                    <span className="text-slate-100 font-semibold">{truncateAddress(walletAddress)}</span>
                     <div className="flex items-center gap-1.5">
                       <button
                         onClick={() => copyToClipboard(walletAddress)}
-                        className="text-[10px] p-1 rounded hover:bg-white/10 text-slate-300 hover:text-white transition flex items-center gap-1"
+                        className="text-[10px] px-1.5 py-0.5 rounded bg-[#20273c] hover:bg-[#2c3652] text-slate-200 hover:text-white transition flex items-center gap-1 border border-white/10"
                         title="复制地址"
                       >
                         {copied ? (
@@ -323,7 +323,7 @@ export function NavAuthBadges({
                         href={`${monadTestnet.blockExplorers.default.url}/address/${walletAddress}`}
                         target="_blank"
                         rel="noreferrer"
-                        className="text-[10px] p-1 rounded hover:bg-white/10 text-slate-300 hover:text-white transition"
+                        className="text-[10px] p-1 rounded bg-[#20273c] hover:bg-[#2c3652] text-slate-200 hover:text-white transition border border-white/10"
                         title="在区块浏览器查看"
                       >
                         <ExternalLink className="w-3 h-3" />
@@ -338,7 +338,7 @@ export function NavAuthBadges({
                         setDropdownOpen(false);
                         setTransferModalOpen(true);
                       }}
-                      className="py-1.5 px-2 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-xs font-mono font-semibold transition flex items-center justify-center gap-1.5 shadow-sm active:scale-95"
+                      className="py-1.5 px-2 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-xs font-mono font-semibold transition flex items-center justify-center gap-1.5 shadow-md active:scale-95 border border-purple-400/40"
                     >
                       <Send className="w-3 h-3" />
                       <span>转账 MON</span>
@@ -348,7 +348,7 @@ export function NavAuthBadges({
                         setDropdownOpen(false);
                         onDisconnectWallet?.();
                       }}
-                      className="py-1.5 px-2 rounded-lg bg-red-500/15 hover:bg-red-500/25 border border-red-500/30 text-red-300 text-xs font-mono transition flex items-center justify-center gap-1.5"
+                      className="py-1.5 px-2 rounded-lg bg-[#2a1720] hover:bg-[#3d1f2d] border border-red-500/40 text-red-300 text-xs font-mono transition flex items-center justify-center gap-1.5"
                     >
                       <LogOut className="w-3 h-3" />
                       <span>断开钱包</span>
@@ -357,7 +357,7 @@ export function NavAuthBadges({
                 </div>
               ) : (
                 <div className="space-y-2">
-                  <p className="text-[11px] text-slate-400 font-sans">
+                  <p className="text-[11px] text-slate-300 font-sans">
                     连接 Monad 钱包以进行链上转账、资产抵押与信用背书。
                   </p>
                   <button
@@ -376,16 +376,16 @@ export function NavAuthBadges({
 
             {/* 3. Identity Credential Badges (Google, GitHub, Steam) */}
             <div className="space-y-2">
-              <div className="flex items-center justify-between text-[11px] font-mono text-slate-300 px-0.5">
-                <span className="flex items-center gap-1">
+              <div className="flex items-center justify-between text-[11px] font-mono text-slate-200 px-0.5">
+                <span className="flex items-center gap-1 font-semibold">
                   <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
                   <span>多轨身份背书与授信</span>
                 </span>
-                <span className="text-[9px] text-emerald-400 font-mono">额度增强</span>
+                <span className="text-[9px] text-emerald-300 font-mono bg-emerald-950/60 px-1.5 py-0.2 rounded border border-emerald-500/30">额度增强</span>
               </div>
 
               {/* Google Row */}
-              <div className="p-2 rounded-xl bg-white/[0.03] border border-white/10 flex items-center justify-between">
+              <div className="p-2.5 rounded-xl bg-[#151a28] border border-white/15 flex items-center justify-between shadow-sm">
                 <div className="flex items-center gap-2">
                   <svg className="w-4 h-4" viewBox="0 0 24 24">
                     <path fill="#EA4335" d="M12 5c1.6 0 3 .6 4.1 1.6l3.1-3.1C17.3 1.8 14.8 1 12 1 7.5 1 3.7 3.6 1.9 7.3l3.7 2.9C6.5 7.4 9 5 12 5z" />
@@ -398,7 +398,7 @@ export function NavAuthBadges({
                       <span>Google 认证</span>
                       {googleUser && <CheckCircle2 className="w-3 h-3 text-blue-400" />}
                     </div>
-                    <div className="text-[10px] font-mono text-slate-400 truncate max-w-[130px]">
+                    <div className="text-[10px] font-mono text-slate-300 truncate max-w-[130px]">
                       {googleUser ? googleUser.email : "+$1,200 USD 授信"}
                     </div>
                   </div>
@@ -409,7 +409,7 @@ export function NavAuthBadges({
                       localStorage.removeItem("koliance_google_profile");
                       syncAuthState();
                     }}
-                    className="text-[10px] font-mono px-2 py-0.5 rounded bg-red-500/10 hover:bg-red-500/20 text-red-300 border border-red-500/20 transition"
+                    className="text-[10px] font-mono px-2 py-1 rounded bg-[#2a1720] hover:bg-[#3d1f2d] text-red-300 border border-red-500/40 transition"
                   >
                     解除
                   </button>
@@ -417,31 +417,31 @@ export function NavAuthBadges({
                   <div className="flex items-center gap-1">
                     <button
                       onClick={handleGoogleLogin}
-                      className="text-[10px] font-mono px-2 py-0.5 rounded bg-blue-600 hover:bg-blue-500 text-white font-bold transition shadow-sm"
+                      className="text-[10px] font-mono px-2.5 py-1 rounded bg-blue-600 hover:bg-blue-500 text-white font-bold transition shadow-sm"
                     >
                       登录
                     </button>
                     <button
                       onClick={handleInstantGoogleDemo}
                       title="模拟登录"
-                      className="p-1 rounded bg-white/10 hover:bg-white/20 text-slate-300"
+                      className="p-1 rounded bg-[#222a42] hover:bg-[#2c3652] text-slate-200 border border-white/10"
                     >
-                      <Sparkles className="w-2.5 h-2.5 text-blue-300" />
+                      <Sparkles className="w-3 h-3 text-blue-300" />
                     </button>
                   </div>
                 )}
               </div>
 
               {/* GitHub Row */}
-              <div className="p-2 rounded-xl bg-white/[0.03] border border-white/10 flex items-center justify-between">
+              <div className="p-2.5 rounded-xl bg-[#151a28] border border-white/15 flex items-center justify-between shadow-sm">
                 <div className="flex items-center gap-2">
-                  <Github className="w-4 h-4 text-slate-200" />
+                  <Github className="w-4 h-4 text-white" />
                   <div>
                     <div className="text-xs font-bold text-white flex items-center gap-1">
                       <span>GitHub BUIDL</span>
                       {githubUser && <CheckCircle2 className="w-3 h-3 text-indigo-400" />}
                     </div>
-                    <div className="text-[10px] font-mono text-slate-400 truncate max-w-[130px]">
+                    <div className="text-[10px] font-mono text-slate-300 truncate max-w-[130px]">
                       {githubUser ? `@${githubUser.username}` : "+$1,000 USD 授信"}
                     </div>
                   </div>
@@ -452,14 +452,14 @@ export function NavAuthBadges({
                       localStorage.removeItem("koliance_github_user");
                       syncAuthState();
                     }}
-                    className="text-[10px] font-mono px-2 py-0.5 rounded bg-red-500/10 hover:bg-red-500/20 text-red-300 border border-red-500/20 transition"
+                    className="text-[10px] font-mono px-2 py-1 rounded bg-[#2a1720] hover:bg-[#3d1f2d] text-red-300 border border-red-500/40 transition"
                   >
                     解除
                   </button>
                 ) : (
                   <button
                     onClick={handleGithubLogin}
-                    className="text-[10px] font-mono px-2 py-0.5 rounded bg-indigo-600 hover:bg-indigo-500 text-white font-bold transition shadow-sm"
+                    className="text-[10px] font-mono px-2.5 py-1 rounded bg-indigo-600 hover:bg-indigo-500 text-white font-bold transition shadow-sm"
                   >
                     授权
                   </button>
@@ -467,7 +467,7 @@ export function NavAuthBadges({
               </div>
 
               {/* Steam Row */}
-              <div className="p-2 rounded-xl bg-white/[0.03] border border-white/10 flex items-center justify-between">
+              <div className="p-2.5 rounded-xl bg-[#151a28] border border-white/15 flex items-center justify-between shadow-sm">
                 <div className="flex items-center gap-2">
                   <Gamepad2 className="w-4 h-4 text-cyan-400" />
                   <div>
@@ -475,7 +475,7 @@ export function NavAuthBadges({
                       <span>Steam 游戏时长</span>
                       {steamUser && <CheckCircle2 className="w-3 h-3 text-cyan-400" />}
                     </div>
-                    <div className="text-[10px] font-mono text-slate-400 truncate max-w-[130px]">
+                    <div className="text-[10px] font-mono text-slate-300 truncate max-w-[130px]">
                       {steamUser ? steamUser.personaName : "+$800 USD 授信"}
                     </div>
                   </div>
@@ -486,14 +486,14 @@ export function NavAuthBadges({
                       localStorage.removeItem("koliance_steam_id");
                       syncAuthState();
                     }}
-                    className="text-[10px] font-mono px-2 py-0.5 rounded bg-red-500/10 hover:bg-red-500/20 text-red-300 border border-red-500/20 transition"
+                    className="text-[10px] font-mono px-2 py-1 rounded bg-[#2a1720] hover:bg-[#3d1f2d] text-red-300 border border-red-500/40 transition"
                   >
                     解除
                   </button>
                 ) : (
                   <button
                     onClick={handleSteamLogin}
-                    className="text-[10px] font-mono px-2 py-0.5 rounded bg-cyan-600 hover:bg-cyan-500 text-white font-bold transition shadow-sm"
+                    className="text-[10px] font-mono px-2.5 py-1 rounded bg-cyan-600 hover:bg-cyan-500 text-white font-bold transition shadow-sm"
                   >
                     绑定
                   </button>
