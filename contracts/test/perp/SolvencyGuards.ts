@@ -8,7 +8,7 @@ import { network } from "hardhat";
  * Every `it` in this file is a FALSIFICATION CASE: it reproduces an observed
  * failure of the pre-fix contracts and asserts the corrected behaviour. On the
  * pre-fix code these tests FAIL; that is their value. See
- * `docs/缺陷分析与GAP台账.md` §4.1 for the raw probe output each one encodes.
+ * `docs/planning/缺陷分析-审计报告.md` §4.1 for the raw probe output each one encodes.
  *
  * Invariant under test, in one line:
  *

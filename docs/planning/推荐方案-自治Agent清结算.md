@@ -1,9 +1,9 @@
-# Koliance 推荐方案：自治 Agent 交易与清结算
+﻿# Koliance 推荐方案：自治 Agent 交易与清结算
 
 > **文档性质**：技术方案推荐（系统架构师口径）
 > **输入依据**：`docs/自治 Agent 交易与链下高性能清结算系统技术架构设计全案.md`（下称 **RFC-001**）
 > **代码基线**：`HEAD = 27400fc4b67bd60ea90aaffaac7be7066e037dbb`（`main`，已 `git fetch` + 快进）
-> **配套文档**：`docs/执行方案-自治Agent清结算.md`（落地排期与任务分解）、`docs/缺陷分析与GAP台账.md`（GAP 编号延续处）
+> **配套文档**：`docs/执行方案-自治Agent清结算.md`（落地排期与任务分解）、`docs/planning/缺陷分析-审计报告.md`（GAP 编号延续处）
 > **编写日期**：2026-10-07
 > **统计口径**：`git ls-files`（`08c9989` 时 160 → 现 `27400fc` 共 194 个受控文件），已隔离 `node_modules` / `artifacts` / `.next`
 
@@ -37,7 +37,7 @@ HEAD = 27400fc
 
 ### 0.3 对审计结论的复核
 
-`缺陷分析与GAP台账.md` 的 4 个 P0（GAP-01/02/03/04）**全部仍然成立**：
+`缺陷分析-审计报告.md` 的 4 个 P0（GAP-01/02/03/04）**全部仍然成立**：
 
 ```
 git diff 08c9989 HEAD -- contracts/contracts/perp/ contracts/test/perp/ src/lib/perp.ts
@@ -464,7 +464,7 @@ cd backend; go build ./...; go vet ./...  # 期望 exit=0
 | S-11 | `package-lock.json` | 陈旧，与 `pnpm-lock.yaml` 冲突 | 删除或在 README 钉死 `pnpm`（GAP-28） |
 | S-12 | 所有文档 | 未记录"必须用 `pnpm install`" | 写入 README 与将来的 CI |
 
-### 5.2 未竟 GAP 台账（延续 `缺陷分析与GAP台账.md` 的编号）
+### 5.2 未竟 GAP 台账（延续 `缺陷分析-审计报告.md` 的编号）
 
 | GAP | 严重度 | 未竟事项 | 承载形式 | 依赖条件 | 可度量 DoD |
 | --- | --- | --- | --- | --- | --- |
@@ -484,7 +484,7 @@ cd backend; go build ./...; go vet ./...  # 期望 exit=0
 
 ### 5.3 与既有台账的关系
 
-`缺陷分析与GAP台账.md` 的 **GAP-01~17 全部仍然成立**（perp 合约零变化）。本方案的 **GAP-18~30** 是新增项。两组关系：
+`缺陷分析-审计报告.md` 的 **GAP-01~17 全部仍然成立**（perp 合约零变化）。本方案的 **GAP-18~30** 是新增项。两组关系：
 
 - **GAP-01~04（🔴）是本方案的绝对前置**——不修则 P0-a 不可交付，且 P1-a（funding）会建在错误的偿付模型上；
 - **GAP-18~21（🔴🟠）只在采纳 P2-b（Redis）时激活**——本方案 §3.2 的取舍 3 建议**本次不做**，正是为了避开这四条。
