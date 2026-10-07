@@ -315,8 +315,12 @@ RFC-001（`自治 Agent 交易与链下高性能清结算系统技术架构设�
 | `1ac689a` | CI 改为**所有分支**触发（原来只 main，导致 fork 分支无 CI） |
 | `e48ed61` | **CI 步骤顺序**：先 compile 再 tsc（artifacts 被 gitignore，否则 110 个类型错误） |
 | `f6ec42d` | 覆盖率按 **LF 口径** + 新增 `.gitattributes`（GAP-35） |
+| `822488e` | 台账记录 GAP-35 与两个"只有 CI 能发现"的失败 |
+
+**详细复盘见 `docs/changes/009-CI首跑修复.md`** —— 三个问题**本机全部是绿的**。
 
 **PR**：[moonhotline/koliance#5](https://github.com/moonhotline/koliance/pull/5)
+（16 提交，52 文件，CI 三 job 全绿）
 
 ---
 
@@ -332,9 +336,12 @@ RFC-001（`自治 Agent 交易与链下高性能清结算系统技术架构设�
 | `c7da777` | 类型化调用打到无代码地址 → **每笔平仓 revert** | `Does not block a close when the price updater is not a contract` | `try/catch` **不捕获**"目标无代码" |
 | `e48ed61` | CI 先 tsc 后 compile → **110 个类型错误**（本地却全绿） | 首次真实 CI 运行 | `artifacts/` 被 gitignore，viem 的合约类型从它推导 |
 | `f6ec42d` | 覆盖率阈值按 CRLF 本机读数定 → **CI 失败** | 首次真实 CI 运行 | 覆盖率插桩按字节偏移，行尾改变测量结果 |
+| `1ac689a` | workflow 从未被触发（`branches: [main]` 不覆盖 feature 分支） | `gh pr checks` 零 check-run | fork 的 PR 运行需要 base 分支已有 workflow |
 
-**共性**：五条都不是逻辑想错，而是**对一个库/语言/环境行为的错误假设**
-（整数除法舍入、try/catch 的边界、空分母、返回值的字段顺序、构建产物与行尾对测量的影响）。
-**其中两条只有真实 CI 才能发现**——本机怎么跑都是绿的。
+**共性**：六条都不是逻辑想错，而是**对一个库/语言/环境行为的错误假设**
+（整数除法舍入、try/catch 的边界、空分母、返回值的字段顺序、
+构建产物被 gitignore、行尾对测量结果的影响）。
 
-> 这正是不写测试、不接 CI 就一定会在演示现场暴露的那类问题。
+**其中三条只有真实 CI 才能发现** —— 本机怎么跑都是绿的。
+**这是"CI 到底值不值"这个问题的答案，由 CI 自己给出。**
+详见 `docs/changes/009-CI首跑修复.md`。
