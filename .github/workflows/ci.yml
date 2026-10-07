@@ -52,8 +52,18 @@ jobs:
       - name: Compile contracts
         run: npx hardhat compile
 
-      - name: Test
-        run: npx hardhat test
+      # --coverage is Hardhat 3's built-in flag; unlike solidity-coverage it
+      # needs no extra dependency (and the third-party tools declare a
+      # hardhat ^2 peer, so they do not work here at all).
+      - name: Test with coverage
+        run: npx hardhat test --coverage
+
+      # Hardhat's coverage config accepts only `skipFiles` - there is no
+      # threshold option, so the report alone would let a regression pass
+      # silently. This reads the lcov the run just produced and fails below the
+      # floor. See scripts/check-coverage.ts for what is in scope and why.
+      - name: Enforce coverage floor
+        run: npx tsx scripts/check-coverage.ts
 
   frontend:
     name: frontend (next + vitest)
