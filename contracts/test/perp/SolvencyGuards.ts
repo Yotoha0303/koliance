@@ -1,4 +1,4 @@
-import assert from "node:assert/strict";
+﻿import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { network } from "hardhat";
 
@@ -149,7 +149,7 @@ describe("Solvency guards (GAP-01/02/03/04/05)", async function () {
 
     // After the largest permitted exit the trader must still be paid in full.
     const before = await token.read.balanceOf([trader.account.address]);
-    await pm.write.closePosition([id, []], { account: trader.account });
+    await pm.write.closePosition([id, 0n, 0n, []], { account: trader.account });
     const gained = (await token.read.balanceOf([trader.account.address])) - before;
 
     assert.ok(gained > 0n, "trader must be paid after the LP's maximum exit");
@@ -201,7 +201,7 @@ describe("Solvency guards (GAP-01/02/03/04/05)", async function () {
     assert.ok(equity < 0n, "position is under water — the hazard case");
 
     // Pre-fix: reverted, leaving isOpen == true and the margin stranded forever.
-    await pm.write.closePosition([id, []], { account: trader.account });
+    await pm.write.closePosition([id, 0n, 0n, []], { account: trader.account });
     assert.equal(await pm.read.isOpen([id]), false, "position must close, not brick");
   });
 
@@ -216,7 +216,7 @@ describe("Solvency guards (GAP-01/02/03/04/05)", async function () {
     const p = await pm.read.getPosition([id]);
     assert.ok(p.payoutCapUsd > 0n, "a payout cap must exist");
 
-    await pm.write.closePosition([id, []], { account: trader.account });
+    await pm.write.closePosition([id, 0n, 0n, []], { account: trader.account });
     assert.equal(await pm.read.isOpen([id]), false, "a capped close must still settle");
   });
 

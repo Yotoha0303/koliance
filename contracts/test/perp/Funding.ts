@@ -1,4 +1,4 @@
-import assert from "node:assert/strict";
+﻿import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { network } from "hardhat";
 
@@ -260,7 +260,7 @@ describe("Funding", async function () {
     const owed = await pm.read.fundingOwed([id]);
     assert.ok(owed > 0n, "the lone long must owe funding");
 
-    await pm.write.closePosition([id, []], { account: long.account });
+    await pm.write.closePosition([id, 0n, 0n, []], { account: long.account });
 
     // Without funding the payout would be the full 999 collateral less the close
     // fee. Funding must come off it.
@@ -281,7 +281,7 @@ describe("Funding", async function () {
     await mine(50);
 
     const publicClient = await viem.getPublicClient();
-    await pm.write.closePosition([id, []], { account: long.account });
+    await pm.write.closePosition([id, 0n, 0n, []], { account: long.account });
 
     const events = await publicClient.getContractEvents({
       address: pm.address,
@@ -297,7 +297,7 @@ describe("Funding", async function () {
   it("stops charging a position once it is closed", async function () {
     const { pm } = await setup();
     const id = await open(pm, long, true);
-    await pm.write.closePosition([id, []], { account: long.account });
+    await pm.write.closePosition([id, 0n, 0n, []], { account: long.account });
 
     // Open interest must be released, or the book would keep charging for a
     // position that no longer exists.

@@ -3,6 +3,7 @@ pragma solidity ^0.8.31;
 
 import {IPositionManager} from "./interfaces/IPositionManager.sol";
 import {IPriceOracle} from "./interfaces/IPriceOracle.sol";
+import {IPyth} from "./interfaces/IPyth.sol";
 import {IVault} from "./interfaces/IVault.sol";
 import {IERC20} from "./interfaces/IERC20.sol";
 import {Ownable} from "./utils/Ownable.sol";
@@ -104,10 +105,28 @@ contract PositionManager is IPositionManager, Ownable {
     error InsufficientPoolCapacity(uint256 requiredUsd, uint256 availableUsd);
     error InvalidFundingRate(int256 rate);
 
+    /// @notice `closePosition` was called after its deadline.
+    error DeadlinePassed(uint256 deadline);
+    /// @notice The payout came out below the caller's floor.
+    error InsufficientOutput(uint256 payoutUsd, uint256 minOutUsd);
+
     event PriceUpdaterSet(address indexed priceUpdater);
 
     /// @notice The per-block funding rate was set.
     event FundingRateSet(int256 ratePerBlockWad);
+
+    /// @notice A best-effort price push succeeded.
+    /// @dev Named distinctly from `PythOracleAdapter.PricePushed` so the two are
+    ///      not confused when reading logs: this one says the manager forwarded
+    ///      an update, that one says Pyth accepted it. Worth emitting even on
+    ///      success — it is the only positive evidence that the oracle's own
+    ///      staleness window is being refreshed rather than quietly elapsing.
+    event PricePushSucceeded(address indexed updater, uint256 updateCount);
+
+    /// @notice A best-effort price push failed and was swallowed.
+    /// @dev The trade still proceeds; this is the signal that it proceeded on a
+    ///      price nobody refreshed. Silence here was the old behaviour.
+    event PricePushFailed(address indexed updater, uint256 updateCount);
 
     /// @notice Emitted when a single position's bounty cannot be paid during a
     ///         batch liquidation. The position is still closed; only the bounty
@@ -341,7 +360,22 @@ contract PositionManager is IPositionManager, Ownable {
     ///         `Vault.payOut` rejects a zero-USDC payout, and for a position whose
     ///         equity is a few wei of USD the honest settlement is "you get
     ///         nothing" — not "you can never close".
-    function closePosition(uint256 positionId, bytes[] calldata pythUpdateData) external {
+    ///
+    ///      `minOutUsd` and `deadline` exist because the exit price is whatever
+    ///      the oracle reports when the transaction lands, and on the Pyth path
+    ///      that price is chosen by the `pythUpdateData` the caller supplies. That
+    ///      is a real exposure on a public mempool: a close can be held and
+    ///      included against a worse print than the one the trader simulated.
+    ///      Both checks happen BEFORE any state changes, so a rejected close
+    ///      leaves the position open and untouched rather than half-settled.
+    function closePosition(
+        uint256 positionId,
+        uint256 minOutUsd,
+        uint256 deadline,
+        bytes[] calldata pythUpdateData
+    ) external {
+        if (deadline != 0 && block.timestamp > deadline) revert DeadlinePassed(deadline);
+
         Position memory p = _requireOpen(positionId);
         if (p.owner != msg.sender) revert NotPositionOwner(positionId, msg.sender);
 
@@ -367,6 +401,11 @@ contract PositionManager is IPositionManager, Ownable {
 
         equity = _applyCloseFee(equity);
         equity = _payableUsd(equity);
+
+        // Checked against the payable figure, because that is what the trader
+        // actually receives. Comparing the pre-truncation number would let a
+        // close through that pays less than the floor by up to one USDC unit.
+        if (equity < minOutUsd) revert InsufficientOutput(equity, minOutUsd);
 
         _close(positionId, p);
 
@@ -524,13 +563,52 @@ contract PositionManager is IPositionManager, Ownable {
     // ==================== INTERNAL ====================
 
     function _pushPrices(bytes[] calldata pythUpdateData) internal {
-        if (priceUpdater == address(0) || pythUpdateData.length == 0) return;
-        // Best-effort: a stale or already-applied update must not block a close or
-        // a liquidation. The staleness check that matters is `getPrice`'s own.
-        (bool ok, ) = priceUpdater.call(
-            abi.encodeWithSignature("updatePriceFeeds(bytes[])", pythUpdateData)
-        );
-        ok; // deliberately ignored
+        address updater = priceUpdater;
+        if (updater == address(0) || pythUpdateData.length == 0) return;
+
+        // The `code.length` guard is load-bearing, not defensive theatre.
+        //
+        // A typed call to an address holding no code reverts with "function call
+        // to a non-contract account", and — measured, not assumed — that revert
+        // is NOT caught by the `try` below, because the code-existence check
+        // happens before the call rather than inside it. Without this guard a
+        // misconfigured `priceUpdater` (an EOA, a typo'd address) would revert
+        // every close and every liquidation. That is GAP-01 arriving by a new
+        // route: positions that cannot be closed.
+        //
+        // So a bad updater degrades to "the push is skipped and reported",
+        // which is the behaviour the low-level call used to give us by accident.
+        if (updater.code.length == 0) {
+            emit PricePushFailed(updater, pythUpdateData.length);
+            return;
+        }
+
+        // Typed call through IPyth, not `abi.encodeWithSignature`.
+        //
+        // The string version was a real hazard: if the signature ever drifted
+        // from what the adapter implements, the selector would hit no function
+        // and the call would simply miss — no revert, no event, no trace. The
+        // only thing guarding it was one test asserting a counter moved. A typed
+        // call turns that class of mistake into a compile error, and type-checks
+        // the argument encoding rather than trusting a hand-written string.
+        //
+        // `updatePriceFeeds` is declared payable on IPyth because the real Pyth
+        // contract charges a fee for it. `PythOracleAdapter` reimplements it as
+        // non-payable and funds the fee from its own balance, which is fine to
+        // call with zero value — payability is not part of the selector.
+        try IPyth(updater).updatePriceFeeds(pythUpdateData) {
+            emit PricePushSucceeded(updater, pythUpdateData.length);
+        } catch {
+            // Best-effort by design. A stale or unfundable update must not brick
+            // a close or a liquidation, because `getPrice` performs its own
+            // staleness check and that is the one that decides correctness.
+            //
+            // But it must not be invisible either. Before this, a push that
+            // failed — wrong address, depleted MON balance, malformed update —
+            // left the caller with no signal at all: the trade succeeded and
+            // only the price silently aged.
+            emit PricePushFailed(updater, pythUpdateData.length);
+        }
     }
 
     function _requireOpen(uint256 positionId) internal view returns (Position memory p) {

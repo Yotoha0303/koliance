@@ -170,6 +170,8 @@ export const POSITION_MANAGER_ABI = [
     stateMutability: "nonpayable",
     inputs: [
       { name: "positionId", type: "uint256" },
+      { name: "minOutUsd", type: "uint256" },
+      { name: "deadline", type: "uint256" },
       { name: "pythUpdateData", type: "bytes[]" },
     ],
     outputs: [],

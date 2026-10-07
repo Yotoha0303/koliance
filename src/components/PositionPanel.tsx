@@ -355,11 +355,25 @@ export function PositionPanel({ account }: { account: `0x${string}` | null }) {
   const handleClose = (id: bigint) =>
     run(`close-${id}`, `已平仓 #${id}`, async () => {
       const wc = writeClient()!;
+      // A close executes at whatever the oracle reports when it lands, and on a
+      // Pyth deployment that price comes from the update data the caller
+      // supplies. Sending no protection means a close can be held and included
+      // against a much worse print than the one shown here.
+      //
+      // So: the payout the row already displays becomes a floor, with a small
+      // tolerance for the funding that accrues between render and execution, and
+      // a two-minute deadline. Set both to zero to opt out.
+      const row = rows.find((r) => r.id === id);
+      const shown = row ? (row.equity > 0n ? row.equity : 0n) : 0n;
+      const tolerance = shown / 50n; // 2%
+      const minOutUsd = shown > tolerance ? shown - tolerance : 0n;
+      const deadline = BigInt(Math.floor(Date.now() / 1000) + 120);
+
       return wc.writeContract({
         address: PERP_ADDRESSES.positionManager,
         abi: POSITION_MANAGER_ABI,
         functionName: "closePosition",
-        args: [id, []],
+        args: [id, minOutUsd, deadline, []],
       });
     });
 

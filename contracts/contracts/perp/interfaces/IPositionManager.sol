@@ -75,7 +75,36 @@ interface IPositionManager {
         bytes[] calldata pythUpdateData
     ) external returns (uint256 positionId);
 
-    function closePosition(uint256 positionId, bytes[] calldata pythUpdateData) external;
+    /// @notice Close a position and receive its remaining equity.
+    ///
+    /// ⚠️ **This signature is a change to a previously frozen interface.**
+    ///
+    /// `推进方案.md:40` froze `closePosition(uint256, bytes[])` so the frontend
+    /// and the (then unstarted) Go bot could be built against it in parallel.
+    /// `minOutUsd` and `deadline` were added by GAP-07. Nothing outside this repo
+    /// consumed the old form — the perp module has never been deployed — so the
+    /// cost is the call sites in this repo, which are updated in the same change.
+    ///
+    /// **If you are building a consumer, expect this to move again**: the module
+    /// is pre-deployment and the interface has not been re-frozen.
+    ///
+    /// @param minOutUsd floor on what the trader receives, 18-decimal USD. The
+    ///        exit price is whatever the oracle reports when the transaction
+    ///        lands, and on the Pyth path it comes from caller-supplied
+    ///        `pythUpdateData` — so without a floor a close can be held and
+    ///        included against a worse print than the one that was simulated.
+    ///        Pass 0 to accept any price.
+    /// @param deadline unix seconds after which the close reverts. Pass 0 to
+    ///        disable. Guards the same exposure from the other side: a stale
+    ///        transaction that lands much later than intended.
+    /// @param pythUpdateData signed price updates, ignored when no price updater
+    ///        is wired (the DemoOracle path).
+    function closePosition(
+        uint256          positionId,
+        uint256          minOutUsd,
+        uint256          deadline,
+        bytes[] calldata pythUpdateData
+    ) external;
 
     /// @notice Batch liquidation.
     ///
