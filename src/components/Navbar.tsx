@@ -4,22 +4,12 @@ import React, { useState } from "react";
 import { motion } from "framer-motion";
 import {
   Shield,
-  Wallet,
-  ChevronDown,
-  CheckCircle2,
-  Copy,
-  LogOut,
-  ExternalLink,
   Zap,
-  Activity,
-  Layers,
   Network,
   CreditCard,
   TrendingUp,
 } from "lucide-react";
-import { truncateAddress } from "@/lib/utils";
 import { BrandIcon } from "@/components/BrandIcon";
-import { monadTestnet } from "@/lib/contract";
 import { NavAuthBadges } from "@/components/NavAuthBadges";
 
 export type NavView = "INDEX" | "DETAIL" | "PRODUCT" | "MARKET" | "AGENTCARD";
@@ -41,15 +31,6 @@ export function Navbar({
   onConnect,
   onDisconnect,
 }: NavbarProps) {
-  const [copied, setCopied] = useState(false);
-  const [dropdownOpen, setDropdownOpen] = useState(false);
-
-  const copyToClipboard = () => {
-    if (!account) return;
-    navigator.clipboard.writeText(account);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
 
   const navItems: Array<{ id: NavView; label: string; icon: React.ReactNode; badge?: string }> = [
     { id: "INDEX", label: "INDEX", icon: <Zap className="w-3.5 h-3.5" /> },
@@ -121,11 +102,8 @@ export function Navbar({
           })}
         </nav>
 
-        {/* Network & High-End Contrast Wallet Button & Web2 Auth Badges */}
+        {/* Network & Unified Account Center */}
         <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
-          {/* Identity & Social Login Badges (Google, GitHub, Steam) */}
-          <NavAuthBadges walletAddress={account} />
-
           {/* Monad Testnet Pill */}
           <div className="hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/[0.04] border border-white/[0.08] text-xs font-mono text-slate-300">
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
@@ -134,79 +112,13 @@ export function Navbar({
             <span className="text-slate-400 text-[10px]">#10143</span>
           </div>
 
-          {/* Wallet Button */}
-          {account ? (
-            <div className="relative">
-              <button
-                onClick={() => setDropdownOpen(!dropdownOpen)}
-                className="flex items-center gap-2 px-3.5 py-1.5 sm:py-2 rounded-xl bg-white/[0.06] border border-white/20 hover:border-white/40 text-xs sm:text-sm font-medium transition-all text-white shadow-sm"
-              >
-                <div className="w-2 h-2 rounded-full bg-emerald-400" />
-                <span className="font-mono text-xs text-white">{truncateAddress(account)}</span>
-                <span className="hidden sm:inline text-xs px-2 py-0.5 rounded bg-white/10 text-slate-200 font-mono">
-                  {balance} MON
-                </span>
-                <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
-              </button>
-
-              {dropdownOpen && (
-                <div className="absolute right-0 mt-2 w-56 rounded-2xl bg-[#141824] border border-white/15 p-2 shadow-2xl z-50 animate-in fade-in zoom-in-95 duration-150">
-                  <div className="px-3 py-2 border-b border-white/10 mb-1">
-                    <p className="text-[11px] text-slate-400 font-mono">Connected Account</p>
-                    <p className="text-xs font-mono text-white truncate mt-0.5">{account}</p>
-                    <p className="text-[11px] font-mono text-emerald-400 mt-1">{balance} MON</p>
-                  </div>
-
-                  <button
-                    onClick={copyToClipboard}
-                    className="w-full flex items-center justify-between px-3 py-2 rounded-lg hover:bg-white/5 text-xs text-slate-300 hover:text-white transition"
-                  >
-                    <span className="flex items-center gap-2">
-                      {copied ? (
-                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                      ) : (
-                        <Copy className="w-3.5 h-3.5" />
-                      )}
-                      {copied ? "Copied!" : "Copy Address"}
-                    </span>
-                  </button>
-
-                  <a
-                    href={`${monadTestnet.blockExplorers.default.url}/address/${account}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="w-full flex items-center justify-between px-3 py-2 rounded-lg hover:bg-white/5 text-xs text-slate-300 hover:text-white transition"
-                  >
-                    <span className="flex items-center gap-2">
-                      <ExternalLink className="w-3.5 h-3.5" />
-                      View on Explorer
-                    </span>
-                  </a>
-
-                  <button
-                    onClick={() => {
-                      setDropdownOpen(false);
-                      onDisconnect();
-                    }}
-                    className="w-full flex items-center justify-between px-3 py-2 rounded-lg hover:bg-red-500/20 text-xs text-red-400 hover:text-red-300 transition mt-1"
-                  >
-                    <span className="flex items-center gap-2">
-                      <LogOut className="w-3.5 h-3.5" />
-                      Disconnect
-                    </span>
-                  </button>
-                </div>
-              )}
-            </div>
-          ) : (
-            <button
-              onClick={onConnect}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white hover:bg-slate-100 text-black font-semibold text-xs sm:text-sm transition-all shadow-[0_2px_12px_rgba(255,255,255,0.18)] active:scale-95"
-            >
-              <Wallet className="w-4 h-4 text-black" />
-              <span>Connect</span>
-            </button>
-          )}
+          {/* User Account / Profile Center: Avatar, Edit Profile, Connect Wallet, Transfer MON, Identity Badges */}
+          <NavAuthBadges
+            walletAddress={account}
+            balance={balance}
+            onConnectWallet={onConnect}
+            onDisconnectWallet={onDisconnect}
+          />
         </div>
       </div>
     </header>
