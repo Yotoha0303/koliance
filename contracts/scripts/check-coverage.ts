@@ -57,10 +57,32 @@ const INCLUDED_PREFIXES = [
  * `branchesFound === 0` path now reports `n/a` and refuses to score, rather than
  * inventing a number.
  *
- * Measured at the time of writing: lines 93.98. The floor sits a point below so
- * ordinary churn does not trip it, while a real regression still does.
+ * ⚠️ THE NUMBER IS LINE-ENDING SENSITIVE. Read this before changing the floor.
+ *
+ * Hardhat maps executed bytecode back to source by BYTE OFFSET, so a CRLF
+ * checkout and an LF checkout do not measure the same thing from identical code.
+ * Measured on this repo, same solc, same tests:
+ *
+ *   CRLF working tree (Windows default)   94.37%
+ *   LF working tree   (Linux, and CI)     89.22%
+ *
+ * The floor was first set to 93% from a local 94.37%, and CI failed on its first
+ * real run at 89.22% — the floor had been calibrated against an artifact of the
+ * machine it was measured on.
+ *
+ * LF IS THE AUTHORITATIVE FIGURE, because that is what CI and every Linux
+ * contributor sees. `.gitattributes` now pins `*.sol` to LF so a Windows checkout
+ * agrees too. Any future reading should be taken from a tree that has been
+ * re-checked out under those attributes — not from a long-lived Windows working
+ * tree, which will read optimistically high.
+ *
+ * 88% sits a point under the LF-measured 89.22%, for the same reason as before:
+ * a floor at the current number fails on the next unrelated refactor and gets
+ * deleted, while one a point down still catches a real regression. Raising it is
+ * the goal; `SafeCast.sol` at 50% and the revert branches in `Vault` and
+ * `PythOracleAdapter` are where the missing lines are.
  */
-const MIN_LINE_PCT = 93;
+const MIN_LINE_PCT = 88;
 /** Only enforced when the report actually carries branch records. */
 const MIN_BRANCH_PCT = 76;
 
