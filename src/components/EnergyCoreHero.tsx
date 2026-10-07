@@ -383,7 +383,7 @@ export function EnergyCoreHero({ onLaunchDApps, onExploreDetails }: EnergyCoreHe
           transition={{ duration: 0.7, delay: 0.1 }}
           className="text-4xl sm:text-6xl md:text-7xl font-black tracking-tight text-white uppercase font-sans leading-none"
         >
-          KOLIANCE <span className="text-purple-400">//</span>{" "}
+          KOLIANCE <span className="text-purple-400">{"//"}</span>{" "}
           <span className="text-gradient">TRUST ARCHITECTURE</span>
         </motion.h1>
 

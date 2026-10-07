@@ -76,7 +76,7 @@ export function Navbar({
                 KOLIANCE
               </span>
               <span className="hidden md:inline-block text-[10px] text-slate-400 font-mono">
-                // TRUST ARCHITECTURE
+                {"//"} TRUST ARCHITECTURE
               </span>
               <span className="text-[9px] uppercase font-mono px-1.5 py-0.2 rounded bg-white/[0.08] text-slate-200 border border-white/[0.12]">
                 10k TPS

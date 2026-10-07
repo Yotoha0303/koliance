@@ -7,6 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
+    "type-check": "tsc --noEmit",
+    "type:lint": "tsc --noEmit && next lint",
+    "test": "vitest run",
     "contract:compile": "cd contracts && npx hardhat compile",
     "contract:deploy": "cd contracts && npx hardhat ignition deploy ignition/modules/Koliance.ts --network monadTestnet",
     "backend:run": "cd backend && go run cmd/api/main.go"
@@ -29,9 +32,15 @@
     "@types/node": "^22.13.4",
     "@types/react": "^19.0.8",
     "@types/react-dom": "^19.0.3",
+    "@vitejs/plugin-react": "^6.1.2",
     "autoprefixer": "^10.4.20",
+    "eslint": "^8.57.0",
+    "eslint-config-next": "^15.2.0",
     "postcss": "^8.5.2",
+    "reflect-metadata": "^0.2.2",
     "tailwindcss": "^3.4.17",
-    "typescript": "^5.7.3"
+    "typeorm": "^1.1.1",
+    "typescript": "^5.7.3",
+    "vitest": "^4.1.11"
   }
 }

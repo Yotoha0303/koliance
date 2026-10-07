@@ -1,17 +1,7 @@
-package main
+-- Koliance Database Schema & Composite Indexes Migration
+-- Target: PostgreSQL / Supabase
 
-import (
-	"context"
-	"fmt"
-	"log"
-	"os"
-	"time"
-
-	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/joho/godotenv"
-)
-
-const schemaSQL = `
+-- 1. Cards Table
 CREATE TABLE IF NOT EXISTS cards (
     card_id VARCHAR(64) PRIMARY KEY,
     card_number VARCHAR(32) NOT NULL,
@@ -25,6 +15,7 @@ CREATE TABLE IF NOT EXISTS cards (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- 2. Card Transactions Table
 CREATE TABLE IF NOT EXISTS card_transactions (
     tx_id VARCHAR(64) PRIMARY KEY,
     card_id VARCHAR(64) REFERENCES cards(card_id) ON DELETE CASCADE,
@@ -39,6 +30,7 @@ CREATE TABLE IF NOT EXISTS card_transactions (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- 3. Session Keys Table
 CREATE TABLE IF NOT EXISTS session_keys (
     key_hex VARCHAR(128) PRIMARY KEY,
     card_id VARCHAR(64) REFERENCES cards(card_id) ON DELETE CASCADE,
@@ -52,6 +44,7 @@ CREATE TABLE IF NOT EXISTS session_keys (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- 4. Game Proofs Table
 CREATE TABLE IF NOT EXISTS game_proofs (
     proof_hash VARCHAR(128) PRIMARY KEY,
     steam_id VARCHAR(64) NOT NULL,
@@ -65,6 +58,7 @@ CREATE TABLE IF NOT EXISTS game_proofs (
     generated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- 5. Market Orders Table
 CREATE TABLE IF NOT EXISTS market_orders (
     order_id VARCHAR(128) PRIMARY KEY,
     symbol VARCHAR(32) NOT NULL,
@@ -75,7 +69,7 @@ CREATE TABLE IF NOT EXISTS market_orders (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Google OAuth Accounts mapping
+-- 6. Google Accounts Table
 CREATE TABLE IF NOT EXISTS google_accounts (
     google_id VARCHAR(128) PRIMARY KEY,
     email VARCHAR(256) NOT NULL,
@@ -104,41 +98,3 @@ CREATE INDEX IF NOT EXISTS idx_game_proofs_steam_app ON game_proofs(steam_id, ap
 
 -- 6. Google accounts index by email and wallet
 CREATE INDEX IF NOT EXISTS idx_google_accounts_email_wallet ON google_accounts(email, wallet_address);
-`
-
-func main() {
-	_ = godotenv.Load()
-	_ = godotenv.Load("../.env")
-
-	dbURL := os.Getenv("DATABASE_URL")
-	if dbURL == "" {
-		log.Fatal("DATABASE_URL environment variable is required")
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-	defer cancel()
-
-	fmt.Println("⏳ Connecting to Supabase PostgreSQL...")
-	pool, err := pgxpool.New(ctx, dbURL)
-	if err != nil {
-		log.Fatalf("❌ Failed to parse/connect to Supabase: %v", err)
-	}
-	defer pool.Close()
-
-	if err := pool.Ping(ctx); err != nil {
-		log.Fatalf("❌ Supabase ping failed: %v", err)
-	}
-	fmt.Println("✅ Successfully connected to Supabase PostgreSQL!")
-
-	fmt.Println("⏳ Initializing database schema...")
-	if _, err := pool.Exec(ctx, schemaSQL); err != nil {
-		log.Fatalf("❌ Schema initialization failed: %v", err)
-	}
-
-	fmt.Println("🎉 Database tables successfully created/verified in Supabase:")
-	fmt.Println("   ├─ cards")
-	fmt.Println("   ├─ card_transactions")
-	fmt.Println("   ├─ session_keys")
-	fmt.Println("   ├─ game_proofs")
-	fmt.Println("   └─ market_orders")
-}

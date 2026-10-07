@@ -42,6 +42,7 @@ import {
 } from "@/lib/api";
 import { SteamGameWall, SteamGameItem } from "@/components/SteamGameWall";
 import { GitHubDevWall } from "@/components/GitHubDevWall";
+import { GoogleAuthWall, GoogleProfile } from "@/components/GoogleAuthWall";
 
 interface AgentCardTerminalProps {
   currentAccount: `0x${string}` | null;
@@ -105,8 +106,8 @@ export function AgentCardTerminal({ currentAccount }: AgentCardTerminalProps) {
     setCardTilt({ rotateX: 0, rotateY: 0, glareX: 50, glareY: 50, active: false });
   };
 
-  // ==================== 1. ATTESTATION (STEAM & GITHUB) ====================
-  const [attestationTab, setAttestationTab] = useState<"steam" | "github">("steam");
+  // ==================== 1. ATTESTATION (STEAM, GITHUB, GOOGLE) ====================
+  const [attestationTab, setAttestationTab] = useState<"steam" | "github" | "google">("steam");
   const [steamConnected, setSteamConnected] = useState(false);
   const [steamLoading, setSteamLoading] = useState(false);
   const [steamData, setSteamData] = useState<GameStats | null>(null);
@@ -403,10 +404,21 @@ export function AgentCardTerminal({ currentAccount }: AgentCardTerminalProps) {
               <Code2 className="w-4 h-4" />
               <span>GitHub 开源贡献背书 (Proof of BUIDL)</span>
             </button>
+            <button
+              onClick={() => setAttestationTab("google")}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold font-mono transition ${
+                attestationTab === "google"
+                  ? "bg-blue-500/20 text-blue-300 border border-blue-400/40 shadow-sm"
+                  : "text-slate-400 hover:text-white"
+              }`}
+            >
+              <Sparkles className="w-4 h-4 text-blue-400" />
+              <span>Google 开发者认证 (OAuth 2.0)</span>
+            </button>
           </div>
 
           <span className="text-[11px] font-mono text-slate-400 hidden md:inline-block">
-            双轨信用背书并行生效 · 共同增强 AgentCard Visa 授信额度
+            三轨信用背书 (Steam + GitHub + Google) 并行生效 · 共同增强 AgentCard Visa 授信额度
           </span>
         </div>
 
@@ -533,6 +545,16 @@ export function AgentCardTerminal({ currentAccount }: AgentCardTerminalProps) {
             currentAccount={currentAccount}
             onProofMinted={(proof) => {
               setCreditLimit((prev) => prev + proof.creditUnlockUSD);
+            }}
+          />
+        )}
+
+        {/* Tab 3: Google Proof of Identity (OAuth 2.0 / TypeORM Sync) */}
+        {attestationTab === "google" && (
+          <GoogleAuthWall
+            walletAddress={targetAddress}
+            onProfileSynced={(profile) => {
+              setCreditLimit((prev) => prev + profile.creditAllowanceUSD);
             }}
           />
         )}
