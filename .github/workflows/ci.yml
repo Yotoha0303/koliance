@@ -1,0 +1,104 @@
+name: CI
+
+# Every test in this repository was, until now, an "outside-the-door" test: 134
+# of them ran only on whoever's laptop happened to remember. The gate matrix in
+# 提示词.md requires 100% of new cases to execute in CI, so this workflow is what
+# turns the suite into something that can actually fail a change.
+#
+# Three independent jobs rather than one, because the three toolchains install
+# differently and a broken frontend install should not mask a broken contract:
+#
+#   contracts/  its own npm project (package-lock.json, npm ci)
+#   root        pnpm (pnpm-lock.yaml v9)
+#   backend/    go modules
+#
+# Note the split deliberately: `contracts/` is NOT part of the pnpm install, and
+# the root `package-lock.json` is stale (it predates @supabase/supabase-js), so
+# `npm ci` at the root would install a tree that fails `tsc`. Root uses pnpm.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# A superseded run on the same ref is wasted work; cancel it.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  contracts:
+    name: contracts (hardhat + solc)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: contracts
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: contracts/package-lock.json
+
+      - run: npm ci
+
+      # Hardhat 3 only compiles .sol, so a separate tsc pass is required to catch
+      # cross-module type errors in the test and ignition files.
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Compile contracts
+        run: npx hardhat compile
+
+      - name: Test
+        run: npx hardhat test
+
+  frontend:
+    name: frontend (next + vitest)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Unit tests
+        run: npx vitest run
+
+      - name: Lint
+        run: npx next lint
+
+      # A build is the only thing that catches a route that typechecks but does
+      # not render, e.g. a client component reaching for a browser global.
+      - name: Build
+        run: npx next build
+
+  backend:
+    name: backend (go)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+          cache-dependency-path: backend/go.sum
+
+      - run: go build ./...
+      - run: go vet ./...

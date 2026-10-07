@@ -11,11 +11,11 @@ async function main() {
     process.exit(1);
   }
 
-  const { viem } = await network.getOrCreate();
+  const { viem, networkName } = await network.getOrCreate();
   const [sender] = await viem.getWalletClients();
   const publicClient = await viem.getPublicClient();
 
-  console.log(`\n🌐 当前网络: ${network.name}`);
+  console.log(`\n🌐 当前网络: ${networkName}`);
   console.log(`👤 操作账户: ${sender.account.address}`);
   console.log(`📍 KolToken 合约: ${contractAddress}`);
 

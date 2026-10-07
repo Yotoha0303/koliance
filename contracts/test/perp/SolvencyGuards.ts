@@ -167,7 +167,6 @@ describe("Solvency guards (GAP-01/02/03/04/05)", async function () {
       pm.write.openPosition([NVDA, usdc(1_000), 500_000n, true, []], {
         account: trader.account,
       }),
-      undefined,
       "a position whose payout cap exceeds the pool must be refused at open"
     );
   });
