@@ -17,8 +17,19 @@ name: CI
 # `npm ci` at the root would install a tree that fails `tsc`. Root uses pnpm.
 
 on:
+  # Every branch, not just main.
+  #
+  # `branches: [main]` was the first version, and it was wrong for how this repo
+  # actually works: contributors push feature branches to their fork, and the PR
+  # comes from the fork. A main-only push trigger means a feature branch gets NO
+  # CI until the PR lands upstream, so the contributor never sees the result of
+  # their own change and the maintainer is the first to find out.
+  #
+  # Worse, a fork's pull_request run needs the upstream repo to have Actions
+  # enabled and the workflow present on the base branch - neither of which holds
+  # here. Running on every push removes that dependency for the contributor.
   push:
-    branches: [main]
+    branches: ["**"]
   pull_request:
 
 # A superseded run on the same ref is wasted work; cancel it.
