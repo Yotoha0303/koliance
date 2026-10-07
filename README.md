@@ -12,25 +12,33 @@ Koliance 是构建在 **Monad 高并发并行 EVM Testnet**（Chain ID: `10143`�
 
 ## 🔑 核心集成与 API 凭证配置
 
-### ## 您的 Steam Web API 密钥
-- **密钥**: `745B577BC3554647B4FA40BE9635E838`
-- **域名名称**: `koliance.oodai.space`
-- **已集成接口**:
-  - `GetPlayerSummaries`：获取玩家昵称与头像
-  - `GetOwnedGames`：获取玩家全量游戏库及各游戏总时长
-  - `GetPlayerAchievements`：获取游戏成就解锁时间与状态
-  - 密码学证明引擎：生成 Keccak256 证明哈希并记录至 `Koliance.sol`
+> ⚠️ **凭证不再写入本文档。** 此前 Steam / Alpaca / Stripe 的密钥以明文列在这里，
+> 在公开仓库中等同于已泄露。已移除，改为从环境变量读取。
+>
+> **这不能撤销泄露**：这些值仍在 git 历史、`backend/internal/config/config.go:38-44`
+> 与 `render.yaml:17-28` 中。**必须轮换密钥**。修完之前，本仓库不应公开。
+> 跟踪编号 `GAP-12`，见 `docs/GAP台账.md`。
 
-### 📈 Alpaca 美股与衍生品交易凭证 (Paper Trading)
-- **API 端点**: `https://paper-api.alpaca.markets/v2`
-- **Key ID**: `PK2SMWLLV64SKRMOJJCQUHUANB`
-- **Secret**: `Eh8yhX5FKFUKhKt3L5dQY7e6MGsJs7XZaCrw6PtcMtgU`
-- **账户能力**: 自带 \$100,000 体验金，支持美股做多 (Long)、做空 (Short)、1x~4x 日内杠杆与实时行情。
+需要的环境变量（本地放 `.env.local` / `backend/.env`，部署放平台的环境变量面板）：
 
-### 💳 Stripe 支付与发票集成
-- **可发布密钥**: `pk_test_51UMQCbEP5h4ijOX4RfqfeOsj5flpshzH2814PRH1FIvK8kPn79Goucx9sAfzvnkVIzdU30f60ozxkD0FC9vejNM300uNY0C82o`
-- **Secret 密钥**: 配置于环境变量 `STRIPE_SECRET_KEY`（沙盒测试模式 `sk_test_...`）
-- **集成服务**: Checkout Sessions, Payments, Billing, Invoicing, Connect 账户。
+| 变量 | 用途 |
+| --- | --- |
+| `STEAM_API_KEY` | Steam Web API |
+| `STEAM_DOMAIN` | 回调域名，默认 `koliance.oodai.space` |
+| `ALPACA_API_KEY` / `ALPACA_API_SECRET` | Alpaca Paper 行情与交易 |
+| `ALPACA_BASE_URL` | 默认 `https://paper-api.alpaca.markets/v2` |
+| `STRIPE_SECRET_KEY` | Stripe 服务端调用（`sk_test_...`） |
+| `STRIPE_PUBLISHABLE_KEY` | 前端可发布密钥（`pk_test_...`） |
+| `DATABASE_URL` | Supabase PostgreSQL 连接串 |
+| `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` | GitHub OAuth |
+| `NEXT_PUBLIC_PERP_*` | 永续合约地址，见 `.env.example` |
+
+**已集成的能力**（不含凭证）：
+
+- **Steam**：`GetPlayerSummaries` / `GetOwnedGames` / `GetPlayerAchievements`，
+  以及生成 Keccak256 证明哈希的密码学证明引擎。
+- **Alpaca**：Paper 账户自带 \$100,000 体验金，支持做多/做空、实时行情。
+- **Stripe**：Checkout Sessions、Payments、Billing、Invoicing、Connect。
 
 ---
 
@@ -89,6 +97,17 @@ koliance/
 
 ## 🚀 快速启动指南
 
+> **包管理器必须是 pnpm，不要用 npm。** 根目录只有 `pnpm-lock.yaml`；
+> 曾经的 `package-lock.json` 已删除（它早于 `@supabase/supabase-js` 的引入，
+> 用它安装会得到一棵 `tsc` 跑不过的依赖树 —— 实测 23 个类型错误）。
+> `contracts/` 是**独立的 npm 工程**，那里仍然用 `npm ci`。
+
+### 安装依赖
+```bash
+pnpm install --frozen-lockfile        # 根目录（前端）
+cd contracts && npm ci                # 合约（独立工程）
+```
+
 ### 启动 Go 后端微服务
 ```bash
 cd backend
@@ -105,9 +124,20 @@ go run cmd/api/main.go
 
 ### 启动 Next.js 前端
 ```bash
-npm run dev
+pnpm dev
 ```
 打开浏览器访问 `http://localhost:3000` 即可体验全套完整交互。
+永续合约终端在 `http://localhost:3000/perp`。
+
+### 本地跑全部检查（与 CI 一致）
+```bash
+npx tsc --noEmit && npx vitest run && npx next lint && npx next build
+cd contracts && npx tsc --noEmit && npx hardhat test
+cd backend   && go build ./... && go vet ./... && go test -race ./...
+```
+
+> **未竟事项见 `docs/GAP台账.md`** —— 那是本项目唯一的缺口台账，持续更新。
+> 规划类文档在 `docs/planning/`，架构决策在 `docs/adr/`，变更记录在 `docs/changes/`。
 
 ---
 
