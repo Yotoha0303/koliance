@@ -46,12 +46,12 @@
 | GAP-04 | `maxPnlCap` 未实现 + 开仓无偿付护栏 | 🔴 P0 | ✅ | `0193e3a` |
 | GAP-05 | 破产头寸清算赏金为 0（激励反向） | 🟠 P1 | ✅ | `0193e3a` |
 | GAP-06 | 前端/链上清算价同源无一致性测试 | 🟠 P1 | 🟠 | 需链上对拍 |
-| GAP-07 | `closePosition` 无价格时效/滑点约束 | 🟠 P1 | 🟠 | — |
-| GAP-08 | `_pushPrices` 字符串签名 + 失败无观测 | 🟡 P2 | 🟠 | — |
-| GAP-09 | `perpConfig.ts` 的 FEEDS 与链上实测矛盾 | 🟡 P2 | ✅ | 本分支 |
+| GAP-07 | `closePosition` 无价格时效/滑点约束 | 🟠 P1 | ✅ | `c7da777` |
+| GAP-08 | `_pushPrices` 字符串签名 + 失败无观测 | 🟡 P2 | ✅ | `c7da777` |
+| GAP-09 | `perpConfig.ts` 的 FEEDS 与链上实测矛盾 | 🟡 P2 | ✅ | `df227bf` |
 | GAP-10 | 无 CI，全部用例是"门外用例" | 🟡 P2 | ✅ | `2b05f05` |
 | GAP-11 | 缺工程骨架目录 | 🟡 P2 | 🟠 | 部分完成 |
-| GAP-12 | 凭证硬编码（6 处，含 README 明文） | 🟡 P2 | 🔴 | **需人工轮换密钥** |
+| GAP-12 | 凭证硬编码（6 处，含 README 明文） | 🟡 P2 | 🔴 | **需人工轮换密钥**；README 已清理 |
 | GAP-13 | 后端零链上交互 + `/health` 伪指标 | 🟡 P2 | 🟠 | — |
 | GAP-14 | 合成随机行情以"实时数据"形态返回 | 🟡 P2 | 🟠 | — |
 | GAP-15 | `docs/changes` 先写后填纪律从未执行 | 🟠 P1 | ✅ | `0193e3a` 起 |
@@ -70,8 +70,10 @@
 | GAP-28 | 双 lockfile，`npm ci` 装过期树 | 🟡 P2 | 🟠 | — |
 | GAP-29 | 缺 `deploy/` 目录 | 🟡 P2 | 🟠 | — |
 | GAP-30 | Redis 额度池 | 🟡 P2 | ⬜ | 需先修 GAP-18~21 |
-| GAP-31 | 规划文档在仓库外，协作者看不到 | 🟡 P2 | ✅ | 本分支（`docs/planning/`） |
-| GAP-32 | 覆盖率阈值未配 | 🟡 P2 | 🟠 | — |
+| GAP-31 | 规划文档在仓库外，协作者看不到 | 🟡 P2 | ✅ | `df227bf`（`docs/planning/`） |
+| GAP-32 | 覆盖率阈值未配 | 🟡 P2 | ✅ | `506c4ef`（合约侧；前端见 GAP-33） |
+| GAP-33 | 前端覆盖率未配 | 🟡 P2 | 🟠 | `@vitest/coverage-v8` 可用 |
+| GAP-34 | `closePosition` 破坏冻结后未重新冻结 | 🟠 P1 | 🟠 | 见 §3.1 |
 
 ---
 
@@ -161,8 +163,46 @@ npx hardhat run scripts/demo-seed.ts --network monadTestnet
 
 **阻塞**：轮换密钥需要外部后台操作（Steam / Alpaca / Stripe / GitHub），无法用代码完成。
 
-**建议的最小动作**（不阻塞其他工作）：先从 `README.md` 删除明文凭证——
-仓库若公开即等同泄露，而这一步只需 1 分钟。
+**已完成的部分**（`50c51d8`）：`README.md` 的明文凭证已移除，改为环境变量清单表。
+**但 git 历史无法清理**，所以泄露已成事实，**必须轮换**。
+
+**建议顺序**（不可颠倒）：
+1. 轮换四组密钥（**外部操作**）
+2. 再改 `config.go` / `render.yaml`，把默认值改为空串（缺失即启动失败）
+3. 最后处理 `exchange/route.ts` 的 OAuth secret fallback
+
+顺序颠倒会得到"用一个缺失的配置换掉了一个已泄露的密钥"，服务直接挂。
+
+---
+
+### 3.1 GAP-34：`closePosition` 破坏冻结后未重新冻结
+
+`推进方案.md:40` 把 `closePosition(uint256, bytes[])` 定为**冻结接口**，
+目的是让前端与 Go Bot 能并行开发。
+
+GAP-07 加了 `minOutUsd` 与 `deadline`（`c7da777`），**冻结被破坏**。
+
+**核查过的代价**（所以是可接受的）：
+- 消费方只有本仓库的测试与前端面板，均已同批更新；
+- Go Bot 的接链部分不存在（GAP-26）；
+- **perp 模块从未部署**（`deployed_addresses.json` 只有身份合约）。
+
+**未竟**：接口现在处于"**已破冻结、未重新冻结**"的状态。
+`IPositionManager.sol` 的 natspec 已写明这一点，并警告消费方"预期它还会变"。
+
+**要做的事**：若 Go Bot 接链要与前端并行开发，**先按现在的签名重新冻结**，
+并更新 `推进方案.md:40`。在此之前不要对外承诺接口稳定性。
+
+---
+
+### 3.2 GAP-33：前端覆盖率未配
+
+合约侧已有门禁（GAP-32 ✅）。前端侧 `@vitest/coverage-v8@4.1.11` 已确认可安装。
+
+**要做的事**：装 provider → `vitest.config.mts` 加 `coverage.thresholds` →
+`vitest run --coverage` 加进 CI frontend job。
+注意前端单测目前只有 23 条且集中在 `src/lib/perp.ts`，覆盖率会很低——
+**先量化再定阈值**，不要拍一个数字上去然后被删掉。
 
 ---
 
@@ -187,15 +227,14 @@ RFC-001（`自治 Agent 交易与链下高性能清结算系统技术架构设�
 
 | 编号 | 事项 | 起点 | 预估 |
 | --- | --- | --- | --- |
-| GAP-28 | 删 `package-lock.json`（陈旧），README 钉死 `pnpm install --frozen-lockfile` | 删除 + 文档 | 15 分钟 |
-| GAP-32 | 覆盖率阈值：合约侧 `solidity-coverage`，前端 `vitest --coverage` | 配置 + CI 步骤 | 半天 |
+| GAP-33 | 前端覆盖率阈值 | 装 `@vitest/coverage-v8`，**先量化再定阈值** | 半天 |
 | GAP-29 | `deploy/` 目录（若确需；Render 已够用则可标 ⬜） | — | — |
-| GAP-07 | `closePosition` 加 `minOut` 滑点约束 | `PositionManager.sol` | 半天 |
-| GAP-08 | `_pushPrices` 改用 `IPyth(priceUpdater)` + 失败发事件 | `PositionManager.sol` | 半天 |
+| GAP-11 | 补 `deploy/` 与顶层 `tests/` 的骨架 | — | 30 分钟 |
+| GAP-25 | `agentcard` 全局锁 → 需先写基准测试量化 | `backend/internal/agentcard` | 1 天 |
 | GAP-06 | 前端强平价与链上对拍测试 | 需要链上部署 | 依赖 GAP-16 |
 | GAP-13 | 后端接 go-ethereum，`/health` 改为真实探活 | `backend/` | 1 天 |
 | GAP-14 | `/api/market` 的 `Math.random` 路径标注为合成数据并在 UI 明示 | `src/app/api/market/route.ts` | 半天 |
-| GAP-11 | 补 `deploy/` 与顶层 `tests/` 的骨架 | — | 30 分钟 |
+| GAP-34 | 重新冻结 `closePosition` 并更新 `推进方案.md:40` | `IPositionManager.sol` | 30 分钟 |
 
 ---
 
@@ -215,7 +254,8 @@ RFC-001（`自治 Agent 交易与链下高性能清结算系统技术架构设�
 
 | 指标 | 数值 | 命令 |
 | --- | --- | --- |
-| 合约测试 | **138 passing**（3 solidity, 135 nodejs） | `cd contracts && npx hardhat test` |
+| 合约测试 | **146 passing**（3 solidity, 143 nodejs） | `cd contracts && npx hardhat test` |
+| 合约覆盖率 | **94.37% 行**（门禁 93%） | `cd contracts && npx hardhat test --coverage && npx tsx scripts/check-coverage.ts` |
 | 合约类型检查 | exit 0 | `cd contracts && npx tsc --noEmit` |
 | 前端单测 | **23 passing**（3 files） | `npx vitest run` |
 | 前端类型检查 | exit 0 | `npx tsc --noEmit` |
@@ -224,7 +264,8 @@ RFC-001（`自治 Agent 交易与链下高性能清结算系统技术架构设�
 | 后端构建/静态检查 | exit 0 | `cd backend && go build ./... && go vet ./...` |
 | 后端测试 | **29 passing**，`-race` | `cd backend && go test -race ./...` |
 
-**本轮基线变化**：合约 111 → 138（+27），前端单测 9 → 23（+14），后端 0 → 29。
+**本轮基线变化**：合约 111 → **146**（+35），前端单测 9 → **23**（+14），后端 0 → **29**。
+覆盖率从 0 → **94.37%**（带门禁）。
 
 ---
 
@@ -236,5 +277,26 @@ RFC-001（`自治 Agent 交易与链下高性能清结算系统技术架构设�
 | `2c0e353` | `scripts/demo-seed.ts` 按出金上限定容 |
 | `36fc5be` | 前端接线：`/perp` + `PositionPanel` + `perpAbi` |
 | `2b05f05` | CI 门禁（GAP-10）+ 修 3 个既有类型错误（2 个非本人引入） |
-| `8d9c715` | 清算 Bot 核心：头寸数学镜像 + 本地 nonce 管理器 |
-| （本次） | 逐块资金费率（GAP-27，ADR-003）+ 本台账 |
+| `8d9c715` | 清算 Bot 核心：头寸数学镜像 + 本地 nonce 管理器（GAP-26 部分） |
+| `1e85092` | 逐块资金费率（GAP-27，ADR-003）+ 本台账 |
+| `df227bf` | 规划文档迁入仓库（GAP-31）+ 修 FEEDS 矛盾（GAP-09） |
+| `50c51d8` | 删陈旧 lockfile（GAP-28）+ README 去明文凭证（GAP-12 部分） |
+| `506c4ef` | 覆盖率门禁（GAP-32） |
+| `c7da777` | 平仓退出保护（GAP-07）+ 推送可观测（GAP-08） |
+
+---
+
+## 9. 修复过程中引入又修掉的真实回归（供参考）
+
+这些是**修 A 引入 B** 的案例，值得记下来，因为它们都是"读代码看不出来、跑测试才暴露"的：
+
+| 提交 | 引入的回归 | 抓到它的测试 | 根因 |
+| --- | --- | --- | --- |
+| `1e85092` | 资金费无侧向符号 → 两侧被收同样的费，空头永远收不到钱 | `charges the crowded side and pays the thin side` | 资金费退化为手续费 |
+| `1e85092` | `_equityAfterFunding` 漏了 `collateral` | `Pays a winning long out of the pool` | 权益凭空少一整个抵押品 |
+| `506c4ef` | 覆盖率脚本在**无分支数据**的报告上打印"branches 100%" | 自己怀疑那个 100% 并 grep 原始文件 | 空分母被当成 100% |
+| `c7da777` | 类型化调用打到无代码地址 → **每笔平仓 revert** | `Does not block a close when the price updater is not a contract` | `try/catch` **不捕获**"目标无代码" |
+
+**共性**：四条都不是逻辑想错，而是**对一个库/语言行为的错误假设**
+（整数除法舍入、try/catch 的边界、空分母、返回值的字段顺序）。
+这正是不写测试就一定会在演示现场暴露的那类问题。
