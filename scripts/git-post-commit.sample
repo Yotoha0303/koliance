@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# Git post-commit hook: 自动将 commit message 作为上下文推送到 Supabase
+# ==============================================================================
+
+# 获取当前最新的 commit message
+COMMIT_MSG=$(git log -1 --pretty=%B | tr '\r\n' ' ' | sed 's/^[ \t]*//;s/[ \t]*$//')
+
+# 过滤掉 merge commit 或自动格式化信息
+if [[ "$COMMIT_MSG" =~ ^Merge ]] || [ -z "$COMMIT_MSG" ]; then
+    exit 0
+fi
+
+SCRIPT_PATH="$(git rev-parse --show-toplevel)/scripts/sync-context.sh"
+
+if [ -f "$SCRIPT_PATH" ]; then
+    # 后台异步同步，不阻断 Git commit 本身
+    "$SCRIPT_PATH" "$COMMIT_MSG" >/dev/null 2>&1 &
+fi
+
+exit 0

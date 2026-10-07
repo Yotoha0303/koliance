@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# Git post-merge hook: 在 git pull 后自动打印最新的上下文供开发者和 AI 参考
+# ==============================================================================
+
+SCRIPT_PATH="$(git rev-parse --show-toplevel)/scripts/sync-context.sh"
+
+if [ -f "$SCRIPT_PATH" ]; then
+    echo ""
+    echo "==================== [Koliance Dev Context Sync] ===================="
+    "$SCRIPT_PATH" pull 3 || true
+    echo "====================================================================="
+    echo ""
+fi
+
+exit 0
