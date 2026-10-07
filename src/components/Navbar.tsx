@@ -104,16 +104,8 @@ export function Navbar({
           })}
         </nav>
 
-        {/* Network & Unified Account Center */}
+        {/* Unified Account Center */}
         <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
-          {/* Monad Testnet Pill (Solid Background) */}
-          <div className="hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#141824] border border-white/15 text-xs font-mono text-slate-200 shadow-sm">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-            <span className="w-2 h-2 -ml-4 rounded-full bg-emerald-400" />
-            <span>Monad Testnet</span>
-            <span className="text-slate-400 text-[10px]">#10143</span>
-          </div>
-
           {/* User Account / Profile Center: Avatar, Edit Profile, Connect Wallet, Transfer MON, Identity Badges */}
           <NavAuthBadges
             walletAddress={account}
