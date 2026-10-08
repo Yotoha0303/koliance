@@ -75,6 +75,21 @@ interface IPositionManager {
         bytes[] calldata pythUpdateData
     ) external returns (uint256 positionId);
 
+    /// @notice Open a position on behalf of a delegating user.
+    /// @dev The agent path — see `PositionManager.openPositionFor`. The position
+    ///      owner is the delegating user; `msg.sender` funds it and pays gas.
+    function openPositionFor(
+        address          sessionKey,
+        bytes32          feedId,
+        uint256          collateralAmount,
+        uint256          leverageBps,
+        bool             isLong,
+        bytes[] calldata pythUpdateData
+    ) external returns (uint256 positionId);
+
+    /// @notice Point the manager at a delegation registry, enabling the agent path.
+    function setSessionKeyRegistry(address registry) external;
+
     /// @notice Close a position and receive its remaining equity.
     ///
     /// ⚠️ **This signature is a change to a previously frozen interface.**

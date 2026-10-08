@@ -78,7 +78,7 @@
 | GAP-21 | RFC `daily_spent` 无重置机制 | 🟠 P1 | ⬜ | 同上 |
 | GAP-22 | RFC 未引用仓库已有 `agentcard` 委托模块 | 🟠 P1 | ⬜ | 设计决策 |
 | GAP-23 | RFC 架构与仓库分层不兼容 + 4 处内部矛盾 | 🔴 P0 | ⬜ | 设计决策 |
-| GAP-24 | 三套 Session Key 模型互不兼容 | 🟠 P1 | 🟠 | **部分**：链上模型已建并验证（`013`）；Go 侧未升级 |
+| GAP-24 | 三套 Session Key 模型互不兼容 | 🟠 P1 | 🟠 | **链上闭环**（`013`+`014`）；Go 侧仍用 `sk_sess_` |
 | GAP-25 | 全局锁串行化 vs 10,000 TPS 目标 | 🟠 P1 | ⬜ | 无基准测试 |
 | GAP-26 | perp 未部署 / 未接线 / 无 Bot | 🔴 P0 | 🟠 | 部分；见 §3 |
 | GAP-27 | 逐块资金费率未实现（赛道靶心） | 🟠 P1 | ✅ | 本分支 |
@@ -383,7 +383,6 @@ ZK Validator 空接口（§3.4）、EIP-712 授权语义（改为升级 `agentca
 | GAP-13 | 后端接 go-ethereum，`/health` 改为真实探活 | `backend/` | 1 天 |
 | GAP-14 | `/api/market` 的 `Math.random` 路径标注为合成数据并在 UI 明示 | `src/app/api/market/route.ts` | 半天 |
 | GAP-34 | 重新冻结 `closePosition` 并更新 `推进方案.md:34-37` | `IPositionManager.sol` | 30 分钟 |
-| **GAP-24 衔接** | 让 `PositionManager` 开仓路径查询 `SessionKeyRegistry`（打穿「Agent 持 session key 交易」的最后一公里） | `contracts/contracts/perp/` | 半天 |
 
 ---
 
@@ -456,6 +455,9 @@ ZK Validator 空接口（§3.4）、EIP-712 授权语义（改为升级 `agentca
 
 **再一轮（线程 B）**：EIP-712 链上委托 `SessionKeyRegistry.sol`（`推荐方案` P1-b）
 + 19 例测试（7 正向 / 12 证伪）+ 纳入覆盖率门禁 + ignition 模块。详见 `docs/changes/013-线程B-EIP712链上委托.md`。
+
+**再一轮（打通连接）**：`openPositionFor` + `SessionKeyRegistry.chargeSpend`（具名消费方，两入口一套规则）
+——Agent 持 session key 在链上开仓，用户签一次后不再碰钱包。178 用例通过。详见 `docs/changes/014-打通连接-Agent链上开仓.md`。
 
 **PR**：[moonhotline/koliance#5](https://github.com/moonhotline/koliance/pull/5)
 （16 提交，52 文件，CI 三 job 全绿）

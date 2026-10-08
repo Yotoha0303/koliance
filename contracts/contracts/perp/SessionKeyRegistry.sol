@@ -91,6 +91,16 @@ contract SessionKeyRegistry is Ownable {
     /// appends.
     mapping(address sessionKey => Delegation) private _delegations;
 
+    /// @notice The module authorised to *charge* a delegation on a user's behalf.
+    /// @dev See `setSpendConsumer`. Distinct from the agent: the agent decides
+    ///      to act, this decides to bill. On the perp path they differ — the
+    ///      manager charges, the agent acts.
+    ///
+    ///      This is a contract, and that is deliberate: billing authority
+    ///      belongs to whatever can prove the action happened, and on this
+    ///      repository that is `PositionManager`.
+    address public spendConsumer;
+
     /// @dev Replay guard. While unrevoked, a delegation is a bearer instrument,
     ///      so the same signed payload must not register twice — including
     ///      after a revoke, which is what makes revocation stick.
@@ -109,6 +119,7 @@ contract SessionKeyRegistry is Ownable {
     event DelegationRevoked(address indexed user, address indexed sessionKey);
     event SessionKeyFrozen(address indexed sessionKey, address indexed by);
     event SessionKeyUnfrozen(address indexed sessionKey, address indexed by);
+    event SpendConsumerSet(address indexed consumer);
 
     // `ZeroAddress` is inherited from `Ownable`; redeclaring it here shadows
     // the parent's error and Hardhat refuses the duplicate declaration.
@@ -118,6 +129,7 @@ contract SessionKeyRegistry is Ownable {
     error ValidityInThePast(uint256 validUntil, uint256 currentTime);
     error SessionKeyAlreadyBound(address sessionKey, address user);
     error SelfDelegation();
+    error NoSpendConsumerSet();
     error NoSuchDelegation(address sessionKey);
     error DelegationIsRevoked(address sessionKey);
     error DelegationIsFrozen(address sessionKey);
@@ -268,13 +280,41 @@ contract SessionKeyRegistry is Ownable {
     }
 
     // ---------------------------------------------------------------------
+    // Configuration
+    // ---------------------------------------------------------------------
+
+    /// @notice Authorise a module to charge delegations without being the agent.
+    /// @dev Why this exists rather than loosening the caller check: on the perp
+    ///      path the *manager contract* is the one that must move the counter,
+    ///      because the manager is what knows a position was actually opened.
+    ///      The agent cannot charge itself after the fact — that would be a
+    ///      caller asserting its own spend succeeded, which is exactly what the
+    ///      registry exists to prevent. So the consumer is named explicitly, by
+    ///      the registry's owner, and only this one address gets the privilege.
+    ///
+    ///      The designated consumer is expected to be a contract — on this
+    ///      repository it is `PositionManager`, which is the only party that
+    ///      knows a position actually opened. It gets exactly one new power:
+    ///      calling `chargeSpend`, which applies the same caps `authorizeSpend`
+    ///      does. It does not get to act as the agent, and it cannot move funds,
+    ///      because this registry never holds any.
+    ///
+    ///      Setting it to zero disables the module path again.
+    function setSpendConsumer(address consumer) external onlyOwner {
+        spendConsumer = consumer;
+        emit SpendConsumerSet(consumer);
+    }
+
+    // ---------------------------------------------------------------------
     // Spending
     // ---------------------------------------------------------------------
 
     /// @notice Authorise one spend against a session key's delegation.
-    /// @dev Callable by the delegated agent or by the user who granted it.
-    ///      Anyone else is refused, so a passer-by cannot burn a user's daily
-    ///      window with junk calls.
+    /// @dev Callable by the delegated agent, by the user who granted it, or by
+    ///      the module named in `spendConsumer` (see `setSpendConsumer` for why
+    ///      that third caller is named explicitly rather than assumed). Anyone
+    ///      else is refused, so a passer-by cannot burn a user's daily window
+    ///      with junk calls.
     ///
     ///      The window is a rolling 24 hours anchored at the delegation's start
     ///      (or at the first spend after the previous window closed). It
@@ -282,13 +322,43 @@ contract SessionKeyRegistry is Ownable {
     ///      GAP-21: `daily_spent` never came back down, so a user hit their cap
     ///      exactly once and permanently.
     function authorizeSpend(address sessionKey, uint256 amount) external returns (bool) {
+        Delegation storage d = _delegations[sessionKey];
+        if (!d.exists) revert NoSuchDelegation(sessionKey);
+        if (d.revoked) revert DelegationIsRevoked(sessionKey);
+
+        // The agent bills itself here. The user may too — the principal can
+        // always exercise its own permission. A *third-party* module does not
+        // come through this function; it uses `chargeSpend`, which is the only
+        // entry that `spendConsumer` unlocks. Keeping the two separate is what
+        // stops "the consumer may charge" from quietly becoming "the consumer
+        // may charge while pretending to be the agent".
+        if (msg.sender != d.agent && msg.sender != d.user) revert NotAuthorizedCaller(msg.sender);
+
+        return _charge(sessionKey, amount);
+    }
+
+    /// @notice Charge a delegation from the designated consuming module.
+    /// @dev The agent path cannot use `authorizeSpend` when a contract is the
+    ///      one that knows the action happened. On the perp path the manager is
+    ///      that contract: it must move the counter *after* a position actually
+    ///      opened, and it cannot be the agent, because the agent is an EOA.
+    ///
+    ///      So the owner names one module, and that module — and only it — may
+    ///      charge. The caps themselves are still applied by `_charge`, in one
+    ///      place, so a consumer cannot charge past a limit that `authorizeSpend`
+    ///      would have refused. Two entry points, one rule.
+    function chargeSpend(address sessionKey, uint256 amount) external returns (bool) {
+        if (msg.sender != spendConsumer || spendConsumer == address(0)) revert NotAuthorizedCaller(msg.sender);
+        return _charge(sessionKey, amount);
+    }
+
+    /// @dev The single place spend rules are applied, whatever the caller.
+    function _charge(address sessionKey, uint256 amount) private returns (bool) {
         if (amount == 0) revert ZeroAmount();
 
         Delegation storage d = _delegations[sessionKey];
         if (!d.exists) revert NoSuchDelegation(sessionKey);
         if (d.revoked) revert DelegationIsRevoked(sessionKey);
-
-        if (msg.sender != d.agent && msg.sender != d.user) revert NotAuthorizedCaller(msg.sender);
 
         // Freeze is checked before expiry so the caller sees the more specific
         // reason.
@@ -376,6 +446,22 @@ contract SessionKeyRegistry is Ownable {
         // Mirror the roll the write path would perform, without performing it.
         uint256 spent = block.timestamp >= d.windowStart + ONE_DAY ? 0 : d.spentInWindow;
         return spent + amount <= d.dailySpendLimit;
+    }
+
+    /// @notice The user who granted this session key its authority.
+    /// @dev `address(0)` when there is no delegation. Exposed as a narrow view
+    ///      rather than having consumers read `getDelegation` and pick fields
+    ///      out: `PositionManager` needs exactly this pair, and a consumer that
+    ///      reaches into the struct is a consumer that breaks when the struct
+    ///      changes. See `ISessionKeyRegistry`.
+    function delegationOwner(address sessionKey) external view returns (address) {
+        return _delegations[sessionKey].user;
+    }
+
+    /// @notice The agent the user named in the delegation.
+    /// @dev `address(0)` when there is no delegation.
+    function delegationAgent(address sessionKey) external view returns (address) {
+        return _delegations[sessionKey].agent;
     }
 
     /// @notice Remaining allowance in the current window.

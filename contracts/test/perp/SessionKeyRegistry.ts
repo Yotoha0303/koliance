@@ -556,6 +556,47 @@ describe("SessionKeyRegistry (EIP-712 delegation)", async function () {
     );
   });
 
+  it("refuses chargeSpend from anyone but the designated consumer", async function () {
+    nonce = 500n;
+    await reset();
+    await register();
+
+    // `chargeSpend` is the module entry. Until a consumer is named, nobody may
+    // use it — least of all the agent itself, which would otherwise be able to
+    // assert its own spend succeeded.
+    await expectRevert(
+      registry.write.chargeSpend([sessionKey, MAX_PER_TX], { account: agent.account }),
+      "NotAuthorizedCaller",
+    );
+
+    // Name a consumer, and then confirm the agent still cannot use the module
+    // path — the privilege belongs to the address, not to the role.
+    await registry.write.setSpendConsumer([outsider.account.address], { account: deployer.account });
+
+    await expectRevert(
+      registry.write.chargeSpend([sessionKey, MAX_PER_TX], { account: agent.account }),
+      "NotAuthorizedCaller",
+    );
+
+    // The named consumer can, and the caps still apply to it.
+    await registry.write.chargeSpend([sessionKey, MAX_PER_TX], { account: outsider.account });
+    const d = await registry.read.getDelegation([sessionKey]);
+    assert.equal(d.spentInWindow, MAX_PER_TX);
+
+    await expectRevert(
+      registry.write.chargeSpend([sessionKey, MAX_PER_TX * 3n], { account: outsider.account }),
+      "ExceededPerTxLimit",
+    );
+  });
+
+  it("refuses to designate a consumer when not the owner", async function () {
+    await reset();
+    await expectRevert(
+      registry.write.setSpendConsumer([outsider.account.address], { account: outsider.account }),
+      "NotOwner",
+    );
+  });
+
   it("refuses to act on a session key that was never registered", async function () {
     await reset();
     await expectRevert(
