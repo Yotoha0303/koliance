@@ -7,7 +7,8 @@
 >
 > **维护要求**：新增缺口立刻编号入表；修完把状态改为 ✅ 并附提交号；**不要删除已完成项**（它们是回归基线）。
 >
-> **最后更新**：2026-10-07 · 分支 `feat/perp-solvency-and-panel`
+> **最后更新**：2026-10-08 · 分支 `feat/perp-solvency-and-panel`
+> **最新登记**：GAP-36（新发现，@2026-10-08，已修）· **GAP-16 幻影路径已修、GAP-34 指针已修**（见 §3.4 / §3.5）
 
 ---
 
@@ -75,6 +76,7 @@
 | GAP-33 | 前端覆盖率未配 | 🟡 P2 | 🟠 | `@vitest/coverage-v8` 可用 |
 | GAP-34 | `closePosition` 破坏冻结后未重新冻结 | 🟠 P1 | 🟠 | 见 §3.1 |
 | GAP-35 | 全库行尾未重规范化（CRLF/LF 混用） | 🟡 P2 | 🟠 | 见 §3.3 |
+| GAP-36 | `.gitignore` 的 `ignition/deployments/` 管不到 `contracts/` 下 → 部署产物误入库 | 🟠 P1 | ✅ | 见 §3.4 |
 
 ---
 
@@ -192,7 +194,7 @@ GAP-07 加了 `minOutUsd` 与 `deadline`（`c7da777`），**冻结被破坏**。
 `IPositionManager.sol` 的 natspec 已写明这一点，并警告消费方"预期它还会变"。
 
 **要做的事**：若 Go Bot 接链要与前端并行开发，**先按现在的签名重新冻结**，
-并更新 `推进方案.md:40`。在此之前不要对外承诺接口稳定性。
+并更新 `推进方案.md:34-37`（**原写 `:40`，实测该行是「部署 `MockUSDC`」，接口冻结描述在 `:34-37`**）。在此之前不要对外承诺接口稳定性。
 
 ---
 
@@ -228,6 +230,90 @@ Windows 工作树是 CRLF、CI 是 LF。
 
 ---
 
+### 3.4 GAP-36：`.gitignore` 规则作用于错误的路径层级（2026-10-08 新发现，已修）
+
+> **与 GAP-16 的关系（重要）**：`contracts/lib/perpConfig.ts` 这个幻影路径**不是新发现**。
+> `缺陷分析-审计报告.md` 的 **S-6** 早已识别它（`触发 GAP-16`），本台账 §3 的 GAP-16 亦已覆盖。
+> 建立框架时我一度把它登记成 **GAP-37**，**经逐行核对后撤销**——那是重复编号，
+> 正是纪律 D4 要消灭的漂移。**教训：登记新缺口前必须 `git grep` 全仓检索是否已被识别；
+> 与既有编号撞车比漏登记更糟。**
+
+**GAP-36 — `.gitignore` 里这条规则从未命中过**
+
+`.gitignore` 写的是 `ignition/deployments/`，**带内部斜杠且无前导 `**/`**，因此它是**根锚定**模式，
+只匹配仓库根下的 `ignition/deployments/`。而 ignition 的实际输出在 `contracts/ignition/deployments/`，
+**规则从未命中**，3 个部署产物已被提交：
+
+```
+$ git check-ignore -v --no-index contracts/ignition/deployments/chain-10143/deployed_addresses.json
+(exit=1，无输出 = 未命中)
+
+$ git ls-files | grep ignition/deployments
+contracts/ignition/deployments/chain-10143/build-info/solc-0_8_31-*.json
+contracts/ignition/deployments/chain-10143/deployed_addresses.json
+contracts/ignition/deployments/chain-10143/journal.jsonl
+```
+
+**为什么 `artifacts/` 没同样出问题**（同文件、同区域，却是对的）：
+`artifacts/` / `cache/` / `typechain/` **没有内部斜杠**，按 gitignore 规则可在**任意层级**匹配，
+所以它们对 `contracts/` 下同样生效。**只有 `ignition/deployments/` 这一条因为多了个斜杠而失效。**
+这正是"看起来一视同仁的清单里藏了一条特例"。
+
+> ⚠️ **`check-ignore` 的陷阱**：对**已入库**的文件，`git check-ignore -v <path>` 也返回 exit=1
+> （即使规则本应忽略它），因为 git 跳过已跟踪文件。判定规则是否命中**必须加 `--no-index`**，
+> 否则会把 GAP-36 误判成"规则没问题"。
+
+**取消跟踪不丢信息**：身份合约地址已另有 4 处记录（`README.md:51`、`src/lib/contract.ts:31`、
+`docs/planning/推进方案.md:18`、`docs/planning/执行方案-自治Agent清结算.md:193`），
+且 CI 不部署、代码零引用（`git grep` 实测）。
+
+**解除条件**：根 `.gitignore` 的 `ignition/deployments/` → `**/ignition/deployments/`，
+再 `git rm --cached -r contracts/ignition/deployments`。
+
+---
+
+### 3.5 GAP-16 幻影路径 —— 已修，并纠正 S-6 的误判范围（2026-10-08）
+
+**现状**：`contracts/lib/perpConfig.ts` 这个幻影路径在**活跃文档中已清零**（`git grep` 实测）。
+
+| 文件 | 状态 |
+| --- | --- |
+| `docs/planning/推进方案.md:41` | ✅ 已改指 `src/lib/perpConfig.ts` |
+| `docs/planning/推进方案.md:133` | ✅ 同上 |
+| `docs/planning/执行方案-后端与合约.md:151` | ✅ 同上（S-6 **漏列**了这处） |
+| `src/lib/perp.ts:4` | ✅ 注释改为 `./perpConfig`（与 `:33` 的实际 `from "./perpConfig"` 一致） |
+
+**⚠️ S-6 的待改清单里有 2 处不该改 —— 这是对审计报告本身的纠正**：
+
+S-6 把 `docs/执行记录-Phase0.md:205-207, 272` 列为"应改为 `src/lib/perpConfig.ts`"。**这是误判**：
+
+- `执行记录-Phase0.md:205` 是**历史叙事**——「写共享常量时，我**最初**放在 `contracts/lib/perpConfig.ts`（因为 `推进方案.md` 第 41 行就是这么写的），前端反向导入」。
+  **它描述的正是当初放错、随后发现并迁走的过程**。把它改成 `src/` 会**抹掉问题本身**，让这条记录失去意义。
+- `:223` 同理，是"问题 2"里**回放的错误代码片段**。
+- `:272` 是那次提交的**文件清单**，`src/lib/perpConfig.ts` 本就正确。
+
+**结论**：历史记录与审计快照**不改**。修文档时"活跃方案"与"历史留痕"必须区分——
+**前者是待执行指令，后者是既有事实**。把历史改成现状，等于篡改证据链。
+（`docs/planning/缺陷分析-审计报告.md` 本身亦然：它是**时点审计结论**，
+其 `:368` 的「不存在」当时为真，不改；仅**未竟清单**的条目按本节结论视为已了结。）
+
+> **另：`GAP-34` 的错误指针已顺带修正**。`GAP-34` 引用「`推进方案.md:40`」指代接口冻结，
+> 但实测 `:40` 是「部署 `MockUSDC` + `DemoOracle`」，接口冻结描述在 **`:34-37`**。
+> `git show 8f69995:docs/planning/推进方案.md` 证实**引入 GAP-34 的那个提交里 `:40` 就已经是这行**，
+> 即该指针**自始即错**、非文档后续漂移。本文件 `:197` 与 `:331` 已改为 `:34-37`。
+
+---
+
+**常量 SSOT 的正确表述**（供各 Agent 统一口径）：
+
+| 角色 | 文件 | 说明 |
+| --- | --- | --- |
+| 链上编译期消费者 | `contracts/contracts/perp/PerpConstants.sol` | 定义 fee/margin/leverage bps |
+| 链下消费者 SSOT | `src/lib/perpConfig.ts` | **镜像**上者；Pyth feedId 只在此定义 |
+| **最终裁决者** | 部署实例的 `IPositionManager` getter 读回值 | 唯一不会过期的口径 |
+
+---
+
 ## 4. 设计决策类未竟项（GAP-22~25）
 
 RFC-001（`自治 Agent 交易与链下高性能清结算系统技术架构设计全案.md`）与本仓库现状的冲突。
@@ -256,7 +342,7 @@ RFC-001（`自治 Agent 交易与链下高性能清结算系统技术架构设�
 | GAP-06 | 前端强平价与链上对拍测试 | 需要链上部署 | 依赖 GAP-16 |
 | GAP-13 | 后端接 go-ethereum，`/health` 改为真实探活 | `backend/` | 1 天 |
 | GAP-14 | `/api/market` 的 `Math.random` 路径标注为合成数据并在 UI 明示 | `src/app/api/market/route.ts` | 半天 |
-| GAP-34 | 重新冻结 `closePosition` 并更新 `推进方案.md:40` | `IPositionManager.sol` | 30 分钟 |
+| GAP-34 | 重新冻结 `closePosition` 并更新 `推进方案.md:34-37` | `IPositionManager.sol` | 30 分钟 |
 
 ---
 
@@ -318,6 +404,10 @@ RFC-001（`自治 Agent 交易与链下高性能清结算系统技术架构设�
 | `822488e` | 台账记录 GAP-35 与两个"只有 CI 能发现"的失败 |
 
 **详细复盘见 `docs/changes/009-CI首跑修复.md`** —— 三个问题**本机全部是绿的**。
+
+**新一轮（仓库文档与 gitignore 修复）**：修 GAP-36（`.gitignore` 根锚定→`**/`）
++ 修 GAP-16 幻影路径（活跃文档 4 处）+ 修 GAP-34 错误指针 + 撤销 GAP-37（编号撞车）。
+详见 `docs/changes/010-gitignore锚定与文档路径修复.md`。
 
 **PR**：[moonhotline/koliance#5](https://github.com/moonhotline/koliance/pull/5)
 （16 提交，52 文件，CI 三 job 全绿）
