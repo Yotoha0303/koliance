@@ -8,7 +8,7 @@
 > **维护要求**：新增缺口立刻编号入表；修完把状态改为 ✅ 并附提交号；**不要删除已完成项**（它们是回归基线）。
 >
 > **最后更新**：2026-10-08 · 分支 `feat/perp-solvency-and-panel`
-> **最新登记**：GAP-36（新发现，@2026-10-08，已修）· **GAP-16 幻影路径已修、GAP-34 指针已修**（见 §3.4 / §3.5）
+> **最新登记**：**GAP-33 前端覆盖率门禁已配**（见 §3.2）· GAP-36 已修 · GAP-16 幻影路径已修 · GAP-34 指针已修（见 §3.4 / §3.5）
 
 ---
 
@@ -73,7 +73,7 @@
 | GAP-30 | Redis 额度池 | 🟡 P2 | ⬜ | 需先修 GAP-18~21 |
 | GAP-31 | 规划文档在仓库外，协作者看不到 | 🟡 P2 | ✅ | `df227bf`（`docs/planning/`） |
 | GAP-32 | 覆盖率阈值未配 | 🟡 P2 | ✅ | `506c4ef`（合约侧；前端见 GAP-33） |
-| GAP-33 | 前端覆盖率未配 | 🟡 P2 | 🟠 | `@vitest/coverage-v8` 可用 |
+| GAP-33 | 前端覆盖率未配 | 🟡 P2 | ✅ | 见 §3.2 |
 | GAP-34 | `closePosition` 破坏冻结后未重新冻结 | 🟠 P1 | 🟠 | 见 §3.1 |
 | GAP-35 | 全库行尾未重规范化（CRLF/LF 混用） | 🟡 P2 | 🟠 | 见 §3.3 |
 | GAP-36 | `.gitignore` 的 `ignition/deployments/` 管不到 `contracts/` 下 → 部署产物误入库 | 🟠 P1 | ✅ | 见 §3.4 |
@@ -198,14 +198,37 @@ GAP-07 加了 `minOutUsd` 与 `deadline`（`c7da777`），**冻结被破坏**。
 
 ---
 
-### 3.2 GAP-33：前端覆盖率未配
+### 3.2 GAP-33：前端覆盖率门禁（已关闭）
 
-合约侧已有门禁（GAP-32 ✅）。前端侧 `@vitest/coverage-v8@4.1.11` 已确认可安装。
+合约侧的地板在 `007` 配好，前端侧一直空着。现已配上（`docs/changes/011`）。
 
-**要做的事**：装 provider → `vitest.config.mts` 加 `coverage.thresholds` →
-`vitest run --coverage` 加进 CI frontend job。
-注意前端单测目前只有 23 条且集中在 `src/lib/perp.ts`，覆盖率会很低——
-**先量化再定阈值**，不要拍一个数字上去然后被删掉。
+**关键发现：`70.35%` 是个假象**。v8 不加 `include` 时**只统计被测试 import 过的文件**——
+实测全树只有 226 行参与统计。这意味着**新增一个谁都没 import 的组件，数字一点都不会降**，
+门禁会长期全绿而生产代码在无人测量地增长。加 `include: ['src/**']` 后真相是 **7.89% / 2015 行**。
+
+**范围决策**：两个极端都不可用（全树 7.89% 只说明"demo 外壳没测试"，已知且非门禁职责），
+故门禁范围取 **perp 逻辑核心** `src/lib/perp.ts` + `perpConfig.ts`，**对齐合约侧
+`INCLUDED_PREFIXES` 的同样做法**（那边也只门禁 perp 模块，不是全树）。
+
+| 指标 | 实测 | 阈值 |
+| --- | --- | --- |
+| Lines | 76.74% | **72** |
+| Branches | 60% | **55** |
+
+**刻意低于实测**——贴着实测值定的地板会在下一次无关重构时变红、然后被赶时间的人删掉
+（`check-coverage.ts` 的注释里有这条教训的原始出处）。v8 有 branch 数据，故 branches 一并门禁
+（合约侧因 Hardhat 不输出 `BRDA` 只能门禁 lines）。
+
+**范围有意留窄**：`PositionPanel.tsx`(659 行)、`/perp` 路由、`api/market` 均不在内。
+它们确实无测试，但拉进来只会得到 25% 的地板、抓不住任何东西。
+**要覆盖 UI，正确做法是先补组件测试再纳入，而不是先降阈值。**
+
+**CI 侧的关键点**：`coverage.thresholds` **只在采集覆盖率时生效**，故 CI 的
+`npx vitest run` 已改为 `npx vitest run --coverage`——否则配置里的地板在 CI 上根本不生效，
+本地绿 CI 也绿，而门禁从未运行。
+
+**负向证伪（已实跑）**：往 `perp.ts` 追加约 20 行无覆盖代码 →
+Lines 76.74%→**68.04%**、Branches 60%→**50.76%**，**两条阈值同时报错，exit=1**；工作区已还原。
 
 ---
 
@@ -335,7 +358,6 @@ RFC-001（`自治 Agent 交易与链下高性能清结算系统技术架构设�
 
 | 编号 | 事项 | 起点 | 预估 |
 | --- | --- | --- | --- |
-| GAP-33 | 前端覆盖率阈值 | 装 `@vitest/coverage-v8`，**先量化再定阈值** | 半天 |
 | GAP-29 | `deploy/` 目录（若确需；Render 已够用则可标 ⬜） | — | — |
 | GAP-11 | 补 `deploy/` 与顶层 `tests/` 的骨架 | — | 30 分钟 |
 | GAP-25 | `agentcard` 全局锁 → 需先写基准测试量化 | `backend/internal/agentcard` | 1 天 |
@@ -408,6 +430,9 @@ RFC-001（`自治 Agent 交易与链下高性能清结算系统技术架构设�
 **新一轮（仓库文档与 gitignore 修复）**：修 GAP-36（`.gitignore` 根锚定→`**/`）
 + 修 GAP-16 幻影路径（活跃文档 4 处）+ 修 GAP-34 错误指针 + 撤销 GAP-37（编号撞车）。
 详见 `docs/changes/010-gitignore锚定与文档路径修复.md`。
+
+**再一轮（03 环收口）**：前端覆盖率门禁（GAP-33 ✅）——`vitest.config.mts` 加
+带 `include` 范围的阈值 + `coverage/` 入忽略 + CI 改跑 `--coverage`。详见 `docs/changes/011-前端覆盖率门禁.md`。
 
 **PR**：[moonhotline/koliance#5](https://github.com/moonhotline/koliance/pull/5)
 （16 提交，52 文件，CI 三 job 全绿）

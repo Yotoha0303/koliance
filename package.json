@@ -10,6 +10,7 @@
     "type-check": "tsc --noEmit",
     "type:lint": "tsc --noEmit && next lint",
     "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
     "contract:compile": "cd contracts && npx hardhat compile",
     "contract:deploy": "cd contracts && npx hardhat ignition deploy ignition/modules/Koliance.ts --network monadTestnet",
     "backend:run": "cd backend && go run cmd/api/main.go"
@@ -34,6 +35,7 @@
     "@types/react": "^19.0.8",
     "@types/react-dom": "^19.0.3",
     "@vitejs/plugin-react": "^6.1.2",
+    "@vitest/coverage-v8": "^4.1.11",
     "autoprefixer": "^10.4.20",
     "eslint": "^8.57.0",
     "eslint-config-next": "^15.2.0",

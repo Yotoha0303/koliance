@@ -19,6 +19,9 @@ dist/
 # TypeScript incremental build info
 *.tsbuildinfo
 
+# Coverage output (vitest --coverage, at any depth)
+coverage/
+
 # Hardhat build output & cache
 artifacts/
 cache/
