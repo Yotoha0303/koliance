@@ -34,20 +34,6 @@ typechain/
 # Vercel
 .vercel
 
-# AI 协同框架（本地工具，不入库）
-# 按人工决定：prompts/ 的 AI 协同框架只在本地使用，不提交到远程仓库。
-# 理由：它是「AI 怎么干活」的约束与运行态，不是本项目的交付物；
-# 且 .claude/agents/ 属 Claude Code 客户端配置，各人环境不同。
-# 相对的，实质工作产出（docs/changes/、台账、运维记录）全部入库。
-AGENTS.md
-.claude/
-
-# AI 运行态产物（不入库）
-# record.md 是 AI 自身操作/执行的逐条留痕，memory.md 是可覆盖的上下文状态；
-# 二者是运行态，不是工作产出。相对的，实质产出（docs/changes/、运维记录、台账）入库。
-record.md
-memory.md
-
 # Debug & OS
 npm-debug.log*
 yarn-debug.log*
