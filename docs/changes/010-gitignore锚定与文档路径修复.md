@@ -96,7 +96,7 @@ S-6 把 `docs/执行记录-Phase0.md:205-207, 272` 列为"应改为 `src/lib/per
 ## 附：AI 协同框架（**本地工具，不入库**）
 
 本次同时建立了一套 AI 协同框架（`AGENTS.md` 约束规范 + `.claude/agents/` 六个子代理 +
-`record.md`/`memory.md` 运行态），来源是 `prompts/提示词.md` 与 `prompts/AI协同工程架构.png`。
+`record.md`/`memory.md` 运行态），来源是 `提示词.md` 与 `AI协同工程架构.png`。
 
 **按人工决定：只在本地使用，不提交到远程仓库**（已写入 `.gitignore`）。
 理由：它是「AI 怎么干活」的约束与运行态，**不是本项目的交付物**；且 `.claude/agents/` 属
