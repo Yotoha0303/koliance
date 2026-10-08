@@ -65,7 +65,7 @@
 | GAP-08 | `_pushPrices` 字符串签名 + 失败无观测 | 🟡 P2 | ✅ | `c7da777` |
 | GAP-09 | `perpConfig.ts` 的 FEEDS 与链上实测矛盾 | 🟡 P2 | ✅ | `df227bf` |
 | GAP-10 | 无 CI，全部用例是"门外用例" | 🟡 P2 | ✅ | `2b05f05` |
-| GAP-11 | 缺工程骨架目录 | 🟡 P2 | 🟠 | 部分完成 |
+| GAP-11 | 缺工程骨架目录 | 🟡 P2 | ✅ | `deploy/README.md`（发布环 runbook） |
 | GAP-12 | 凭证硬编码（6 处，含 README 明文） | 🟡 P2 | 🔴 | **需人工轮换密钥**；README 已清理 |
 | GAP-13 | 后端零链上交互 + `/health` 伪指标 | 🟡 P2 | 🟠 | — |
 | GAP-14 | 合成随机行情以"实时数据"形态返回 | 🟡 P2 | ✅ | `docs/changes/018` |
@@ -83,7 +83,7 @@
 | GAP-26 | perp 未部署 / 未接线 / 无 Bot | 🔴 P0 | 🟠 | 部分；见 §3 |
 | GAP-27 | 逐块资金费率未实现（赛道靶心） | 🟠 P1 | ✅ | 本分支 |
 | GAP-28 | 双 lockfile，`npm ci` 装过期树 | 🟡 P2 | 🟠 | — |
-| GAP-29 | 缺 `deploy/` 目录 | 🟡 P2 | 🟠 | — |
+| GAP-29 | 缺 `deploy/` 目录 | 🟡 P2 | ✅ | `docs/changes/019` |
 | GAP-30 | Redis 额度池 | 🟡 P2 | ⬜ | 需先修 GAP-18~21 |
 | GAP-31 | 规划文档在仓库外，协作者看不到 | 🟡 P2 | ✅ | `df227bf`（`docs/planning/`） |
 | GAP-32 | 覆盖率阈值未配 | 🟡 P2 | ✅ | `506c4ef`（合约侧；前端见 GAP-33） |
@@ -417,8 +417,6 @@ ZK Validator 空接口（§3.4）、EIP-712 授权语义（改为升级 `agentca
 
 | 编号 | 事项 | 起点 | 预估 |
 | --- | --- | --- | --- |
-| GAP-29 | `deploy/` 目录（若确需；Render 已够用则可标 ⬜） | — | — |
-| GAP-11 | 补 `deploy/` 与顶层 `tests/` 的骨架 | — | 30 分钟 |
 | GAP-25 | `agentcard` 全局锁 → 需先写基准测试量化 | `backend/internal/agentcard` | 1 天 |
 | GAP-13 | 后端接 go-ethereum，`/health` 改为真实探活 | `backend/` | 1 天 |
 
@@ -511,6 +509,10 @@ ZK Validator 空接口（§3.4）、EIP-712 授权语义（改为升级 `agentca
 **再一轮（可信度）**：GAP-14 关闭 —— 合成行情改用**确定性种子**（同请求恒定、跨天推进），
 来源名改为如实（`synthetic_curated` / `synthetic_fallback`），并让 UI **显示**来源与说明。
 详见 `docs/changes/018-GAP14-合成行情标注.md`。
+
+**再一轮（发布环）**：GAP-11 / GAP-29 关闭 —— `deploy/README.md` 成为**发布环 runbook**
+（含第 0 步：GAP-12 轮换凭证，附就绪改动与风险说明）；并补齐 `.env.example` 缺失的 4 个变量。
+详见 `docs/changes/019-GAP11-发布环与env补齐.md`。
 
 **PR**：[moonhotline/koliance#5](https://github.com/moonhotline/koliance/pull/5)
 （16 提交，52 文件，CI 三 job 全绿）
