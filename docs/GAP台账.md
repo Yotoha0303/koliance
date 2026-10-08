@@ -88,7 +88,7 @@
 | GAP-31 | 规划文档在仓库外，协作者看不到 | 🟡 P2 | ✅ | `df227bf`（`docs/planning/`） |
 | GAP-32 | 覆盖率阈值未配 | 🟡 P2 | ✅ | `506c4ef`（合约侧；前端见 GAP-33） |
 | GAP-33 | 前端覆盖率未配 | 🟡 P2 | ✅ | 见 §3.2 |
-| GAP-34 | `closePosition` 破坏冻结后未重新冻结 | 🟠 P1 | 🟠 | 见 §3.1 |
+| GAP-34 | `closePosition` 破坏冻结后未重新冻结 | 🟠 P1 | ✅ | 见 §3.1 |
 | GAP-35 | 全库行尾未重规范化（CRLF/LF 混用） | 🟡 P2 | 🟠 | 见 §3.3 |
 | GAP-36 | `.gitignore` 的 `ignition/deployments/` 管不到 `contracts/` 下 → 部署产物误入库 | 🟠 P1 | ✅ | 见 §3.4 |
 | GAP-37 | 面板同时显示两条口径的清算状态（一条含资金费、一条不含） | 🟠 P1 | 🟠 | 见 §3.6（**新发现**） |
@@ -208,8 +208,10 @@ GAP-07 加了 `minOutUsd` 与 `deadline`（`c7da777`），**冻结被破坏**。
 **未竟**：接口现在处于"**已破冻结、未重新冻结**"的状态。
 `IPositionManager.sol` 的 natspec 已写明这一点，并警告消费方"预期它还会变"。
 
-**要做的事**：若 Go Bot 接链要与前端并行开发，**先按现在的签名重新冻结**，
-并更新 `推进方案.md:34-37`（**原写 `:40`，实测该行是「部署 `MockUSDC`」，接口冻结描述在 `:34-37`**）。在此之前不要对外承诺接口稳定性。
+**已完成**（`docs/changes/017`）：接口已按现在的签名**重新冻结**，`推进方案.md:34-37` 已对齐实际签名，`IPositionManager.sol` 文件头新增**权威冻结清单**
+（20 函数 + 5 事件，并注明「与规划文档冲突时以本清单为准」），并由 `contracts/test/perp/FrozenSurface.ts` **机械守住**（含变异测试）。
+
+**消费方现在可以按该接口并行开发。** 但注意：模块**仍未部署**，这是对接口形状的承诺，不是「地址已存在」。
 
 ---
 
@@ -420,7 +422,6 @@ ZK Validator 空接口（§3.4）、EIP-712 授权语义（改为升级 `agentca
 | GAP-25 | `agentcard` 全局锁 → 需先写基准测试量化 | `backend/internal/agentcard` | 1 天 |
 | GAP-13 | 后端接 go-ethereum，`/health` 改为真实探活 | `backend/` | 1 天 |
 | GAP-14 | `/api/market` 的 `Math.random` 路径标注为合成数据并在 UI 明示 | `src/app/api/market/route.ts` | 半天 |
-| GAP-34 | 重新冻结 `closePosition` 并更新 `推进方案.md:34-37` | `IPositionManager.sol` | 30 分钟 |
 
 ---
 
@@ -503,6 +504,10 @@ ZK Validator 空接口（§3.4）、EIP-712 授权语义（改为升级 `agentca
 **再一轮（演示可运行）**：新增 `DemoControlPanel.tsx`（演示扳机，直接读链不经 Bot）
 + `DemoRehearsal.ts`（把彩排变成测试）；补前端 ABI 缺失的 `PositionLiquidated`。
 **发现演示自带 42 分钟资金费时钟**（seed 把费率设到上限 1e13）。详见 `docs/changes/016-演示可运行-控制台与彩排.md`。
+
+**再一轮（重新冻结）**：GAP-34 关闭 —— `IPositionManager` 接口重新冻结，
+文件头加权威冻结清单（20 函数 + 5 事件），并新增机械守卫 `FrozenSurface.ts`（含变异测试）。
+详见 `docs/changes/017-GAP34-接口重新冻结.md`。
 
 **PR**：[moonhotline/koliance#5](https://github.com/moonhotline/koliance/pull/5)
 （16 提交，52 文件，CI 三 job 全绿）
