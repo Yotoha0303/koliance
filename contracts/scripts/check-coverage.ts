@@ -38,6 +38,12 @@ const INCLUDED_PREFIXES = [
   "contracts/perp/Vault.sol",
   "contracts/perp/PythOracleAdapter.sol",
   "contracts/perp/DemoOracle.sol",
+  // ADR-004's on-chain delegation anchor. Gated for the same reason as the
+  // rest: a contract in this module that nothing measures is a contract whose
+  // regression nobody notices. It is the newest file here and the one whose
+  // failure mode (a forged or replayed delegation) is least likely to show up
+  // in a demo and most likely to matter.
+  "contracts/perp/SessionKeyRegistry.sol",
   "contracts/perp/MockUSDC.sol",
   "contracts/perp/utils/Ownable.sol",
   "contracts/perp/utils/SafeCast.sol",
