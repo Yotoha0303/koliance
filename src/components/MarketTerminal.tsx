@@ -30,6 +30,10 @@ import { fetchMarketOverview, executeMarketTrade, closeMarketPosition, MarketPos
 
 interface MarketResponse {
   source: string;
+  /** True when the series was generated rather than fetched. */
+  synthetic?: boolean;
+  /** Plain-language note on where the numbers came from, when it is not a live feed. */
+  dataCaveat?: string | null;
   meta: {
     symbol: string;
     name: string;
@@ -379,8 +383,25 @@ export function MarketTerminal({ onTradeAction }: MarketTerminalProps) {
               </span>
             </h2>
             <p className="text-xs sm:text-sm text-slate-400 font-mono mt-1">
-              {marketData?.meta.name || "NVIDIA Corporation"} · Real-time Technical Analysis
+              {marketData?.meta.name || "NVIDIA Corporation"} ·{" "}
+              {marketData?.synthetic ? "Technical Analysis on Synthetic Data" : "Real-time Technical Analysis"}
             </p>
+            {/*
+              The source was already in the payload and was never rendered. It
+              is shown now because the alternative is a screen that presents a
+              generated series under the words "Real-time" with nothing to say
+              otherwise — which is the one thing this project cannot afford,
+              given that its whole argument is that a judge should be able to
+              verify what is on screen.
+            */}
+            {marketData?.dataCaveat && (
+              <p className="mt-1.5 inline-flex items-start gap-1.5 rounded-md border border-amber-400/30 bg-amber-400/5 px-2 py-1 text-[10px] leading-relaxed text-amber-200/90">
+                <span className="font-mono uppercase tracking-wider text-amber-300/90">
+                  {marketData.source}
+                </span>
+                <span>{marketData.dataCaveat}</span>
+              </p>
+            )}
           </div>
 
           {/* Preset Buttons */}
