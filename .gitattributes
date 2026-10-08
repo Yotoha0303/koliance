@@ -40,6 +40,22 @@
 *.html text eol=lf
 *.sh text eol=lf
 
+# Types the first pass missed, added while closing GAP-35. Nothing here is
+# line-ending-sensitive the way Solidity coverage is; they are listed so a
+# renormalize does not have to be repeated per file, and so a fresh clone does
+# not mix endings within one language's tree.
+*.go         text eol=lf
+*.sql        text eol=lf
+*.mjs        text eol=lf
+*.mod        text eol=lf
+*.sum        text eol=lf
+*.txt        text eol=lf
+*.svg        text eol=lf
+*.example    text eol=lf
+*.sample     text eol=lf
+.gitignore   text eol=lf
+.vercelignore text eol=lf
+
 # Windows-only scripts must keep CRLF or cmd.exe will not run them.
 *.bat text eol=crlf
 *.cmd text eol=crlf

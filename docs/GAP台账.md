@@ -82,14 +82,14 @@
 | GAP-25 | 全局锁串行化 vs 10,000 TPS 目标 | 🟠 P1 | ⬜ | 无基准测试 |
 | GAP-26 | perp 未部署 / 未接线 / 无 Bot | 🔴 P0 | 🟠 | 部分；见 §3 |
 | GAP-27 | 逐块资金费率未实现（赛道靶心） | 🟠 P1 | ✅ | 本分支 |
-| GAP-28 | 双 lockfile，`npm ci` 装过期树 | 🟡 P2 | 🟠 | — |
+| GAP-28 | 双 lockfile，`npm ci` 装过期树 | 🟡 P2 | ✅ | 前提已消失（`docs/changes/020`） |
 | GAP-29 | 缺 `deploy/` 目录 | 🟡 P2 | ✅ | `docs/changes/019` |
 | GAP-30 | Redis 额度池 | 🟡 P2 | ⬜ | 需先修 GAP-18~21 |
 | GAP-31 | 规划文档在仓库外，协作者看不到 | 🟡 P2 | ✅ | `df227bf`（`docs/planning/`） |
 | GAP-32 | 覆盖率阈值未配 | 🟡 P2 | ✅ | `506c4ef`（合约侧；前端见 GAP-33） |
 | GAP-33 | 前端覆盖率未配 | 🟡 P2 | ✅ | 见 §3.2 |
 | GAP-34 | `closePosition` 破坏冻结后未重新冻结 | 🟠 P1 | ✅ | 见 §3.1 |
-| GAP-35 | 全库行尾未重规范化（CRLF/LF 混用） | 🟡 P2 | 🟠 | 见 §3.3 |
+| GAP-35 | 全库行尾未重规范化（CRLF/LF 混用） | 🟡 P2 | ✅ | 见 §3.3（**推迟理由不成立**） |
 | GAP-36 | `.gitignore` 的 `ignition/deployments/` 管不到 `contracts/` 下 → 部署产物误入库 | 🟠 P1 | ✅ | 见 §3.4 |
 | GAP-37 | 面板同时显示两条口径的清算状态（一条含资金费、一条不含） | 🟠 P1 | 🟠 | 见 §3.6（**新发现**） |
 
@@ -513,6 +513,10 @@ ZK Validator 空接口（§3.4）、EIP-712 授权语义（改为升级 `agentca
 **再一轮（发布环）**：GAP-11 / GAP-29 关闭 —— `deploy/README.md` 成为**发布环 runbook**
 （含第 0 步：GAP-12 轮换凭证，附就绪改动与风险说明）；并补齐 `.env.example` 缺失的 4 个变量。
 详见 `docs/changes/019-GAP11-发布环与env补齐.md`。
+
+**再一轮（行尾 + lockfile）**：GAP-35 / GAP-28 关闭 —— **索引早已全是 LF，无需任何重规范化提交**；
+真正的问题是属性生效前检出的**工作树副本**（`.sol` 16/22 仍 CRLF）。刷新工作树后全库 235/235 LF，**零提交**。
+实测后果：覆盖率 LF 读数 **89.29%**（此前报的 90.92% 是 **CRLF 虚高**）。详见 `docs/changes/020-GAP35-行尾与GAP28-lockfile.md`。
 
 **PR**：[moonhotline/koliance#5](https://github.com/moonhotline/koliance/pull/5)
 （16 提交，52 文件，CI 三 job 全绿）
