@@ -311,6 +311,34 @@ export const POSITION_MANAGER_ABI = [
     outputs: [{ name: "", type: "uint256" }],
   },
   {
+    // The demo screen reads these two directly off the chain rather than
+    // through the Go bot. That is a deliberate reduction in moving parts: the
+    // bot's chain-facing half is a tracked gap (GAP-26) and a demo that needs
+    // it cannot be rehearsed until it lands, while `getContractEvents` works
+    // today against whatever is deployed. The bot's remaining job — scanning
+    // prices and choosing what to liquidate — stays visible as a separate
+    // track; it is simply not on the critical path for the screen.
+    type: "event",
+    name: "PositionLiquidated",
+    inputs: [
+      { name: "positionId", type: "uint256", indexed: true },
+      { name: "owner", type: "address", indexed: true },
+      { name: "liquidator", type: "address", indexed: true },
+      { name: "exitPrice", type: "uint256", indexed: false },
+      { name: "reward", type: "uint256", indexed: false },
+    ],
+  },
+  {
+    type: "event",
+    name: "PositionClosed",
+    inputs: [
+      { name: "positionId", type: "uint256", indexed: true },
+      { name: "owner", type: "address", indexed: true },
+      { name: "exitPrice", type: "uint256", indexed: false },
+      { name: "pnl", type: "int256", indexed: false },
+    ],
+  },
+  {
     type: "event",
     name: "PositionOpened",
     inputs: [

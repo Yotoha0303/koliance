@@ -500,6 +500,10 @@ ZK Validator 空接口（§3.4）、EIP-712 授权语义（改为升级 `agentca
 **再一轮（对拍）**：GAP-06 关闭 —— 前端强平价与链上判定黄金向量对拍（60 条），
 含变异测试证明判据有牙齿；并发现 GAP-37（面板两条清算口径）。详见 `docs/changes/015-GAP06-强平价对拍.md`。
 
+**再一轮（演示可运行）**：新增 `DemoControlPanel.tsx`（演示扳机，直接读链不经 Bot）
++ `DemoRehearsal.ts`（把彩排变成测试）；补前端 ABI 缺失的 `PositionLiquidated`。
+**发现演示自带 42 分钟资金费时钟**（seed 把费率设到上限 1e13）。详见 `docs/changes/016-演示可运行-控制台与彩排.md`。
+
 **PR**：[moonhotline/koliance#5](https://github.com/moonhotline/koliance/pull/5)
 （16 提交，52 文件，CI 三 job 全绿）
 
