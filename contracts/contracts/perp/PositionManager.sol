@@ -7,6 +7,7 @@ import {IPyth} from "./interfaces/IPyth.sol";
 import {IVault} from "./interfaces/IVault.sol";
 import {IERC20} from "./interfaces/IERC20.sol";
 import {Ownable} from "./utils/Ownable.sol";
+import {ISessionKeyRegistry} from "./interfaces/ISessionKeyRegistry.sol";
 import {SafeCast} from "./utils/SafeCast.sol";
 import {PerpConstants} from "./PerpConstants.sol";
 
@@ -43,6 +44,12 @@ contract PositionManager is IPositionManager, Ownable {
 
     /// @notice 18/6 scale factor for USDC -> USD.
     uint256 public immutable usdcToUsdScale;
+
+    /// @notice Delegation registry, for the agent path. Optional: when unset,
+    ///         `openPositionFor` refuses and the plain `openPosition` path is
+    ///         unaffected, so a deployment that does not use agents pays
+    ///         nothing for this. See `setSessionKeyRegistry`.
+    ISessionKeyRegistry public sessionKeyRegistry;
 
     /// @notice Positions by id. Ids start at 1; id 0 is never a valid position.
     mapping(uint256 => Position) internal _positions;
@@ -104,6 +111,9 @@ contract PositionManager is IPositionManager, Ownable {
     error InsufficientCollateral();
     error InsufficientPoolCapacity(uint256 requiredUsd, uint256 availableUsd);
     error InvalidFundingRate(int256 rate);
+    error SessionKeyRegistryUnset();
+    error SessionKeyNotAuthorized(address sessionKey, address caller);
+    error NotDelegatedAgent(address sessionKey, address caller);
 
     /// @notice `closePosition` was called after its deadline.
     error DeadlinePassed(uint256 deadline);
@@ -114,6 +124,7 @@ contract PositionManager is IPositionManager, Ownable {
 
     /// @notice The per-block funding rate was set.
     event FundingRateSet(int256 ratePerBlockWad);
+    event SessionKeyRegistrySet(address indexed registry);
 
     /// @notice A best-effort price push succeeded.
     /// @dev Named distinctly from `PythOracleAdapter.PricePushed` so the two are
@@ -250,6 +261,16 @@ contract PositionManager is IPositionManager, Ownable {
 
     // ==================== WIRING ====================
 
+    /// @notice Point the manager at a delegation registry, enabling the agent path.
+    /// @dev Settable rather than constructor-set so the registry can be deployed
+    ///      after the stack (or replaced) without a redeploy of the contracts
+    ///      that hold the money. Setting it to zero disables `openPositionFor`
+    ///      again — a kill switch that does not disturb open positions.
+    function setSessionKeyRegistry(address registry) external onlyOwner {
+        sessionKeyRegistry = ISessionKeyRegistry(registry);
+        emit SessionKeyRegistrySet(registry);
+    }
+
     function setPriceUpdater(address priceUpdater_) external onlyOwner {
         if (priceUpdater_ == address(0)) revert ZeroAddress();
         priceUpdater = priceUpdater_;
@@ -286,6 +307,80 @@ contract PositionManager is IPositionManager, Ownable {
         bool isLong,
         bytes[] calldata pythUpdateData
     ) external returns (uint256 positionId) {
+        // Trader opens for themselves and pays from their own balance.
+        return _openPosition(msg.sender, msg.sender, feedId, collateralAmount, leverageBps, isLong, pythUpdateData);
+    }
+
+    /// @notice Open a position on behalf of a user who delegated the authority.
+    /// @dev This is ADR-004's connection made executable: the user signs one
+    ///      EIP-712 delegation off-chain and walks away, the agent submits the
+    ///      order and pays the gas, and the user never touches a wallet again.
+    ///
+    ///      Two roles, deliberately kept apart:
+    ///
+    ///        - `owner` of the position is the **delegating user** (from the
+    ///          registry). An agent that could own positions could not be
+    ///          revoked into a clean state — the positions would be its own.
+    ///        - `payer` is the **agent** (`msg.sender`). It supplies the margin
+    ///          and the gas, which is what "autonomous" has to mean on chain.
+    ///
+    ///      `msg.sender` must be the agent named in the delegation, not merely
+    ///      a holder of the session key. The registry's `authorizeSpend`
+    ///      authorises spends *by the agent*; letting any key holder through
+    ///      would turn a bounded delegation into a transferable bearer token.
+    ///
+    ///      The caps are read from the registry, never re-derived here. A second
+    ///      implementation of the same limit is how the three incompatible
+    ///      models in GAP-24 came about.
+    function openPositionFor(
+        address sessionKey,
+        bytes32 feedId,
+        uint256 collateralAmount,
+        uint256 leverageBps,
+        bool isLong,
+        bytes[] calldata pythUpdateData
+    ) external returns (uint256 positionId) {
+        ISessionKeyRegistry registry = sessionKeyRegistry;
+        if (address(registry) == address(0)) revert SessionKeyRegistryUnset();
+
+        address agent = registry.delegationAgent(sessionKey);
+        address owner_ = registry.delegationOwner(sessionKey);
+        if (agent == address(0) || owner_ == address(0)) {
+            revert SessionKeyNotAuthorized(sessionKey, msg.sender);
+        }
+        if (msg.sender != agent) revert NotDelegatedAgent(sessionKey, msg.sender);
+
+        // Refuse before touching the token or the vault, so an unauthorised
+        // spend fails on the delegation's own terms rather than on whatever
+        // the pool happens to say next.
+        if (!registry.isAuthorized(sessionKey, collateralAmount)) {
+            revert SessionKeyNotAuthorized(sessionKey, msg.sender);
+        }
+
+        positionId = _openPosition(owner_, msg.sender, feedId, collateralAmount, leverageBps, isLong, pythUpdateData);
+
+        // Consume the allowance through the *module* entry: this contract is
+        // the designated consumer, not the agent, and it cannot present itself
+        // as the agent because the agent is an EOA. Ordering is not
+        // load-bearing — a revert anywhere rolls the whole call back, so there
+        // is no window where the delegation is charged for an open that did not
+        // happen — but doing it last keeps the write after the read it depends
+        // on.
+        registry.chargeSpend(sessionKey, collateralAmount);
+    }
+
+    /// @dev Shared body. `owner_` is who the position belongs to; `payer` is
+    ///      who funds it. They are the same account on the self-serve path and
+    ///      differ on the delegated one.
+    function _openPosition(
+        address owner_,
+        address payer,
+        bytes32 feedId,
+        uint256 collateralAmount,
+        uint256 leverageBps,
+        bool isLong,
+        bytes[] calldata pythUpdateData
+    ) internal returns (uint256 positionId) {
         if (collateralAmount == 0) revert ZeroAmount();
         if (leverageBps < PerpConstants.MIN_LEVERAGE_BPS || leverageBps > PerpConstants.MAX_LEVERAGE_BPS) {
             revert InvalidLeverage(leverageBps);
@@ -304,7 +399,7 @@ contract PositionManager is IPositionManager, Ownable {
         positionId = ++nextPositionId;
 
         // Collateral moves straight to the Vault — this contract never holds funds.
-        if (!collateralToken.transferFrom(msg.sender, address(vault), collateralAmount)) {
+        if (!collateralToken.transferFrom(payer, address(vault), collateralAmount)) {
             revert InsufficientCollateral();
         }
 
@@ -319,7 +414,7 @@ contract PositionManager is IPositionManager, Ownable {
         _assertPoolCapacity(payoutCapUsd);
 
         _positions[positionId] = Position({
-            owner: msg.sender,
+            owner: owner_,
             feedId: feedId,
             collateralUsd: collateralUsd,
             sizeUsd: sizeUsd,
@@ -344,7 +439,7 @@ contract PositionManager is IPositionManager, Ownable {
         // this records it so the indexer can attribute it.
         vault.receiveFees(collateralAmount * usdcToUsdScale - collateralUsd);
 
-        emit PositionOpened(positionId, msg.sender, feedId, collateralUsd, sizeUsd, price, isLong);
+        emit PositionOpened(positionId, owner_, feedId, collateralUsd, sizeUsd, price, isLong);
     }
 
     // ==================== CLOSE ====================

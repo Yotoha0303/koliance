@@ -1,0 +1,425 @@
+{
+  "_comment": "Generated from src/lib/perp.ts by tests/_gen-vectors.test.ts. Do not hand-edit. The frontend test asserts these match live output; the contracts test replays them on chain.",
+  "vectors": [
+    {
+      "leverageBps": "10000",
+      "collateralUsdc": "100",
+      "entryPrice": "180000000000000000000",
+      "isLong": true,
+      "liqPrice": "1800000000000000000"
+    },
+    {
+      "leverageBps": "10000",
+      "collateralUsdc": "100",
+      "entryPrice": "180000000000000000000",
+      "isLong": false,
+      "liqPrice": "358200000000000000000"
+    },
+    {
+      "leverageBps": "10000",
+      "collateralUsdc": "100",
+      "entryPrice": "200000000000000000000",
+      "isLong": true,
+      "liqPrice": "2000000000000000000"
+    },
+    {
+      "leverageBps": "10000",
+      "collateralUsdc": "100",
+      "entryPrice": "200000000000000000000",
+      "isLong": false,
+      "liqPrice": "398000000000000000000"
+    },
+    {
+      "leverageBps": "10000",
+      "collateralUsdc": "100",
+      "entryPrice": "33333000000000000000000",
+      "isLong": true,
+      "liqPrice": "333330000000000000000"
+    },
+    {
+      "leverageBps": "10000",
+      "collateralUsdc": "100",
+      "entryPrice": "33333000000000000000000",
+      "isLong": false,
+      "liqPrice": "66332670000000000000000"
+    },
+    {
+      "leverageBps": "10000",
+      "collateralUsdc": "1000",
+      "entryPrice": "180000000000000000000",
+      "isLong": true,
+      "liqPrice": "1800000000000000000"
+    },
+    {
+      "leverageBps": "10000",
+      "collateralUsdc": "1000",
+      "entryPrice": "180000000000000000000",
+      "isLong": false,
+      "liqPrice": "358200000000000000000"
+    },
+    {
+      "leverageBps": "10000",
+      "collateralUsdc": "1000",
+      "entryPrice": "200000000000000000000",
+      "isLong": true,
+      "liqPrice": "2000000000000000000"
+    },
+    {
+      "leverageBps": "10000",
+      "collateralUsdc": "1000",
+      "entryPrice": "200000000000000000000",
+      "isLong": false,
+      "liqPrice": "398000000000000000000"
+    },
+    {
+      "leverageBps": "10000",
+      "collateralUsdc": "1000",
+      "entryPrice": "33333000000000000000000",
+      "isLong": true,
+      "liqPrice": "333330000000000000000"
+    },
+    {
+      "leverageBps": "10000",
+      "collateralUsdc": "1000",
+      "entryPrice": "33333000000000000000000",
+      "isLong": false,
+      "liqPrice": "66332670000000000000000"
+    },
+    {
+      "leverageBps": "20000",
+      "collateralUsdc": "100",
+      "entryPrice": "180000000000000000000",
+      "isLong": true,
+      "liqPrice": "91800000000000000000"
+    },
+    {
+      "leverageBps": "20000",
+      "collateralUsdc": "100",
+      "entryPrice": "180000000000000000000",
+      "isLong": false,
+      "liqPrice": "268200000000000000000"
+    },
+    {
+      "leverageBps": "20000",
+      "collateralUsdc": "100",
+      "entryPrice": "200000000000000000000",
+      "isLong": true,
+      "liqPrice": "102000000000000000000"
+    },
+    {
+      "leverageBps": "20000",
+      "collateralUsdc": "100",
+      "entryPrice": "200000000000000000000",
+      "isLong": false,
+      "liqPrice": "298000000000000000000"
+    },
+    {
+      "leverageBps": "20000",
+      "collateralUsdc": "100",
+      "entryPrice": "33333000000000000000000",
+      "isLong": true,
+      "liqPrice": "16999830000000000000000"
+    },
+    {
+      "leverageBps": "20000",
+      "collateralUsdc": "100",
+      "entryPrice": "33333000000000000000000",
+      "isLong": false,
+      "liqPrice": "49666170000000000000000"
+    },
+    {
+      "leverageBps": "20000",
+      "collateralUsdc": "1000",
+      "entryPrice": "180000000000000000000",
+      "isLong": true,
+      "liqPrice": "91800000000000000000"
+    },
+    {
+      "leverageBps": "20000",
+      "collateralUsdc": "1000",
+      "entryPrice": "180000000000000000000",
+      "isLong": false,
+      "liqPrice": "268200000000000000000"
+    },
+    {
+      "leverageBps": "20000",
+      "collateralUsdc": "1000",
+      "entryPrice": "200000000000000000000",
+      "isLong": true,
+      "liqPrice": "102000000000000000000"
+    },
+    {
+      "leverageBps": "20000",
+      "collateralUsdc": "1000",
+      "entryPrice": "200000000000000000000",
+      "isLong": false,
+      "liqPrice": "298000000000000000000"
+    },
+    {
+      "leverageBps": "20000",
+      "collateralUsdc": "1000",
+      "entryPrice": "33333000000000000000000",
+      "isLong": true,
+      "liqPrice": "16999830000000000000000"
+    },
+    {
+      "leverageBps": "20000",
+      "collateralUsdc": "1000",
+      "entryPrice": "33333000000000000000000",
+      "isLong": false,
+      "liqPrice": "49666170000000000000000"
+    },
+    {
+      "leverageBps": "100000",
+      "collateralUsdc": "100",
+      "entryPrice": "180000000000000000000",
+      "isLong": true,
+      "liqPrice": "163800000000000000000"
+    },
+    {
+      "leverageBps": "100000",
+      "collateralUsdc": "100",
+      "entryPrice": "180000000000000000000",
+      "isLong": false,
+      "liqPrice": "196200000000000000000"
+    },
+    {
+      "leverageBps": "100000",
+      "collateralUsdc": "100",
+      "entryPrice": "200000000000000000000",
+      "isLong": true,
+      "liqPrice": "182000000000000000000"
+    },
+    {
+      "leverageBps": "100000",
+      "collateralUsdc": "100",
+      "entryPrice": "200000000000000000000",
+      "isLong": false,
+      "liqPrice": "218000000000000000000"
+    },
+    {
+      "leverageBps": "100000",
+      "collateralUsdc": "100",
+      "entryPrice": "33333000000000000000000",
+      "isLong": true,
+      "liqPrice": "30333030000000000000000"
+    },
+    {
+      "leverageBps": "100000",
+      "collateralUsdc": "100",
+      "entryPrice": "33333000000000000000000",
+      "isLong": false,
+      "liqPrice": "36332970000000000000000"
+    },
+    {
+      "leverageBps": "100000",
+      "collateralUsdc": "1000",
+      "entryPrice": "180000000000000000000",
+      "isLong": true,
+      "liqPrice": "163800000000000000000"
+    },
+    {
+      "leverageBps": "100000",
+      "collateralUsdc": "1000",
+      "entryPrice": "180000000000000000000",
+      "isLong": false,
+      "liqPrice": "196200000000000000000"
+    },
+    {
+      "leverageBps": "100000",
+      "collateralUsdc": "1000",
+      "entryPrice": "200000000000000000000",
+      "isLong": true,
+      "liqPrice": "182000000000000000000"
+    },
+    {
+      "leverageBps": "100000",
+      "collateralUsdc": "1000",
+      "entryPrice": "200000000000000000000",
+      "isLong": false,
+      "liqPrice": "218000000000000000000"
+    },
+    {
+      "leverageBps": "100000",
+      "collateralUsdc": "1000",
+      "entryPrice": "33333000000000000000000",
+      "isLong": true,
+      "liqPrice": "30333030000000000000000"
+    },
+    {
+      "leverageBps": "100000",
+      "collateralUsdc": "1000",
+      "entryPrice": "33333000000000000000000",
+      "isLong": false,
+      "liqPrice": "36332970000000000000000"
+    },
+    {
+      "leverageBps": "250000",
+      "collateralUsdc": "100",
+      "entryPrice": "180000000000000000000",
+      "isLong": true,
+      "liqPrice": "174600000000000000000"
+    },
+    {
+      "leverageBps": "250000",
+      "collateralUsdc": "100",
+      "entryPrice": "180000000000000000000",
+      "isLong": false,
+      "liqPrice": "185400000000000000000"
+    },
+    {
+      "leverageBps": "250000",
+      "collateralUsdc": "100",
+      "entryPrice": "200000000000000000000",
+      "isLong": true,
+      "liqPrice": "194000000000000000000"
+    },
+    {
+      "leverageBps": "250000",
+      "collateralUsdc": "100",
+      "entryPrice": "200000000000000000000",
+      "isLong": false,
+      "liqPrice": "206000000000000000000"
+    },
+    {
+      "leverageBps": "250000",
+      "collateralUsdc": "100",
+      "entryPrice": "33333000000000000000000",
+      "isLong": true,
+      "liqPrice": "32333010000000000000000"
+    },
+    {
+      "leverageBps": "250000",
+      "collateralUsdc": "100",
+      "entryPrice": "33333000000000000000000",
+      "isLong": false,
+      "liqPrice": "34332990000000000000000"
+    },
+    {
+      "leverageBps": "250000",
+      "collateralUsdc": "1000",
+      "entryPrice": "180000000000000000000",
+      "isLong": true,
+      "liqPrice": "174600000000000000000"
+    },
+    {
+      "leverageBps": "250000",
+      "collateralUsdc": "1000",
+      "entryPrice": "180000000000000000000",
+      "isLong": false,
+      "liqPrice": "185400000000000000000"
+    },
+    {
+      "leverageBps": "250000",
+      "collateralUsdc": "1000",
+      "entryPrice": "200000000000000000000",
+      "isLong": true,
+      "liqPrice": "194000000000000000000"
+    },
+    {
+      "leverageBps": "250000",
+      "collateralUsdc": "1000",
+      "entryPrice": "200000000000000000000",
+      "isLong": false,
+      "liqPrice": "206000000000000000000"
+    },
+    {
+      "leverageBps": "250000",
+      "collateralUsdc": "1000",
+      "entryPrice": "33333000000000000000000",
+      "isLong": true,
+      "liqPrice": "32333010000000000000000"
+    },
+    {
+      "leverageBps": "250000",
+      "collateralUsdc": "1000",
+      "entryPrice": "33333000000000000000000",
+      "isLong": false,
+      "liqPrice": "34332990000000000000000"
+    },
+    {
+      "leverageBps": "500000",
+      "collateralUsdc": "100",
+      "entryPrice": "180000000000000000000",
+      "isLong": true,
+      "liqPrice": "178200000000000000000"
+    },
+    {
+      "leverageBps": "500000",
+      "collateralUsdc": "100",
+      "entryPrice": "180000000000000000000",
+      "isLong": false,
+      "liqPrice": "181800000000000000000"
+    },
+    {
+      "leverageBps": "500000",
+      "collateralUsdc": "100",
+      "entryPrice": "200000000000000000000",
+      "isLong": true,
+      "liqPrice": "198000000000000000000"
+    },
+    {
+      "leverageBps": "500000",
+      "collateralUsdc": "100",
+      "entryPrice": "200000000000000000000",
+      "isLong": false,
+      "liqPrice": "202000000000000000000"
+    },
+    {
+      "leverageBps": "500000",
+      "collateralUsdc": "100",
+      "entryPrice": "33333000000000000000000",
+      "isLong": true,
+      "liqPrice": "32999670000000000000000"
+    },
+    {
+      "leverageBps": "500000",
+      "collateralUsdc": "100",
+      "entryPrice": "33333000000000000000000",
+      "isLong": false,
+      "liqPrice": "33666330000000000000000"
+    },
+    {
+      "leverageBps": "500000",
+      "collateralUsdc": "1000",
+      "entryPrice": "180000000000000000000",
+      "isLong": true,
+      "liqPrice": "178200000000000000000"
+    },
+    {
+      "leverageBps": "500000",
+      "collateralUsdc": "1000",
+      "entryPrice": "180000000000000000000",
+      "isLong": false,
+      "liqPrice": "181800000000000000000"
+    },
+    {
+      "leverageBps": "500000",
+      "collateralUsdc": "1000",
+      "entryPrice": "200000000000000000000",
+      "isLong": true,
+      "liqPrice": "198000000000000000000"
+    },
+    {
+      "leverageBps": "500000",
+      "collateralUsdc": "1000",
+      "entryPrice": "200000000000000000000",
+      "isLong": false,
+      "liqPrice": "202000000000000000000"
+    },
+    {
+      "leverageBps": "500000",
+      "collateralUsdc": "1000",
+      "entryPrice": "33333000000000000000000",
+      "isLong": true,
+      "liqPrice": "32999670000000000000000"
+    },
+    {
+      "leverageBps": "500000",
+      "collateralUsdc": "1000",
+      "entryPrice": "33333000000000000000000",
+      "isLong": false,
+      "liqPrice": "33666330000000000000000"
+    }
+  ]
+}

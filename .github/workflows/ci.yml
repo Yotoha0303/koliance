@@ -108,8 +108,12 @@ jobs:
       - name: Typecheck
         run: npx tsc --noEmit
 
-      - name: Unit tests
-        run: npx vitest run
+      - name: Unit tests with coverage
+        # --coverage, not a bare `vitest run`: the thresholds in
+        # vitest.config.mts only apply when coverage is collected, so a plain
+        # run would leave the floor unenforced in CI. Step name says so, since
+        # this is the only place the floor is actually applied.
+        run: npx vitest run --coverage
 
       - name: Lint
         run: npx next lint

@@ -7,6 +7,39 @@ pragma solidity ^0.8.31;
 /// The liquidation path is the demo centrepiece. `liquidate` takes an array of
 /// position ids so the off-chain Go bot can clear dozens of positions inside a
 /// single Monad block.
+///
+/// ---------------------------------------------------------------------------
+/// FROZEN SURFACE — this list is the authority, not any planning document
+/// ---------------------------------------------------------------------------
+///
+/// These signatures were frozen in `docs/changes/017`, closing GAP-34. A
+/// consumer may build against them. Planning documents describe intent at the
+/// time they were written; when one of them and this list disagree, this list
+/// is what the code does.
+///
+///   write   openPosition(bytes32, uint256, uint256, bool, bytes[]) -> uint256
+///   write   openPositionFor(address, bytes32, uint256, uint256, bool, bytes[]) -> uint256
+///   write   closePosition(uint256, uint256, uint256, bytes[])
+///   write   liquidate(uint256[], bytes[])
+///   write   setSessionKeyRegistry(address)
+///   read    getPosition(uint256) -> Position
+///   read    isLiquidatable(uint256) -> bool
+///   read    nextPositionId() -> uint256
+///   read    openFeeBps() / closeFeeBps() / maintenanceMarginBps()
+///           liquidatorRewardBps() / maxLeverageBps() / maxProfitBps()
+///   read    cumulativeFundingIndex(bytes32) / fundingRatePerBlockWad()
+///           fundingOwed(uint256) / openInterest(bytes32) / reservedAssets()
+///   write   accrueFunding(bytes32) -> int256
+///
+/// Events are frozen for the same reason and are listed at their declarations:
+/// `PositionOpened`, `PositionClosed`, `PositionLiquidated`, `FundingAccrued`,
+/// `FundingSettled`. An off-chain indexer backfills from them, so a signature
+/// change there is as breaking as a function change.
+///
+/// The module is still undeployed, so this is a commitment about the *shape* of
+/// the interface, not a claim that an address exists. Changing a frozen
+/// signature costs a change record and an update to every call site in the same
+/// commit — which is the point of writing the list down.
 interface IPositionManager {
     struct Position {
         address owner;
@@ -75,18 +108,35 @@ interface IPositionManager {
         bytes[] calldata pythUpdateData
     ) external returns (uint256 positionId);
 
+    /// @notice Open a position on behalf of a delegating user.
+    /// @dev The agent path — see `PositionManager.openPositionFor`. The position
+    ///      owner is the delegating user; `msg.sender` funds it and pays gas.
+    function openPositionFor(
+        address          sessionKey,
+        bytes32          feedId,
+        uint256          collateralAmount,
+        uint256          leverageBps,
+        bool             isLong,
+        bytes[] calldata pythUpdateData
+    ) external returns (uint256 positionId);
+
+    /// @notice Point the manager at a delegation registry, enabling the agent path.
+    function setSessionKeyRegistry(address registry) external;
+
     /// @notice Close a position and receive its remaining equity.
     ///
-    /// ⚠️ **This signature is a change to a previously frozen interface.**
+    /// **Re-frozen.** This signature changed once, and the change is now closed.
     ///
-    /// `推进方案.md:40` froze `closePosition(uint256, bytes[])` so the frontend
-    /// and the (then unstarted) Go bot could be built against it in parallel.
-    /// `minOutUsd` and `deadline` were added by GAP-07. Nothing outside this repo
-    /// consumed the old form — the perp module has never been deployed — so the
-    /// cost is the call sites in this repo, which are updated in the same change.
+    /// `closePosition(uint256, bytes[])` was the frozen form; GAP-07 added
+    /// `minOutUsd` and `deadline`. Nothing outside this repo consumed the old
+    /// form — the module has never been deployed — so the cost was this repo's
+    /// call sites, all updated in the same change.
     ///
-    /// **If you are building a consumer, expect this to move again**: the module
-    /// is pre-deployment and the interface has not been re-frozen.
+    /// **Consumers may now build against this.** The interface was re-frozen in
+    /// `docs/changes/017` (GAP-34), and the authoritative list of the frozen
+    /// signatures is the header of this file rather than any planning document.
+    /// The perp module is still undeployed, so this is a commitment about the
+    /// shape of the interface, not a claim that an address exists.
     ///
     /// @param minOutUsd floor on what the trader receives, 18-decimal USD. The
     ///        exit price is whatever the oracle reports when the transaction

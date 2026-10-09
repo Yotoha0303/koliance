@@ -98,6 +98,41 @@ const FALLBACK_MARKET_DATA: Record<string, any> = {
 const ALLOWED_RANGES = new Set(["1d", "5d", "1mo", "6mo", "1y"]);
 const ALLOWED_INTERVALS = new Set(["5m", "15m", "1d", "1wk"]);
 
+/**
+ * Deterministic pseudo-random generator, seeded from a string.
+ *
+ * This replaced `Math.random()`, and the reason is worth keeping: a random walk
+ * regenerated on every request means two refreshes of the same page show two
+ * different price histories. Nobody can verify a chart that changes when you
+ * look at it, and in a project whose whole argument is "judges must be able to
+ * verify what was built", a demo asset that cannot be reproduced is worse than
+ * no demo asset.
+ *
+ * Seeded per symbol and per UTC day, so the series is stable within a day and
+ * advances across days — the shape of a real series rather than a frozen
+ * constant. Still synthetic, and labelled as such everywhere it is returned.
+ */
+function seededRandom(seed: string): () => number {
+  let h = 2166136261 >>> 0;
+  for (let i = 0; i < seed.length; i++) {
+    h ^= seed.charCodeAt(i);
+    h = Math.imul(h, 16777619) >>> 0;
+  }
+  return () => {
+    h ^= h << 13;
+    h >>>= 0;
+    h ^= h >>> 17;
+    h ^= h << 5;
+    h >>>= 0;
+    return h / 4294967296;
+  };
+}
+
+/** UTC day index, so synthetic series are stable within a day. */
+function utcDaySeed(): string {
+  return String(Math.floor(Date.now() / 86_400_000));
+}
+
 // Calculate RSI (Relative Strength Index)
 function calculateRSI(prices: number[], period: number = 14): number {
   if (prices.length < period + 1) return 55;
@@ -167,9 +202,12 @@ export async function GET(request: NextRequest) {
     const baseTime = Math.floor(Date.now() / 1000) - 30 * 86400;
     let curPrice = 2.85;
 
+    // Deterministic, and honest about what it is: MON-USD has no upstream feed
+    // here, so this is a synthetic series with a curated anchor price.
+    const rand = seededRandom(`MON-USD:${range}:${interval}:${utcDaySeed()}`);
     for (let i = 0; i < 30; i++) {
       timestamps.push(baseTime + i * 86400);
-      curPrice += (Math.random() - 0.42) * 0.12;
+      curPrice += (rand() - 0.42) * 0.12;
       closes.push(Math.round(curPrice * 100) / 100);
     }
     closes[closes.length - 1] = mock.regularMarketPrice;
@@ -178,7 +216,12 @@ export async function GET(request: NextRequest) {
     const sma20 = calculateSMA(closes, 20);
 
     return NextResponse.json({
-      source: "monad_oracle_gatekeeper",
+      // Named for what it is. The previous `monad_oracle_gatekeeper` read as
+      // though an oracle had been consulted; no oracle is involved.
+      source: "synthetic_curated",
+      synthetic: true,
+      dataCaveat:
+        "Synthetic series with a curated anchor price. Not a market feed; there is no MON-USD upstream on this deployment.",
       meta: mock,
       chart: { timestamps, closes },
       analysis: {
@@ -269,6 +312,8 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       source: "yahoo_finance_live",
+      synthetic: false,
+      dataCaveat: null,
       meta: {
         symbol: rawMeta.symbol || symbol,
         name: rawMeta.shortName || rawMeta.symbol || symbol,
@@ -324,9 +369,10 @@ export async function GET(request: NextRequest) {
     const baseTime = Math.floor(Date.now() / 1000) - count * 86400;
     let basePrice = fallback.regularMarketPrice * 0.92;
 
+    const rand = seededRandom(`${symbol}:${range}:${interval}:${utcDaySeed()}:fallback`);
     for (let i = 0; i < count; i++) {
       timestamps.push(baseTime + i * 86400);
-      basePrice += (Math.random() - 0.46) * (fallback.regularMarketPrice * 0.02);
+      basePrice += (rand() - 0.46) * (fallback.regularMarketPrice * 0.02);
       closes.push(Math.round(basePrice * 100) / 100);
     }
     closes[closes.length - 1] = fallback.regularMarketPrice;
@@ -335,7 +381,12 @@ export async function GET(request: NextRequest) {
     const sma20 = calculateSMA(closes, 20);
 
     return NextResponse.json({
-      source: "cached_calibrated_mirror",
+      // `cached_calibrated_mirror` claimed both a cache and calibration that do
+      // not exist. The Yahoo call failed and this is a generated stand-in.
+      source: "synthetic_fallback",
+      synthetic: true,
+      dataCaveat:
+        "Upstream market data was unreachable, so this series is generated. Figures are indicative only and are not a market quote.",
       meta: fallback,
       chart: { timestamps, closes },
       analysis: {

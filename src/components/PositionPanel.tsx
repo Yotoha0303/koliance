@@ -255,8 +255,18 @@ export function PositionPanel({ account }: { account: `0x${string}` | null }) {
             pos.sizeUsd === 0n
               ? 0n
               : (equity > 0n ? equity : 0n) * BPS_DENOMINATOR / pos.sizeUsd,
-          // Still a mirror: there is no per-position getter on chain. Guarded by
-          // tests/perp.test.ts against the contract's formula.
+          // Still a mirror: there is no per-position getter on chain. The price
+          // formula itself is now checked against the chain by
+          // contracts/test/perp/LiquidationParity.ts (GAP-06): 60 vectors, each
+          // replayed on chain, including that the advertised price is the exact
+          // boundary. tests/perp.test.ts alone was not sufficient — its
+          // round-trip assertion is funding-blind and self-consistent.
+          //
+          // NOTE the residual gap (GAP-37): `liquidatable` above is the chain's
+          // verdict and INCLUDES funding, while this `liqPrice` is the price
+          // formula alone and does NOT. With funding non-zero the two can
+          // disagree on screen. Fixing it needs a funding-aware liquidation
+          // price, and which figure the panel should show is a product decision.
           liqPrice: liquidationPrice(math),
           liquidatable,
         });

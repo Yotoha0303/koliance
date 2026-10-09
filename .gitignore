@@ -19,11 +19,17 @@ dist/
 # TypeScript incremental build info
 *.tsbuildinfo
 
+# Coverage output (vitest --coverage, at any depth)
+coverage/
+
 # Hardhat build output & cache
 artifacts/
 cache/
 typechain/
-ignition/deployments/
+# 带内部斜杠且无前导 **/ 时，模式是根锚定的 -> 只会匹配仓库根的 ignition/，
+# 而 ignition 输出在 contracts/ 下，规则从未命中（GAP-36）。必须用 **/ 才跨层级生效。
+# 对照：artifacts/ cache/ typechain/ 无内部斜杠，故任何层级都匹配，它们一直是对的。
+**/ignition/deployments/
 
 # Vercel
 .vercel

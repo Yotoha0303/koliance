@@ -1,7 +1,7 @@
 /**
  * Koliance Perp — frontend bindings.
  *
- * Re-exports the shared constants from `contracts/lib/perpConfig.ts` so the
+ * Re-exports the shared constants from `./perpConfig` so the
  * frontend and the contracts can never drift apart, then adds the derived
  * math the UI needs.
  *

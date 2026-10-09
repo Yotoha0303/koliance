@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import { Navbar, NavView } from "@/components/Navbar";
 import { CursorTrail } from "@/components/CursorTrail";
 import { PositionPanel } from "@/components/PositionPanel";
+import { DemoControlPanel } from "@/components/DemoControlPanel";
 import { useRouter } from "next/navigation";
 import { createPublicClient, http, formatEther } from "viem";
 import { monadTestnet } from "@/lib/contract";
@@ -140,7 +141,15 @@ export default function PerpPage() {
           </p>
         </div>
 
-        <PositionPanel account={account} />
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+          <PositionPanel account={account} />
+
+          {/* Stage controls. The demo's whole trigger lives here, which is why
+              it sits beside the positions rather than behind a menu: the price
+              bump and the liquidation are one click each, on the same screen
+              the audience is already looking at. */}
+          <DemoControlPanel account={account} />
+        </div>
       </main>
 
       <footer className="border-t border-white/10 py-6 px-4 sm:px-8 mt-12 bg-[#0d1017]/80 backdrop-blur-md">
