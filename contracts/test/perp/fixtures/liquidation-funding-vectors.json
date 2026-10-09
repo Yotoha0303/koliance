@@ -1,0 +1,245 @@
+{
+  "_comment": "Generated from src/lib/perp.ts via tests/liquidation-funding-vectors.ts. Do not hand-edit. The frontend test pins live output to this file; the contracts test replays it on chain, accruing real funding for elapsedBlocks before comparing.",
+  "vectors": [
+    {
+      "leverageBps": "10000",
+      "collateralUsdc": "100",
+      "entryPrice": "200000000000000000000",
+      "isLong": true,
+      "elapsedBlocks": "0",
+      "fundingRateWad": "10000000000000",
+      "fundingOwedUsd": "0",
+      "liqPrice": "2000000000000000000"
+    },
+    {
+      "leverageBps": "10000",
+      "collateralUsdc": "100",
+      "entryPrice": "200000000000000000000",
+      "isLong": true,
+      "elapsedBlocks": "5",
+      "fundingRateWad": "10000000000000",
+      "fundingOwedUsd": "4995000000000000",
+      "liqPrice": "2010000000000000000"
+    },
+    {
+      "leverageBps": "10000",
+      "collateralUsdc": "100",
+      "entryPrice": "200000000000000000000",
+      "isLong": true,
+      "elapsedBlocks": "50",
+      "fundingRateWad": "10000000000000",
+      "fundingOwedUsd": "49950000000000000",
+      "liqPrice": "2100000000000000000"
+    },
+    {
+      "leverageBps": "10000",
+      "collateralUsdc": "100",
+      "entryPrice": "200000000000000000000",
+      "isLong": false,
+      "elapsedBlocks": "0",
+      "fundingRateWad": "10000000000000",
+      "fundingOwedUsd": "0",
+      "liqPrice": "398000000000000000000"
+    },
+    {
+      "leverageBps": "10000",
+      "collateralUsdc": "100",
+      "entryPrice": "200000000000000000000",
+      "isLong": false,
+      "elapsedBlocks": "5",
+      "fundingRateWad": "10000000000000",
+      "fundingOwedUsd": "4995000000000000",
+      "liqPrice": "397990000000000000000"
+    },
+    {
+      "leverageBps": "10000",
+      "collateralUsdc": "100",
+      "entryPrice": "200000000000000000000",
+      "isLong": false,
+      "elapsedBlocks": "50",
+      "fundingRateWad": "10000000000000",
+      "fundingOwedUsd": "49950000000000000",
+      "liqPrice": "397900000000000000000"
+    },
+    {
+      "leverageBps": "10000",
+      "collateralUsdc": "1000",
+      "entryPrice": "200000000000000000000",
+      "isLong": true,
+      "elapsedBlocks": "0",
+      "fundingRateWad": "10000000000000",
+      "fundingOwedUsd": "0",
+      "liqPrice": "2000000000000000000"
+    },
+    {
+      "leverageBps": "10000",
+      "collateralUsdc": "1000",
+      "entryPrice": "200000000000000000000",
+      "isLong": true,
+      "elapsedBlocks": "5",
+      "fundingRateWad": "10000000000000",
+      "fundingOwedUsd": "49950000000000000",
+      "liqPrice": "2010000000000000000"
+    },
+    {
+      "leverageBps": "10000",
+      "collateralUsdc": "1000",
+      "entryPrice": "200000000000000000000",
+      "isLong": true,
+      "elapsedBlocks": "50",
+      "fundingRateWad": "10000000000000",
+      "fundingOwedUsd": "499500000000000000",
+      "liqPrice": "2100000000000000000"
+    },
+    {
+      "leverageBps": "10000",
+      "collateralUsdc": "1000",
+      "entryPrice": "200000000000000000000",
+      "isLong": false,
+      "elapsedBlocks": "0",
+      "fundingRateWad": "10000000000000",
+      "fundingOwedUsd": "0",
+      "liqPrice": "398000000000000000000"
+    },
+    {
+      "leverageBps": "10000",
+      "collateralUsdc": "1000",
+      "entryPrice": "200000000000000000000",
+      "isLong": false,
+      "elapsedBlocks": "5",
+      "fundingRateWad": "10000000000000",
+      "fundingOwedUsd": "49950000000000000",
+      "liqPrice": "397990000000000000000"
+    },
+    {
+      "leverageBps": "10000",
+      "collateralUsdc": "1000",
+      "entryPrice": "200000000000000000000",
+      "isLong": false,
+      "elapsedBlocks": "50",
+      "fundingRateWad": "10000000000000",
+      "fundingOwedUsd": "499500000000000000",
+      "liqPrice": "397900000000000000000"
+    },
+    {
+      "leverageBps": "500000",
+      "collateralUsdc": "100",
+      "entryPrice": "200000000000000000000",
+      "isLong": true,
+      "elapsedBlocks": "0",
+      "fundingRateWad": "10000000000000",
+      "fundingOwedUsd": "0",
+      "liqPrice": "198000000000000000000"
+    },
+    {
+      "leverageBps": "500000",
+      "collateralUsdc": "100",
+      "entryPrice": "200000000000000000000",
+      "isLong": true,
+      "elapsedBlocks": "5",
+      "fundingRateWad": "10000000000000",
+      "fundingOwedUsd": "249750000000000000",
+      "liqPrice": "198010000000000000000"
+    },
+    {
+      "leverageBps": "500000",
+      "collateralUsdc": "100",
+      "entryPrice": "200000000000000000000",
+      "isLong": true,
+      "elapsedBlocks": "50",
+      "fundingRateWad": "10000000000000",
+      "fundingOwedUsd": "2497500000000000000",
+      "liqPrice": "198100000000000000000"
+    },
+    {
+      "leverageBps": "500000",
+      "collateralUsdc": "100",
+      "entryPrice": "200000000000000000000",
+      "isLong": false,
+      "elapsedBlocks": "0",
+      "fundingRateWad": "10000000000000",
+      "fundingOwedUsd": "0",
+      "liqPrice": "202000000000000000000"
+    },
+    {
+      "leverageBps": "500000",
+      "collateralUsdc": "100",
+      "entryPrice": "200000000000000000000",
+      "isLong": false,
+      "elapsedBlocks": "5",
+      "fundingRateWad": "10000000000000",
+      "fundingOwedUsd": "249750000000000000",
+      "liqPrice": "201990000000000000000"
+    },
+    {
+      "leverageBps": "500000",
+      "collateralUsdc": "100",
+      "entryPrice": "200000000000000000000",
+      "isLong": false,
+      "elapsedBlocks": "50",
+      "fundingRateWad": "10000000000000",
+      "fundingOwedUsd": "2497500000000000000",
+      "liqPrice": "201900000000000000000"
+    },
+    {
+      "leverageBps": "500000",
+      "collateralUsdc": "1000",
+      "entryPrice": "200000000000000000000",
+      "isLong": true,
+      "elapsedBlocks": "0",
+      "fundingRateWad": "10000000000000",
+      "fundingOwedUsd": "0",
+      "liqPrice": "198000000000000000000"
+    },
+    {
+      "leverageBps": "500000",
+      "collateralUsdc": "1000",
+      "entryPrice": "200000000000000000000",
+      "isLong": true,
+      "elapsedBlocks": "5",
+      "fundingRateWad": "10000000000000",
+      "fundingOwedUsd": "2497500000000000000",
+      "liqPrice": "198010000000000000000"
+    },
+    {
+      "leverageBps": "500000",
+      "collateralUsdc": "1000",
+      "entryPrice": "200000000000000000000",
+      "isLong": true,
+      "elapsedBlocks": "50",
+      "fundingRateWad": "10000000000000",
+      "fundingOwedUsd": "24975000000000000000",
+      "liqPrice": "198100000000000000000"
+    },
+    {
+      "leverageBps": "500000",
+      "collateralUsdc": "1000",
+      "entryPrice": "200000000000000000000",
+      "isLong": false,
+      "elapsedBlocks": "0",
+      "fundingRateWad": "10000000000000",
+      "fundingOwedUsd": "0",
+      "liqPrice": "202000000000000000000"
+    },
+    {
+      "leverageBps": "500000",
+      "collateralUsdc": "1000",
+      "entryPrice": "200000000000000000000",
+      "isLong": false,
+      "elapsedBlocks": "5",
+      "fundingRateWad": "10000000000000",
+      "fundingOwedUsd": "2497500000000000000",
+      "liqPrice": "201990000000000000000"
+    },
+    {
+      "leverageBps": "500000",
+      "collateralUsdc": "1000",
+      "entryPrice": "200000000000000000000",
+      "isLong": false,
+      "elapsedBlocks": "50",
+      "fundingRateWad": "10000000000000",
+      "fundingOwedUsd": "24975000000000000000",
+      "liqPrice": "201900000000000000000"
+    }
+  ]
+}
