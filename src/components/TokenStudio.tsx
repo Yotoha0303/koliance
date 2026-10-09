@@ -24,6 +24,8 @@ import {
   formatEther,
   parseEther,
   http,
+  fallback,
+  encodeFunctionData,
   isAddress,
 } from "viem";
 import {
@@ -53,7 +55,7 @@ export function TokenStudio({
   // Actions state
   const [recipient, setRecipient] = useState("");
   const [amount, setAmount] = useState("");
-  const [transferType, setTransferType] = useState<"ICON" | "MON">("ICON");
+  const [transferType, setTransferType] = useState<"KOL" | "MON">("KOL");
   const [isTransferring, setIsTransferring] = useState(false);
   const [isClaiming, setIsClaiming] = useState(false);
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; msg: string; txHash?: string } | null>(null);
@@ -64,7 +66,10 @@ export function TokenStudio({
       setLoadingStats(true);
       const publicClient = createPublicClient({
         chain: monadTestnet,
-        transport: http("https://testnet-rpc.monad.xyz"),
+        transport: fallback([
+          http("https://monad-testnet.drpc.org"),
+          http("https://testnet-rpc.monad.xyz"),
+        ]),
       });
 
       const [supply, era, rate] = await Promise.all([
@@ -107,7 +112,7 @@ export function TokenStudio({
 
   useEffect(() => {
     fetchTokenData();
-    const interval = setInterval(fetchTokenData, 10000);
+    const interval = setInterval(fetchTokenData, 30000);
     return () => clearInterval(interval);
   }, [account]);
 
@@ -125,7 +130,7 @@ export function TokenStudio({
           type: "ERC20",
           options: {
             address: KOL_TOKEN_ADDRESS,
-            symbol: "ICON",
+            symbol: "KOL",
             decimals: 18,
             image: "https://koliance.vercel.app/brand-icon-512.png",
           },
@@ -149,21 +154,26 @@ export function TokenStudio({
       setIsClaiming(true);
       setFeedback(null);
 
-      const walletClient = createWalletClient({
-        account,
-        chain: monadTestnet,
-        transport: custom(window.ethereum),
-      });
-
-      const hash = await walletClient.writeContract({
-        address: KOL_TOKEN_ADDRESS,
+      // Encode claimBlockReward call
+      const data = encodeFunctionData({
         abi: KOL_TOKEN_ABI,
         functionName: "claimBlockReward",
       });
 
+      const hash = (await window.ethereum.request({
+        method: "eth_sendTransaction",
+        params: [
+          {
+            from: account,
+            to: KOL_TOKEN_ADDRESS,
+            data,
+          },
+        ],
+      })) as `0x${string}`;
+
       setFeedback({
         type: "success",
-        msg: "成功占领区块并领取 ICON 代币奖励！",
+        msg: "成功占领区块并领取 KOL 代币奖励！",
         txHash: hash,
       });
       fetchTokenData();
@@ -179,7 +189,7 @@ export function TokenStudio({
     }
   };
 
-  // Transfer ICON or MON
+  // Transfer KOL or MON
   const handleTransfer = async (e: React.FormEvent) => {
     e.preventDefault();
     setFeedback(null);
@@ -205,27 +215,31 @@ export function TokenStudio({
 
     try {
       setIsTransferring(true);
-      const walletClient = createWalletClient({
-        account,
-        chain: monadTestnet,
-        transport: custom(window.ethereum),
-      });
-
       let hash: `0x${string}`;
 
-      if (transferType === "ICON") {
+      if (transferType === "KOL") {
         if (numAmount > parseFloat(tokenBalance)) {
-          setFeedback({ type: "error", msg: `ICON 余额不足 (当前: ${tokenBalance} ICON)` });
+          setFeedback({ type: "error", msg: `KOL 余额不足 (当前: ${tokenBalance} KOL)` });
           setIsTransferring(false);
           return;
         }
 
-        hash = await walletClient.writeContract({
-          address: KOL_TOKEN_ADDRESS,
+        const data = encodeFunctionData({
           abi: KOL_TOKEN_ABI,
           functionName: "transfer",
           args: [cleanRecipient as `0x${string}`, parseEther(amount.trim())],
         });
+
+        hash = (await window.ethereum.request({
+          method: "eth_sendTransaction",
+          params: [
+            {
+              from: account,
+              to: KOL_TOKEN_ADDRESS,
+              data,
+            },
+          ],
+        })) as `0x${string}`;
       } else {
         if (numAmount > parseFloat(nativeBalance)) {
           setFeedback({ type: "error", msg: `MON 余额不足 (当前: ${nativeBalance} MON)` });
@@ -233,10 +247,17 @@ export function TokenStudio({
           return;
         }
 
-        hash = await walletClient.sendTransaction({
-          to: cleanRecipient as `0x${string}`,
-          value: parseEther(amount.trim()),
-        });
+        const valueHex = "0x" + parseEther(amount.trim()).toString(16);
+        hash = (await window.ethereum.request({
+          method: "eth_sendTransaction",
+          params: [
+            {
+              from: account,
+              to: cleanRecipient,
+              value: valueHex,
+            },
+          ],
+        })) as `0x${string}`;
       }
 
       setFeedback({
@@ -270,13 +291,13 @@ export function TokenStudio({
               <span>Monad Testnet (Chain ID: 10143)</span>
             </div>
             <h1 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight flex items-center gap-3">
-              <span>KOL 代币 (ICON)</span>
+              <span>KOL 代币 (KOL)</span>
               <span className="text-xs font-mono px-2.5 py-1 rounded-lg bg-emerald-500/20 border border-emerald-400/30 text-emerald-400 font-normal">
                 已部署
               </span>
             </h1>
             <p className="text-sm text-slate-300 max-w-2xl font-sans">
-              Koliance 原生代币，名称 <strong className="text-white">kol</strong>，符号 <strong className="text-white">ICON</strong>。
+              Koliance 原生代币，名称 <strong className="text-white">kol</strong>，符号 <strong className="text-white">KOL</strong>。
               总硬顶恒定 <strong className="text-white">2^30 (1,073,741,824)</strong> 枚，遵循比特币式每 2 年减半释放模型。
             </p>
           </div>
@@ -287,7 +308,7 @@ export function TokenStudio({
               className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/15 border border-white/15 text-white text-xs font-mono transition"
             >
               <PlusCircle className="w-4 h-4 text-purple-400" />
-              <span>添加 ICON 到 MetaMask</span>
+              <span>添加 KOL 到 MetaMask</span>
             </button>
             <a
               href={`${monadTestnet.blockExplorers.default.url}/address/${KOL_TOKEN_ADDRESS}`}
@@ -307,11 +328,11 @@ export function TokenStudio({
         {/* Token Balance */}
         <div className="p-5 rounded-2xl bg-[#141824]/90 border border-white/10 space-y-2">
           <div className="flex items-center justify-between text-slate-400 text-xs font-mono">
-            <span>我的 ICON 余额</span>
+            <span>我的 KOL 余额</span>
             <Coins className="w-4 h-4 text-purple-400" />
           </div>
           <div className="text-2xl font-bold text-white font-mono">
-            {parseFloat(tokenBalance).toFixed(4)} <span className="text-sm text-purple-300 font-normal">ICON</span>
+            {parseFloat(tokenBalance).toFixed(4)} <span className="text-sm text-purple-300 font-normal">KOL</span>
           </div>
           <div className="text-[11px] text-slate-400 font-mono">
             原生 MON: <span className="text-emerald-400 font-semibold">{nativeBalance} MON</span>
@@ -436,13 +457,13 @@ export function TokenStudio({
             ) : (
               <>
                 <Pickaxe className="w-4 h-4" />
-                <span>立即占领区块并领取 ICON</span>
+                <span>立即占领区块并领取 KOL</span>
               </>
             )}
           </button>
         </div>
 
-        {/* Right: Transfer Portal (ICON or MON) */}
+        {/* Right: Transfer Portal (KOL or MON) */}
         <div className="p-6 sm:p-8 rounded-3xl bg-[#141824]/90 border border-white/10 space-y-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -452,7 +473,7 @@ export function TokenStudio({
               <div>
                 <h3 className="text-base font-bold text-white">链上转账控制台</h3>
                 <p className="text-xs text-slate-400 font-mono">
-                  支持转账 ICON 与 原生 MON
+                  支持转账 KOL 与 原生 MON
                 </p>
               </div>
             </div>
@@ -461,14 +482,14 @@ export function TokenStudio({
             <div className="flex items-center gap-1 p-1 bg-black/50 border border-white/10 rounded-xl">
               <button
                 type="button"
-                onClick={() => setTransferType("ICON")}
+                onClick={() => setTransferType("KOL")}
                 className={`px-3 py-1 rounded-lg text-xs font-mono transition ${
-                  transferType === "ICON"
+                  transferType === "KOL"
                     ? "bg-purple-600 text-white font-bold"
                     : "text-slate-400 hover:text-white"
                 }`}
               >
-                ICON
+                KOL
               </button>
               <button
                 type="button"
@@ -503,7 +524,7 @@ export function TokenStudio({
                 <button
                   type="button"
                   onClick={() => {
-                    if (transferType === "ICON") {
+                    if (transferType === "KOL") {
                       setAmount(tokenBalance);
                     } else {
                       const balNum = parseFloat(nativeBalance || "0");
@@ -512,7 +533,7 @@ export function TokenStudio({
                   }}
                   className="text-[11px] text-purple-300 hover:text-purple-200 underline"
                 >
-                  全部可用 ({transferType === "ICON" ? parseFloat(tokenBalance).toFixed(4) : nativeBalance})
+                  全部可用 ({transferType === "KOL" ? parseFloat(tokenBalance).toFixed(4) : nativeBalance})
                 </button>
               </div>
               <div className="relative">

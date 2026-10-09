@@ -19,12 +19,14 @@ import {
   Send,
   Copy,
   Link2,
+  Coins,
 } from "lucide-react";
 import Image from "next/image";
+import { createPublicClient, http, fallback, formatEther } from "viem";
 import { GOOGLE_CLIENT_ID, GITHUB_CLIENT_ID } from "@/lib/authConfig";
 import { EditProfileModal, UserProfileData } from "@/components/EditProfileModal";
 import { TransferModal } from "@/components/TransferModal";
-import { monadTestnet } from "@/lib/contract";
+import { monadTestnet, KOL_TOKEN_ADDRESS, KOL_TOKEN_ABI } from "@/lib/contract";
 import { truncateAddress } from "@/lib/utils";
 
 interface NavAuthBadgesProps {
@@ -43,7 +45,40 @@ export function NavAuthBadges({
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [transferModalOpen, setTransferModalOpen] = useState(false);
+  const [transferCurrency, setTransferCurrency] = useState<"KOL" | "MON">("KOL");
+  const [kolBalance, setKolBalance] = useState("0.00");
   const [copied, setCopied] = useState(false);
+
+  // Fetch KOL Token balance for the connected wallet
+  useEffect(() => {
+    if (!walletAddress) {
+      setKolBalance("0.00");
+      return;
+    }
+    const fetchBalance = async () => {
+      try {
+        const client = createPublicClient({
+          chain: monadTestnet,
+          transport: fallback([
+            http("https://monad-testnet.drpc.org"),
+            http("https://testnet-rpc.monad.xyz"),
+          ]),
+        });
+        const bal = await client.readContract({
+          address: KOL_TOKEN_ADDRESS,
+          abi: KOL_TOKEN_ABI,
+          functionName: "balanceOf",
+          args: [walletAddress as `0x${string}`],
+        });
+        setKolBalance(parseFloat(formatEther(bal)).toFixed(4));
+      } catch (err) {
+        console.error("Failed to load KOL balance in navbar:", err);
+      }
+    };
+    fetchBalance();
+    const interval = setInterval(fetchBalance, 30000);
+    return () => clearInterval(interval);
+  }, [walletAddress]);
 
   // Auth states stored in localStorage
   const [googleUser, setGoogleUser] = useState<{
@@ -297,9 +332,14 @@ export function NavAuthBadges({
                   <Wallet className="w-4 h-4 text-purple-400" />
                   <span>Monad 链上钱包</span>
                 </span>
-                <span className="text-[10px] text-emerald-300 font-bold bg-emerald-950/60 border border-emerald-500/50 px-2 py-0.5 rounded-full">
-                  {walletAddress ? `${balance} MON` : "未连接"}
-                </span>
+                <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                  <span className="text-[10px] text-purple-300 font-bold bg-purple-950/60 border border-purple-500/50 px-2 py-0.5 rounded-full">
+                    {walletAddress ? `${kolBalance} KOL` : "未连接"}
+                  </span>
+                  <span className="text-[10px] text-emerald-300 font-bold bg-emerald-950/60 border border-emerald-500/50 px-2 py-0.5 rounded-full">
+                    {walletAddress ? `${balance} MON` : "未连接"}
+                  </span>
+                </div>
               </div>
 
               {walletAddress ? (
@@ -331,16 +371,28 @@ export function NavAuthBadges({
                     </div>
                   </div>
 
-                  {/* Wallet Action Buttons: Transfer & Disconnect */}
-                  <div className="grid grid-cols-2 gap-2 pt-0.5">
+                  {/* Wallet Action Buttons: Transfer KOL, Transfer MON & Disconnect */}
+                  <div className="grid grid-cols-3 gap-1.5 pt-0.5">
                     <button
                       onClick={() => {
+                        setTransferCurrency("KOL");
                         setDropdownOpen(false);
                         setTransferModalOpen(true);
                       }}
-                      className="py-1.5 px-2 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-xs font-mono font-semibold transition flex items-center justify-center gap-1.5 shadow-md active:scale-95 border border-purple-400/40"
+                      className="py-1.5 px-2 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-[11px] font-mono font-semibold transition flex items-center justify-center gap-1 shadow-md active:scale-95 border border-purple-400/40"
                     >
-                      <Send className="w-3 h-3" />
+                      <Coins className="w-3 h-3 text-purple-200" />
+                      <span>转账 KOL</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        setTransferCurrency("MON");
+                        setDropdownOpen(false);
+                        setTransferModalOpen(true);
+                      }}
+                      className="py-1.5 px-2 rounded-lg bg-emerald-700/80 hover:bg-emerald-600 text-white text-[11px] font-mono font-semibold transition flex items-center justify-center gap-1 shadow-md active:scale-95 border border-emerald-400/40"
+                    >
+                      <Send className="w-3 h-3 text-emerald-200" />
                       <span>转账 MON</span>
                     </button>
                     <button
@@ -348,10 +400,10 @@ export function NavAuthBadges({
                         setDropdownOpen(false);
                         onDisconnectWallet?.();
                       }}
-                      className="py-1.5 px-2 rounded-lg bg-[#2a1720] hover:bg-[#3d1f2d] border border-red-500/40 text-red-300 text-xs font-mono transition flex items-center justify-center gap-1.5"
+                      className="py-1.5 px-2 rounded-lg bg-[#2a1720] hover:bg-[#3d1f2d] border border-red-500/40 text-red-300 text-[11px] font-mono transition flex items-center justify-center gap-1"
                     >
                       <LogOut className="w-3 h-3" />
-                      <span>断开钱包</span>
+                      <span>断开</span>
                     </button>
                   </div>
                 </div>
@@ -544,13 +596,14 @@ export function NavAuthBadges({
         }}
       />
 
-      {/* Transfer Modal for Monad MON */}
+      {/* Transfer Modal for Monad KOL & MON */}
       {effectiveWallet && (
         <TransferModal
           isOpen={transferModalOpen}
           onClose={() => setTransferModalOpen(false)}
           senderAddress={effectiveWallet}
           balance={balance}
+          initialCurrency={transferCurrency}
         />
       )}
     </div>

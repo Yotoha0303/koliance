@@ -11,10 +11,16 @@ export const monadTestnet = defineChain({
   },
   rpcUrls: {
     default: {
-      http: ["https://testnet-rpc.monad.xyz"],
+      http: [
+        "https://testnet-rpc.monad.xyz",
+        "https://monad-testnet.drpc.org",
+      ],
     },
     public: {
-      http: ["https://testnet-rpc.monad.xyz"],
+      http: [
+        "https://testnet-rpc.monad.xyz",
+        "https://monad-testnet.drpc.org",
+      ],
     },
   },
   blockExplorers: {
@@ -30,9 +36,9 @@ export const monadTestnet = defineChain({
 export const KOLIANCE_ADDRESS = (process.env.NEXT_PUBLIC_KOLIANCE_ADDRESS ||
   "0x32fDd6B096EE14246b5b6971135286Bad01F4928") as `0x${string}`;
 
-// KolToken (ICON) deployed on Monad Testnet
+// KolToken (KOL) deployed on Monad Testnet
 export const KOL_TOKEN_ADDRESS = (process.env.NEXT_PUBLIC_KOL_TOKEN_ADDRESS ||
-  "0xe18e18604ebe9b7692ac67d2c0f1d5af3aa6cca4") as `0x${string}`;
+  "0x4cadb6f0e1b83ccb7207db4786b2a1500f066328") as `0x${string}`;
 
 export const KOL_TOKEN_ABI = [
   {

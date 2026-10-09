@@ -16,7 +16,7 @@ describe("KolToken (kol / ICON)", async function () {
     const maxSupply = await kolToken.read.MAX_SUPPLY();
 
     assert.equal(name, "kol");
-    assert.equal(symbol, "ICON");
+    assert.equal(symbol, "KOL");
     assert.equal(decimals, 18);
     // 2^30 * 10^18
     const expectedMaxSupply = (2n ** 30n) * (10n ** 18n);

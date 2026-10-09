@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Send,
@@ -10,15 +10,31 @@ import {
   AlertCircle,
   ArrowUpRight,
   ExternalLink,
+  Coins,
 } from "lucide-react";
-import { parseEther } from "viem";
-import { monadTestnet } from "@/lib/contract";
+import {
+  parseEther,
+  formatEther,
+  createPublicClient,
+  createWalletClient,
+  custom,
+  http,
+  fallback,
+  encodeFunctionData,
+  isAddress,
+} from "viem";
+import {
+  monadTestnet,
+  KOL_TOKEN_ADDRESS,
+  KOL_TOKEN_ABI,
+} from "@/lib/contract";
 
 interface TransferModalProps {
   isOpen: boolean;
   onClose: () => void;
   senderAddress: string;
-  balance: string;
+  balance: string; // Native MON balance
+  initialCurrency?: "KOL" | "MON";
   onSuccess?: (txHash: string) => void;
 }
 
@@ -27,15 +43,53 @@ export function TransferModal({
   onClose,
   senderAddress,
   balance,
+  initialCurrency = "KOL",
   onSuccess,
 }: TransferModalProps) {
+  const [currency, setCurrency] = useState<"KOL" | "MON">(initialCurrency);
+  const [kolBalance, setKolBalance] = useState<string>("0.00");
   const [recipient, setRecipient] = useState("");
   const [amount, setAmount] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [txHash, setTxHash] = useState<string | null>(null);
 
+  useEffect(() => {
+    setCurrency(initialCurrency);
+  }, [initialCurrency, isOpen]);
+
+  // Fetch user's KOL token balance
+  useEffect(() => {
+    if (!isOpen || !senderAddress) return;
+
+    const fetchKolBalance = async () => {
+      try {
+        const publicClient = createPublicClient({
+          chain: monadTestnet,
+          transport: fallback([
+            http("https://monad-testnet.drpc.org"),
+            http("https://testnet-rpc.monad.xyz"),
+          ]),
+        });
+
+        const bal = await publicClient.readContract({
+          address: KOL_TOKEN_ADDRESS,
+          abi: KOL_TOKEN_ABI,
+          functionName: "balanceOf",
+          args: [senderAddress as `0x${string}`],
+        });
+        setKolBalance(parseFloat(formatEther(bal)).toFixed(4));
+      } catch (err) {
+        console.error("Failed to fetch KOL balance in modal:", err);
+      }
+    };
+
+    fetchKolBalance();
+  }, [isOpen, senderAddress]);
+
   if (!isOpen) return null;
+
+  const currentAvailableBalance = currency === "KOL" ? kolBalance : balance;
 
   const handleTransfer = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -43,7 +97,7 @@ export function TransferModal({
     setTxHash(null);
 
     const cleanRecipient = recipient.trim();
-    if (!cleanRecipient.startsWith("0x") || cleanRecipient.length !== 42) {
+    if (!isAddress(cleanRecipient)) {
       setError("请输入合法的 0x 开头 42 位 EVM 钱包地址");
       return;
     }
@@ -54,31 +108,53 @@ export function TransferModal({
       return;
     }
 
-    if (numAmount > parseFloat(balance || "0")) {
-      setError(`转账金额超出可用余额 (${balance} MON)`);
+    if (numAmount > parseFloat(currentAvailableBalance || "0")) {
+      setError(`转账金额超出可用余额 (${currentAvailableBalance} ${currency})`);
       return;
     }
 
     if (typeof window === "undefined" || !window.ethereum) {
-      setError("未检测到 Web3 钱包 (如 MetaMask / Phantom)");
+      setError("未检测到 Web3 钱包 (如 MetaMask)");
       return;
     }
 
     setIsLoading(true);
 
     try {
-      const valueHex = "0x" + parseEther(amount.trim()).toString(16);
+      let hash: `0x${string}`;
 
-      const hash = (await window.ethereum.request({
-        method: "eth_sendTransaction",
-        params: [
-          {
-            from: senderAddress,
-            to: cleanRecipient,
-            value: valueHex,
-          },
-        ],
-      })) as string;
+      if (currency === "KOL") {
+        // Transfer ERC-20 KOL Token directly via MetaMask to avoid RPC rate limit
+        const data = encodeFunctionData({
+          abi: KOL_TOKEN_ABI,
+          functionName: "transfer",
+          args: [cleanRecipient as `0x${string}`, parseEther(amount.trim())],
+        });
+
+        hash = (await window.ethereum.request({
+          method: "eth_sendTransaction",
+          params: [
+            {
+              from: senderAddress,
+              to: KOL_TOKEN_ADDRESS,
+              data,
+            },
+          ],
+        })) as `0x${string}`;
+      } else {
+        // Transfer Native MON
+        const valueHex = "0x" + parseEther(amount.trim()).toString(16);
+        hash = (await window.ethereum.request({
+          method: "eth_sendTransaction",
+          params: [
+            {
+              from: senderAddress,
+              to: cleanRecipient,
+              value: valueHex,
+            },
+          ],
+        })) as `0x${string}`;
+      }
 
       setTxHash(hash);
       onSuccess?.(hash);
@@ -91,10 +167,13 @@ export function TransferModal({
   };
 
   const handleSetMax = () => {
-    const balNum = parseFloat(balance || "0");
-    // Leave small buffer for gas
-    const maxVal = Math.max(0, balNum - 0.005).toFixed(4);
-    setAmount(maxVal);
+    if (currency === "KOL") {
+      setAmount(kolBalance);
+    } else {
+      const balNum = parseFloat(balance || "0");
+      const maxVal = Math.max(0, balNum - 0.005).toFixed(4);
+      setAmount(maxVal);
+    }
   };
 
   return (
@@ -114,7 +193,7 @@ export function TransferModal({
           initial={{ opacity: 0, scale: 0.95, y: 15 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 15 }}
-          className="relative w-full max-w-md rounded-2xl bg-[#141824] border border-white/15 p-6 shadow-2xl text-white z-10 space-y-5"
+          className="relative w-full max-w-md rounded-3xl bg-[#141824] border border-white/15 p-6 shadow-2xl text-white z-10 space-y-5"
         >
           {/* Header */}
           <div className="flex items-center justify-between border-b border-white/10 pb-3">
@@ -123,9 +202,12 @@ export function TransferModal({
                 <Send className="w-4 h-4" />
               </div>
               <div>
-                <h3 className="text-sm font-bold text-white">链上转账 (Monad MON)</h3>
+                <h3 className="text-sm font-bold text-white">Monad 链上转账</h3>
                 <p className="text-[11px] font-mono text-slate-400">
-                  当前余额: <span className="text-emerald-400 font-semibold">{balance} MON</span>
+                  当前余额:{" "}
+                  <span className="text-purple-300 font-semibold">{kolBalance} KOL</span>
+                  {" · "}
+                  <span className="text-emerald-400 font-semibold">{balance} MON</span>
                 </p>
               </div>
             </div>
@@ -139,9 +221,9 @@ export function TransferModal({
 
           {/* Form */}
           {txHash ? (
-            <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-400/30 space-y-3 text-center">
+            <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-400/30 space-y-3 text-center">
               <CheckCircle2 className="w-8 h-8 text-emerald-400 mx-auto" />
-              <div className="text-xs font-bold text-white">转账交易已成功广播！</div>
+              <div className="text-xs font-bold text-white">{currency} 转账交易已成功广播！</div>
               <p className="text-[11px] font-mono text-slate-300 break-all bg-black/40 p-2 rounded-lg">
                 Tx: {txHash}
               </p>
@@ -172,6 +254,44 @@ export function TransferModal({
                 </div>
               )}
 
+              {/* Currency Selector */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-mono text-slate-300">选择转账币种</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCurrency("KOL");
+                      setAmount("");
+                    }}
+                    className={`py-2 px-3 rounded-xl border flex items-center justify-center gap-2 text-xs font-mono font-bold transition ${
+                      currency === "KOL"
+                        ? "bg-purple-600 border-purple-400 text-white shadow-md shadow-purple-600/30"
+                        : "bg-black/30 border-white/10 text-slate-400 hover:text-white"
+                    }`}
+                  >
+                    <Coins className="w-4 h-4 text-purple-300" />
+                    <span>KOL 代币 ({kolBalance})</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCurrency("MON");
+                      setAmount("");
+                    }}
+                    className={`py-2 px-3 rounded-xl border flex items-center justify-center gap-2 text-xs font-mono font-bold transition ${
+                      currency === "MON"
+                        ? "bg-emerald-600 border-emerald-400 text-white shadow-md shadow-emerald-600/30"
+                        : "bg-black/30 border-white/10 text-slate-400 hover:text-white"
+                    }`}
+                  >
+                    <Send className="w-4 h-4 text-emerald-300" />
+                    <span>MON 原生币 ({balance})</span>
+                  </button>
+                </div>
+              </div>
+
               {/* Recipient Address */}
               <div className="space-y-1.5">
                 <label className="text-xs font-mono text-slate-300">接收方地址 (Recipient Address)</label>
@@ -188,13 +308,13 @@ export function TransferModal({
               {/* Amount */}
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between text-xs font-mono text-slate-300">
-                  <label>转账数量 (Amount MON)</label>
+                  <label>转账数量 (Amount {currency})</label>
                   <button
                     type="button"
                     onClick={handleSetMax}
                     className="text-[10px] text-purple-300 hover:text-purple-200 underline"
                   >
-                    最大 (保留少量Gas)
+                    最大 ({currentAvailableBalance} {currency})
                   </button>
                 </div>
                 <div className="relative">
@@ -207,8 +327,8 @@ export function TransferModal({
                     className="w-full px-3 py-2 pr-14 rounded-xl bg-black/40 border border-white/15 focus:border-purple-400 focus:outline-none text-xs font-mono text-white placeholder-slate-500"
                     required
                   />
-                  <span className="absolute right-3 top-2 text-xs font-mono text-slate-400 pointer-events-none">
-                    MON
+                  <span className="absolute right-3 top-2 text-xs font-mono text-slate-300 font-bold pointer-events-none">
+                    {currency}
                   </span>
                 </div>
               </div>
@@ -227,7 +347,7 @@ export function TransferModal({
                 ) : (
                   <>
                     <ArrowUpRight className="w-4 h-4" />
-                    <span>确认发送转账</span>
+                    <span>确认发送 {currency} 转账</span>
                   </>
                 )}
               </button>

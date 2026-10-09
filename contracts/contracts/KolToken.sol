@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.31;
 
-/// @title KolToken (ICON)
-/// @notice Monad 链上代币，名称 kol，符号 ICON，总上限 2^30，每 2 年减半释放
+/// @title KolToken (KOL)
+/// @notice Monad 链上代币，名称 kol，符号 KOL，总上限 2^30，每 2 年减半释放
 contract KolToken {
     string public constant name = "kol";
-    string public constant symbol = "ICON";
+    string public constant symbol = "KOL";
     uint8 public constant decimals = 18;
 
     // 总硬顶 2^30 * 1e18

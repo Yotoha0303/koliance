@@ -19,9 +19,9 @@ async function main() {
   console.log(`\n✅ KolToken 部署成功！`);
   console.log(`📍 合约地址: ${kolToken.address}`);
   console.log(`📌 代币名称 (Name): kol`);
-  console.log(`📌 代币符号 (Symbol): ICON`);
+  console.log(`📌 代币符号 (Symbol): KOL`);
   console.log(`📌 精度 (Decimals): 18`);
-  console.log(`📌 总硬顶 (Max Supply): 2^30 (${2n ** 30n} ICON)`);
+  console.log(`📌 总硬顶 (Max Supply): 2^30 (${2n ** 30n} KOL)`);
   console.log(`\n🔍 在 Monad 浏览器查看: https://testnet.monadexplorer.com/address/${kolToken.address}\n`);
 }
 
