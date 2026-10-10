@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { syncUserToDatabase } from "@/lib/db";
+import { checkGoogleIdTokenClaims } from "@/lib/googleIdToken";
+import { googleLoginTier } from "@/lib/trustTier";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -23,14 +25,10 @@ export async function OPTIONS() {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const {
-      code,
-      id_token,
-      clientId: clientProvidedId,
-      clientSecret: clientProvidedSecret,
-      redirect_uri,
-      wallet_address,
-    } = body;
+    // `clientId` / `clientSecret` in the body are deliberately ignored: the
+    // audience a token is checked against must be the one THIS server is
+    // configured for, never one the caller chooses.
+    const { code, id_token, redirect_uri, wallet_address } = body;
 
     // Support both direct code exchange and pre-verified id_token exchange
     if (!code && !id_token) {
@@ -43,13 +41,9 @@ export async function POST(request: NextRequest) {
     const clientId =
       process.env.GOOGLE_CLIENT_ID ||
       process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ||
-      clientProvidedId ||
       DEFAULT_GOOGLE_CLIENT_ID;
 
-    const clientSecret =
-      process.env.GOOGLE_CLIENT_SECRET ||
-      clientProvidedSecret ||
-      DEFAULT_GOOGLE_CLIENT_SECRET;
+    const clientSecret = process.env.GOOGLE_CLIENT_SECRET || DEFAULT_GOOGLE_CLIENT_SECRET;
 
     // Handle instant sandbox demo verification
     if (id_token === "demo_verified_google_identity") {
@@ -166,6 +160,13 @@ export async function POST(request: NextRequest) {
         );
       }
       const tokenInfo = await tokenInfoRes.json();
+      const claims = checkGoogleIdTokenClaims(tokenInfo, clientId);
+      if (!claims.ok) {
+        return NextResponse.json(
+          { error: `Invalid Google ID token: ${claims.reason}` },
+          { status: 401, headers: corsHeaders }
+        );
+      }
       googleUser = {
         sub: tokenInfo.sub,
         email: tokenInfo.email,
@@ -175,16 +176,8 @@ export async function POST(request: NextRequest) {
       };
     }
 
-    // Determine developer / trust credit allowance based on Google account verification
-    const emailDomain = googleUser.email.split("@")[1] || "";
-    const isEnterpriseOrDev = [
-      "google.com",
-      "gmail.com",
-      "github.com",
-      "monad.xyz",
-    ].includes(emailDomain);
-    const tier = isEnterpriseOrDev ? "GOOGLE VERIFIED ARCHITECT" : "GOOGLE VERIFIED CITIZEN";
-    const creditAllowanceUSD = isEnterpriseOrDev ? 1200 : 600;
+    // Same baseline for every Google login; no e-mail-domain bonus (see trustTier.ts).
+    const { tier, creditAllowanceUSD } = googleLoginTier();
 
     // Automatically create / upsert Koliance account and sync to database
     const kolianceUserId = `did:koliance:google:${googleUser.sub}`;

@@ -1,0 +1,16 @@
+# gitleaks baseline: findings that already existed in history when the
+# secret-scan CI job was added (fix/review-hardening). Each entry is
+# <commit>:<file>:<rule>:<line> - a location, never a secret value.
+#
+# Because entries are pinned to the historical commit, they do NOT exempt the
+# same value in any new commit: copying, moving or editing one of these lines
+# produces a new fingerprint and fails CI. Remove an entry only by rotating the
+# credential; add one only for a confirmed false positive.
+3390b45cc8d85df563bfd69c8d1014a2da850d8a:.env.example:generic-api-key:5
+79e70733e55b707cc69d668809328624caa36ce2:.env.example:generic-api-key:5
+79e70733e55b707cc69d668809328624caa36ce2:src/lib/contract.ts:generic-api-key:34
+96a6efd7e4b4ddd6aeb22cb4cf8354e9c224f6a4:backend/internal/config/config.go:generic-api-key:39
+96a6efd7e4b4ddd6aeb22cb4cf8354e9c224f6a4:backend/internal/config/config.go:generic-api-key:40
+96a6efd7e4b4ddd6aeb22cb4cf8354e9c224f6a4:backend/internal/config/config.go:generic-api-key:42
+ae237897e9eca83870f6f402e6d6ee00186600af:src/lib/db.ts:generic-api-key:7
+df227bff45274015f4da6ff3585a8a2089c2ce40:docs/planning/执行方案-自治Agent清结算.md:generic-api-key:194

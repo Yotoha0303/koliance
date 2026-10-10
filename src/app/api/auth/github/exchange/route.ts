@@ -1,4 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
+import {
+  GITHUB_STATE_COOKIE,
+  GITHUB_STATE_COOKIE_PATH,
+  stateMatchesCookie,
+} from "@/lib/oauthState";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -16,10 +21,24 @@ export async function OPTIONS() {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { code, clientId: clientProvidedId, clientSecret: clientProvidedSecret, redirect_uri } = body;
+    const { code, state, clientId: clientProvidedId, clientSecret: clientProvidedSecret, redirect_uri } = body;
 
     if (!code) {
       return NextResponse.json({ error: "Missing authorization code" }, { status: 400, headers: corsHeaders });
+    }
+
+    // CSRF: the state GitHub echoed back must carry the nonce that
+    // /api/auth/github/start put in this browser's httpOnly cookie. The
+    // cookie is cleared on a mismatch and after a successful exchange, and
+    // expires on its own after STATE_TTL_SECONDS.
+    const cookieNonce = request.cookies.get(GITHUB_STATE_COOKIE)?.value;
+    if (!stateMatchesCookie(state, cookieNonce)) {
+      const res = NextResponse.json(
+        { error: "OAuth state mismatch or expired; please start the GitHub login again" },
+        { status: 403, headers: corsHeaders }
+      );
+      res.cookies.set(GITHUB_STATE_COOKIE, "", { path: GITHUB_STATE_COOKIE_PATH, maxAge: 0 });
+      return res;
     }
 
     const clientId =
@@ -131,7 +150,7 @@ export async function POST(request: NextRequest) {
       creditUSD = 2500;
     }
 
-    return NextResponse.json(
+    const ok = NextResponse.json(
       {
         success: true,
         stats: {
@@ -153,6 +172,8 @@ export async function POST(request: NextRequest) {
       },
       { headers: corsHeaders }
     );
+    ok.cookies.set(GITHUB_STATE_COOKIE, "", { path: GITHUB_STATE_COOKIE_PATH, maxAge: 0 });
+    return ok;
   } catch (err: any) {
     return NextResponse.json({ error: String(err?.message || err) }, { status: 500, headers: corsHeaders });
   }

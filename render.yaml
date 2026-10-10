@@ -35,3 +35,15 @@ services:
         value: "10143"
       - key: KOLIANCE_CONTRACT_ADDRESS
         value: "0x32fDd6B096EE14246b5b6971135286Bad01F4928"
+      # Browser origins allowed by CORS (exact match, comma separated; no "*").
+      - key: CORS_ALLOWED_ORIGINS
+        value: "https://koliance.oodai.space,http://localhost:3000,http://127.0.0.1:3000"
+      # Operator bearer token for batch-settle / Stripe customer / Alpaca writes.
+      # Set it in the Render dashboard; unset = those endpoints answer 503.
+      - key: KOLIANCE_API_TOKEN
+        sync: false
+      # Hackathon demo: let browsers place Alpaca *paper* trades without the
+      # operator token (inputs are still validated and capped). Set to "false"
+      # to make trade/close operator-only.
+      - key: DEMO_PUBLIC_TRADING
+        value: "true"

@@ -25,6 +25,17 @@ import {PerpConstants} from "./PerpConstants.sol";
 /// Solvency: withdrawals are capped at `totalAssets() - reservedAssets()`, where the
 /// reserve is whatever the PositionManager reports it may owe open positions. A pool
 /// that cannot pay must revert, never settle a shortfall by minting value.
+///
+/// LP pricing (SC-1): shares are priced off the pool's NET asset value, not its
+/// balance. The balance includes every open position's collateral, which belongs
+/// to the traders; counting it let an LP who joined while positions were open buy
+/// in at an inflated price and lose ~11% when those traders closed flat
+/// (20,000 in, 17,782.22 out). See `lpNavUsd` and
+/// `IPositionManager.lpLiabilityUsd` for how unrealised PnL is treated.
+///
+/// Inflation attack: share maths uses a virtual offset (VIRTUAL_SHARES /
+/// VIRTUAL_ASSETS, i.e. a phantom 1-USD LP), so a first depositor who donates to
+/// the pool to skew the share price captures almost none of the donation.
 contract Vault is IVault, Ownable {
     using SafeCast for uint256;
 
@@ -46,6 +57,11 @@ contract Vault is IVault, Ownable {
 
     /// @notice The only address allowed to move funds out via {payOut}.
     address public positionManager;
+
+    /// @notice Virtual offset for share pricing (OpenZeppelin ERC-4626 style).
+    /// Equal values keep the first deposit at exactly 1 share per 1e18 USD.
+    uint256 public constant VIRTUAL_SHARES = 1e18;
+    uint256 public constant VIRTUAL_ASSETS = 1e18;
 
     error ZeroAmount();
     error ZeroShares();
@@ -114,10 +130,12 @@ contract Vault is IVault, Ownable {
     function addLiquidity(uint256 amount) external returns (uint256 shares) {
         if (amount == 0) revert ZeroAmount();
 
-        // Shares are minted against the pool's value BEFORE this deposit, so a
-        // deposit cannot dilute existing LPs by counting itself as backing.
-        uint256 assetsBefore = totalAssets();
-        shares = totalShares == 0 ? usdcToUsd(amount) : (usdcToUsd(amount) * totalShares) / assetsBefore;
+        // Shares are minted against the pool's NAV BEFORE this deposit (so the
+        // deposit cannot count itself as backing), net of what open positions
+        // are owed (so trader collateral is not sold to the new LP as pool
+        // value). Rounds down, against the depositor.
+        uint256 navBefore = lpNavUsd(false);
+        shares = (usdcToUsd(amount) * (totalShares + VIRTUAL_SHARES)) / (navBefore + VIRTUAL_ASSETS);
         if (shares == 0) revert ZeroShares();
 
         if (!asset.transferFrom(msg.sender, address(this), amount)) revert TransferFailed();
@@ -135,7 +153,9 @@ contract Vault is IVault, Ownable {
         if (shares > held) revert InsufficientShares(shares, held);
 
         uint256 assets = totalAssets();
-        uint256 grossUsd = (assets * shares) / totalShares;
+        // Priced off the conservative NAV: unrealised trader losses are not
+        // paid out to a leaving LP before they are realised. Rounds down.
+        uint256 grossUsd = (shares * (lpNavUsd(true) + VIRTUAL_ASSETS)) / (totalShares + VIRTUAL_SHARES);
 
         // LPs may only take what is not needed to back open positions. Without this
         // an LP could drain the collateral behind live trades and leave winning
@@ -155,8 +175,27 @@ contract Vault is IVault, Ownable {
     }
 
     /// @inheritdoc IVault
+    /// @dev The raw balance in USD, INCLUDING open positions' collateral. This
+    ///      is what solvency checks and payouts compare against. LP share
+    ///      pricing uses {lpNavUsd} instead.
     function totalAssets() public view returns (uint256) {
         return usdcToUsd(usdcBalance());
+    }
+
+    /// @notice Net asset value attributable to LPs, 18-decimal USD:
+    ///         `totalAssets() - lpLiabilityUsd(forWithdrawal)`, floored at 0.
+    /// @param forWithdrawal true for the (lower) value used to pay leaving LPs,
+    ///        false for the value used to price new deposits.
+    function lpNavUsd(bool forWithdrawal) public view returns (uint256) {
+        uint256 assets = totalAssets();
+        if (positionManager == address(0)) return assets;
+        uint256 liability = IPositionManager(positionManager).lpLiabilityUsd(forWithdrawal);
+        return assets > liability ? assets - liability : 0;
+    }
+
+    /// @notice USD value of `shares` if redeemed now (before the liquidity cap).
+    function previewRedeemUsd(uint256 shares) external view returns (uint256) {
+        return (shares * (lpNavUsd(true) + VIRTUAL_ASSETS)) / (totalShares + VIRTUAL_SHARES);
     }
 
     // ==================== POSITION MANAGER ====================

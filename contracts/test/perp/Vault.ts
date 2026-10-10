@@ -154,6 +154,39 @@ describe("Vault", async function () {
     assert.equal(await vault.read.totalShares(), usd(600));
   });
 
+  it("Prices deposits and withdrawals off NAV net of the PositionManager's liability", async function () {
+    const { token, vault } = await setup();
+    const pm = await viem.deployContract("MockPositionManager");
+    await vault.write.addLiquidity([THOUSAND_USDC], { account: lp.account });
+    await vault.write.setPositionManager([pm.address]);
+
+    // 1000 in the pool, of which the PM says 200 (deposit view) / 500
+    // (withdrawal view) is owed to traders.
+    await pm.write.setLiability([usd(200), usd(500)]);
+    assert.equal(await vault.read.lpNavUsd([false]), usd(800));
+    assert.equal(await vault.read.lpNavUsd([true]), usd(500));
+
+    // A deposit of 800 at NAV 800 for 1000 shares mints ~1000 shares.
+    await token.write.mint([other.account.address, usdc(800)]);
+    await token.write.approve([vault.address, usdc(800)], { account: other.account });
+    await vault.write.addLiquidity([usdc(800)], { account: other.account });
+    const minted = await vault.read.sharesOf([other.account.address]);
+    assert.ok(minted > usd(999) && minted <= usd(1_000), `minted ${minted}`);
+
+    // Redemption uses the withdrawal view: (1800 - 500) / ~2000 shares.
+    const preview = await vault.read.previewRedeemUsd([usd(100)]);
+    assert.ok(preview > usd(64) && preview < usd(66), `preview ${preview}`);
+  });
+
+  it("Values LP shares at zero when the liability exceeds the pool", async function () {
+    const { vault } = await setup();
+    const pm = await viem.deployContract("MockPositionManager");
+    await vault.write.addLiquidity([THOUSAND_USDC], { account: lp.account });
+    await vault.write.setPositionManager([pm.address]);
+    await pm.write.setLiability([usd(5_000), usd(5_000)]);
+    assert.equal(await vault.read.lpNavUsd([true]), 0n);
+  });
+
   it("Treats the reserve as zero before the PositionManager is wired", async function () {
     const { vault } = await setup();
     await vault.write.addLiquidity([THOUSAND_USDC], { account: lp.account });

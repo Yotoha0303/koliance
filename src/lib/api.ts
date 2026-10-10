@@ -39,12 +39,16 @@ export interface GameplayProof {
   generatedAt: string;
 }
 
+// The Go gateway never returns the full PAN or the CVV. `cardToken` is the
+// card owner's bearer credential and is only present in the /generate
+// response; send it as `Authorization: Bearer <cardToken>` for card lookup,
+// session-key issue and owner charges.
 export interface VisaCardData {
   cardId: string;
-  cardNumber: string;
   formattedNumber: string;
+  last4: string;
   expiry: string;
-  cvv: string;
+  cardToken?: string;
   cardholderName: string;
   walletAddress: string;
   balanceUSD: number;

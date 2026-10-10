@@ -216,6 +216,43 @@ describe("PythOracleAdapter", async function () {
     assert.equal(await pyth.read.updateCallCount(), 0n);
   });
 
+  it("Refuses pushes from a stranger, so nobody can drain the fee balance", async function () {
+    const { pyth, adapter } = await setup();
+    await pyth.write.setUpdateFee([1_000n]);
+    await deployer.sendTransaction({ to: adapter.address, value: 10_000n });
+
+    await assert.rejects(
+      adapter.write.updatePriceFeeds([["0xdeadbeef"]], { account: other.account }),
+      /NotUpdater/
+    );
+    assert.equal(await pyth.read.updateCallCount(), 0n);
+  });
+
+  it("Accepts pushes from an allow-listed updater, and stops after revocation", async function () {
+    const { pyth, adapter } = await setup();
+    await pyth.write.setUpdateFee([0n]);
+
+    await adapter.write.setUpdater([other.account.address, true]);
+    assert.equal(await adapter.read.isUpdater([other.account.address]), true);
+    await adapter.write.updatePriceFeeds([["0xdeadbeef"]], { account: other.account });
+    assert.equal(await pyth.read.updateCallCount(), 1n);
+
+    await adapter.write.setUpdater([other.account.address, false]);
+    await assert.rejects(
+      adapter.write.updatePriceFeeds([["0xdeadbeef"]], { account: other.account }),
+      /NotUpdater/
+    );
+  });
+
+  it("Only the owner may manage updaters, and never the zero address", async function () {
+    const { adapter } = await setup();
+    await assert.rejects(adapter.write.setUpdater([other.account.address, true], { account: other.account }));
+    await assert.rejects(
+      adapter.write.setUpdater(["0x0000000000000000000000000000000000000000", true]),
+      /ZeroAddress/
+    );
+  });
+
   it("Only the owner may withdraw leftover MON", async function () {
     const { adapter } = await setup();
     await deployer.sendTransaction({ to: adapter.address, value: 10_000n });

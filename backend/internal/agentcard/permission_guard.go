@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"math"
 	"sync"
 	"time"
 )
@@ -39,7 +40,9 @@ func (g *PermissionGuard) IssueSessionKey(cardID, agentID string, maxPerTx, dail
 	defer g.mu.Unlock()
 
 	b := make([]byte, 24)
-	_, _ = rand.Read(b)
+	if _, err := rand.Read(b); err != nil {
+		panic(fmt.Sprintf("crypto/rand unavailable: %v", err))
+	}
 	keyHex := "sk_sess_" + hex.EncodeToString(b)
 
 	if ttlHours <= 0 {
@@ -64,12 +67,18 @@ func (g *PermissionGuard) IssueSessionKey(cardID, agentID string, maxPerTx, dail
 }
 
 // VerifyAndDeduct verifies permission rules and updates daily consumption atomically
-func (g *PermissionGuard) VerifyAndDeduct(keyHex string, amountUSD float64, mcc string) error {
+// The key must have been issued for cardID: a key for card A cannot charge
+// card B.
+func (g *PermissionGuard) VerifyAndDeduct(keyHex, cardID string, amountUSD float64, mcc string) error {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 
+	if math.IsNaN(amountUSD) || math.IsInf(amountUSD, 0) || amountUSD <= 0 {
+		return errors.New("amount must be greater than zero")
+	}
+
 	sk, exists := g.sessionKeys[keyHex]
-	if !exists {
+	if !exists || sk.CardID != cardID {
 		return errors.New("invalid or revoked session key")
 	}
 
