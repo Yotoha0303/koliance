@@ -25,6 +25,7 @@ import {
   payoutCapUsd,
   poolCapacityCheck,
   liquidationPrice,
+  liquidationPriceWithFunding,
   formatUsd,
   formatLeverage,
   validateOpenPosition,
@@ -72,7 +73,16 @@ interface PositionRow {
   /** Funding owed, positive meaning the trader pays. Read from the contract. */
   funding: bigint;
   marginBps: bigint;
+  /** Liquidation price from the price formula alone — funding not counted. */
   liqPrice: bigint;
+  /**
+   * Liquidation price with accrued funding applied, i.e. the boundary the
+   * chain's verdict actually uses. Shown beside `liqPrice` rather than instead
+   * of it: the two answer different questions ("where is the price boundary" vs
+   * "where does my cost of carry put the boundary"), and collapsing them into
+   * one would hide whichever the trader was not thinking about (GAP-37).
+   */
+  liqPriceWithFunding: bigint;
   /** Read from `PositionManager.isLiquidatable`, not derived here. */
   liquidatable: boolean;
 }
@@ -262,12 +272,20 @@ export function PositionPanel({ account }: { account: `0x${string}` | null }) {
           // boundary. tests/perp.test.ts alone was not sufficient — its
           // round-trip assertion is funding-blind and self-consistent.
           //
-          // NOTE the residual gap (GAP-37): `liquidatable` above is the chain's
-          // verdict and INCLUDES funding, while this `liqPrice` is the price
-          // formula alone and does NOT. With funding non-zero the two can
-          // disagree on screen. Fixing it needs a funding-aware liquidation
-          // price, and which figure the panel should show is a product decision.
+          // The two figures below answer different questions and are both shown
+          // on purpose (GAP-37). `liquidatable` is the chain's verdict and
+          // INCLUDES funding; `liqPriceWithFunding` is the boundary that verdict
+          // implies, and `liqPrice` is where the price would have to be with no
+          // cost of carry at all. The two prices can differ while the verdict
+          // agrees with the funding-aware one — which is the point, and why the
+          // panel labels them rather than picking silently.
+          //
+          // Both come from the same rearrangement GAP-06 pins to the chain; the
+          // funding-aware pair is additionally pinned by
+          // contracts/test/perp/FundingLiquidationParity.ts with funding actually
+          // accruing, so neither number is an unverified mirror.
           liqPrice: liquidationPrice(math),
+          liqPriceWithFunding: liquidationPriceWithFunding(math, funding),
           liquidatable,
         });
       }
@@ -627,7 +645,7 @@ export function PositionPanel({ account }: { account: `0x${string}` | null }) {
                       </span>
                     </div>
 
-                    <div className="mt-2 grid grid-cols-2 gap-2 font-mono text-[10px] text-white/40 sm:grid-cols-4">
+                    <div className="mt-2 grid grid-cols-2 gap-2 font-mono text-[10px] text-white/40 sm:grid-cols-5">
                       <div>
                         <div className="text-white/30">保证金</div>
                         <div className="text-white/70">${formatUsd(r.pos.collateralUsd)}</div>
@@ -637,8 +655,12 @@ export function PositionPanel({ account }: { account: `0x${string}` | null }) {
                         <div className="text-white/70">${formatUsd(r.pos.entryPrice)}</div>
                       </div>
                       <div>
-                        <div className="text-white/30">预估强平价</div>
+                        <div className="text-white/30">强平价（纯价格）</div>
                         <div className="text-white/70">${formatUsd(r.liqPrice)}</div>
+                      </div>
+                      <div>
+                        <div className="text-white/30">强平价（含资金费）</div>
+                        <div className="text-white/70">${formatUsd(r.liqPriceWithFunding)}</div>
                       </div>
                       <div>
                         <div className="text-white/30">

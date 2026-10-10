@@ -290,30 +290,59 @@ export function marginRatioBps(p: PositionMath, markPrice: bigint): bigint {
 }
 
 /**
- * Liquidation price — MUST match `PositionManager.isLiquidatable` exactly.
+ * Liquidation price including accrued funding — MUST match the contract's
+ * `_isLiquidatable` when funding is non-zero.
  *
- * Solves `collateral + pnl == size * MMR` for price:
- *   long : P = entry * (mm - collateral + size) / size
- *   short: P = entry * (collateral + size - mm) / size
+ * Solving `collateral + pnl - funding == mm` for price:
+ *   long : P = entry * (mm - collateral + funding + size) / size
+ *   short: P = entry * (collateral + size - mm - funding) / size
  * where mm = size * MAINTENANCE_MARGIN_BPS / BPS_DENOMINATOR.
+ *
+ * That is the funding-free rearrangement with `funding` added to the numerator,
+ * so `liquidationPriceWithFunding(p, 0n)` is bit-for-bit `liquidationPrice(p)` —
+ * the two cannot drift apart, and the 60 golden vectors that pin the funding-free
+ * case transitively pin this one at funding zero.
+ *
+ * `fundingOwedUsd` is positive when the trader pays, matching `fundingOwed`.
+ * A payer is liquidated sooner (a long's price rises, a short's falls); one
+ * receiving funding is liquidated later. This is the term that makes per-block
+ * funding bite, and the reason a panel showing only `liquidationPrice` can
+ * disagree with the chain's verdict on the same screen (GAP-37).
  *
  * Two integer divisions happen here (mm, then the final divide) and the contract
  * does the same two, so the results agree bit-for-bit. Changing the order of
  * operations in either place will desynchronise them.
+ *
+ * A return of `0n` means the boundary is not at a positive price — either the
+ * collateral alone covers it, or (short branch) the position is already through
+ * it. The caller should lean on the chain's `liquidatable` verdict for "is it
+ * liquidatable right now" and treat this as the price, not the answer.
  */
-export function liquidationPrice(p: PositionMath): bigint {
+export function liquidationPriceWithFunding(
+  p: PositionMath,
+  fundingOwedUsd: bigint
+): bigint {
   const size = positionSizeUsd(p);
   if (size === 0n) return 0n;
   const mm = applyBps(size, MAINTENANCE_MARGIN_BPS);
 
   if (p.isLong) {
-    const numerator = mm - p.collateralUsd + size;
+    const numerator = mm - p.collateralUsd + fundingOwedUsd + size;
     if (numerator <= 0n) return 0n; // collateral alone already covers it
     return (p.entryPrice * numerator) / size;
   }
-  const numerator = p.collateralUsd + size - mm;
+  const numerator = p.collateralUsd + size - mm - fundingOwedUsd;
   if (numerator <= 0n) return 0n;
   return (p.entryPrice * numerator) / size;
+}
+
+/**
+ * Liquidation price ignoring funding: the funding-free case of
+ * `liquidationPriceWithFunding`. Kept as its own name because it is the figure
+ * that answers "where is the price boundary", independent of the cost of carry.
+ */
+export function liquidationPrice(p: PositionMath): bigint {
+  return liquidationPriceWithFunding(p, 0n);
 }
 
 /** True when the position would be liquidated at `markPrice`. */
