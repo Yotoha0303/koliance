@@ -3,7 +3,9 @@ package game
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -41,16 +43,16 @@ type GamePlayRank struct {
 }
 
 type GameplayProofResponse struct {
-	ProofHash      string    `json:"proofHash"` // bytes32 hex
-	SteamID        string    `json:"steamId"`
-	TargetWallet   string    `json:"targetWallet"`
-	AppID          int       `json:"appId"`
-	GameName       string    `json:"gameName"`
-	PlaytimeHours  float64   `json:"playtimeHours"`
-	Achievements   int       `json:"achievementsUnlocked"`
-	TrustScoreTier string    `json:"trustScoreTier"` // BRONZE, SILVER, GOLD, PLATINUM
-	CreditUnlockUSD float64  `json:"creditUnlockUSD"`
-	GeneratedAt    time.Time `json:"generatedAt"`
+	ProofHash       string    `json:"proofHash"` // bytes32 hex
+	SteamID         string    `json:"steamId"`
+	TargetWallet    string    `json:"targetWallet"`
+	AppID           int       `json:"appId"`
+	GameName        string    `json:"gameName"`
+	PlaytimeHours   float64   `json:"playtimeHours"`
+	Achievements    int       `json:"achievementsUnlocked"`
+	TrustScoreTier  string    `json:"trustScoreTier"` // BRONZE, SILVER, GOLD, PLATINUM
+	CreditUnlockUSD float64   `json:"creditUnlockUSD"`
+	GeneratedAt     time.Time `json:"generatedAt"`
 }
 
 func cleanSteamIdentifier(raw string) string {
@@ -79,9 +81,61 @@ func cleanSteamIdentifier(raw string) string {
 	return strings.Trim(raw, "/")
 }
 
+var (
+	// SteamID64 for individual accounts: 17 digits starting 7656119.
+	steamID64Re = regexp.MustCompile(`^7656119[0-9]{10}$`)
+	// Steam custom URL ("vanity") names: 3-32 of [A-Za-z0-9_-].
+	vanityRe = regexp.MustCompile(`^[A-Za-z0-9_-]{3,32}$`)
+	walletRe = regexp.MustCompile(`^0x[0-9a-fA-F]{40}$`)
+
+	ErrInvalidSteamID = errors.New("invalid Steam identifier: expected a 17-digit SteamID64 or a 3-32 character custom URL name")
+	ErrInvalidWallet  = errors.New("invalid wallet address: expected 0x followed by 40 hex characters")
+)
+
+// ValidateSteamIdentifier accepts a SteamID64 or a vanity name (after the
+// profile-URL prefixes have been stripped by cleanSteamIdentifier).
+func ValidateSteamIdentifier(id string) error {
+	if steamID64Re.MatchString(id) {
+		return nil
+	}
+	isAllDigits := id != ""
+	for _, c := range id {
+		if c < '0' || c > '9' {
+			isAllDigits = false
+			break
+		}
+	}
+	// A numeric string that is not a valid SteamID64 is rejected rather than
+	// treated as a vanity name.
+	if !isAllDigits && vanityRe.MatchString(id) {
+		return nil
+	}
+	return ErrInvalidSteamID
+}
+
+// ValidateWallet checks an EVM address shape (no checksum enforcement).
+func ValidateWallet(addr string) error {
+	if !walletRe.MatchString(addr) {
+		return ErrInvalidWallet
+	}
+	return nil
+}
+
+// idSuffix returns up to the last four characters, never panicking. The old
+// code sliced steamID[len-4:] directly, which crashed for "?id=ab".
+func idSuffix(id string) string {
+	if len(id) <= 4 {
+		return id
+	}
+	return id[len(id)-4:]
+}
+
 // GetUserGameStats resolves vanity name if needed and aggregates play stats
 func (s *Service) GetUserGameStats(rawIdentifier string) (*GameStatsResponse, error) {
 	identifier := cleanSteamIdentifier(rawIdentifier)
+	if err := ValidateSteamIdentifier(identifier); err != nil {
+		return nil, err
+	}
 	steamID := identifier
 	// If identifier is not all digits, resolve vanity
 	isAllDigits := true
@@ -103,7 +157,7 @@ func (s *Service) GetUserGameStats(rawIdentifier string) (*GameStatsResponse, er
 		// Resilient fallback for local testing when network to Steam servers is blocked
 		return &GameStatsResponse{
 			SteamID:        steamID,
-			PersonaName:    "SteamOperative_" + steamID[len(steamID)-4:],
+			PersonaName:    "SteamOperative_" + idSuffix(steamID),
 			Avatar:         "https://avatars.steamstatic.com/fef49e7fa7e1997310d705b2a6158ff8dc1cdfeb_full.jpg",
 			TotalPlayHours: 842.5,
 			TotalGames:     28,
@@ -166,6 +220,12 @@ func (s *Service) GetUserGameStats(rawIdentifier string) (*GameStatsResponse, er
 
 // GenerateGameplayProof produces a cryptographic proof for Koliance.sol
 func (s *Service) GenerateGameplayProof(steamID, walletAddress string, appID int) (*GameplayProofResponse, error) {
+	if !steamID64Re.MatchString(steamID) {
+		return nil, ErrInvalidSteamID
+	}
+	if err := ValidateWallet(walletAddress); err != nil {
+		return nil, err
+	}
 	games, _, err := s.client.GetOwnedGames(steamID)
 	if err != nil || len(games) == 0 {
 		games = []OwnedGame{
@@ -231,12 +291,12 @@ func (s *Service) GenerateGameplayProof(steamID, walletAddress string, appID int
 	// Persist to database/memory store
 	if s.db != nil && s.db.MemoryStore != nil {
 		s.db.MemoryStore.AppendProof(map[string]interface{}{
-			"proofHash":      proofHex,
-			"steamId":        steamID,
-			"wallet":         walletAddress,
-			"tier":           tier,
-			"creditUSD":      creditUSD,
-			"timestamp":      time.Now(),
+			"proofHash": proofHex,
+			"steamId":   steamID,
+			"wallet":    walletAddress,
+			"tier":      tier,
+			"creditUSD": creditUSD,
+			"timestamp": time.Now(),
 		})
 	}
 

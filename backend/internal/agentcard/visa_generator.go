@@ -2,22 +2,27 @@ package agentcard
 
 import (
 	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"math/big"
 	"time"
 )
 
+// VisaCard is the internal record. The full PAN and the CVV are tagged
+// `json:"-"` so that no handler can serialise them by accident: responses use
+// CardView (see service.go), which only carries the masked number and last 4.
 type VisaCard struct {
-	CardID         string    `json:"cardId"`
-	CardNumber     string    `json:"cardNumber"`     // 16-digit Visa
-	FormattedNumber string   `json:"formattedNumber"` // 4xxx **** **** xxxx
-	Expiry         string    `json:"expiry"`         // MM/YY
-	CVV            string    `json:"cvv"`            // 3-digit CVV
-	CardholderName string    `json:"cardholderName"`
-	WalletAddress  string    `json:"walletAddress"`
-	BalanceUSD     float64   `json:"balanceUSD"`
-	Status         string    `json:"status"`         // ACTIVE, FROZEN, SUSPENDED
-	CreatedAt      time.Time `json:"createdAt"`
+	CardID          string    `json:"cardId"`
+	CardNumber      string    `json:"-"`               // 16-digit Visa, never serialised
+	FormattedNumber string    `json:"formattedNumber"` // 4xxx **** **** xxxx
+	Last4           string    `json:"last4"`
+	Expiry          string    `json:"expiry"` // MM/YY
+	CVV             string    `json:"-"`      // 3-digit CVV, never serialised
+	CardholderName  string    `json:"cardholderName"`
+	WalletAddress   string    `json:"walletAddress"`
+	BalanceUSD      float64   `json:"balanceUSD"`
+	Status          string    `json:"status"` // ACTIVE, FROZEN, SUSPENDED
+	CreatedAt       time.Time `json:"createdAt"`
 }
 
 // GenerateVisaCard creates a real-format Visa card compliant with ISO/IEC 7812 & Luhn algorithm
@@ -43,12 +48,12 @@ func GenerateVisaCard(walletAddress, holderName string, initialBalance float64) 
 	cvv := fmt.Sprintf("%03d", cvvNum.Int64()+100)
 
 	formatted := fmt.Sprintf("%s **** **** %s", fullNumber[:4], fullNumber[12:])
-	cardID := fmt.Sprintf("card_%s", fullNumber[10:])
 
 	return &VisaCard{
-		CardID:          cardID,
+		CardID:          newCardID(),
 		CardNumber:      fullNumber,
 		FormattedNumber: formatted,
+		Last4:           fullNumber[12:],
 		Expiry:          expiry,
 		CVV:             cvv,
 		CardholderName:  holderName,
@@ -57,6 +62,17 @@ func GenerateVisaCard(walletAddress, holderName string, initialBalance float64) 
 		Status:          "ACTIVE",
 		CreatedAt:       time.Now().UTC(),
 	}
+}
+
+// newCardID returns an opaque random identifier. It used to be
+// "card_" + the last six PAN digits, which leaked part of the PAN and made the
+// ID space small enough (10^6) to enumerate.
+func newCardID() string {
+	b := make([]byte, 12)
+	if _, err := rand.Read(b); err != nil {
+		panic(fmt.Sprintf("crypto/rand unavailable: %v", err))
+	}
+	return "card_" + hex.EncodeToString(b)
 }
 
 // calculateLuhnCheckDigit generates the MOD 10 checksum digit
