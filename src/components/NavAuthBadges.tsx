@@ -117,7 +117,7 @@ export function NavAuthBadges({
           picture: g.picture,
           bio: g.bio,
           walletAddress: g.walletAddress || g.wallet_address,
-          tier: g.trustTier || "GOOGLE ARCHITECT",
+          tier: g.trustTier || "GOOGLE VERIFIED CITIZEN",
           creditAllowanceUSD: g.creditAllowanceUSD || 1200,
         });
       } else {
@@ -581,7 +581,7 @@ export function NavAuthBadges({
             picture: updated.picture,
             bio: updated.bio,
             walletAddress: updated.walletAddress,
-            tier: updated.trustTier || "GOOGLE ARCHITECT",
+            tier: updated.trustTier || "GOOGLE VERIFIED CITIZEN",
             creditAllowanceUSD: updated.creditAllowanceUSD,
           });
         }}

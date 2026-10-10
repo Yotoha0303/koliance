@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { syncUserToDatabase } from "@/lib/db";
 import { checkGoogleIdTokenClaims } from "@/lib/googleIdToken";
+import { googleLoginTier } from "@/lib/trustTier";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -175,16 +176,8 @@ export async function POST(request: NextRequest) {
       };
     }
 
-    // Determine developer / trust credit allowance based on Google account verification
-    const emailDomain = googleUser.email.split("@")[1] || "";
-    const isEnterpriseOrDev = [
-      "google.com",
-      "gmail.com",
-      "github.com",
-      "monad.xyz",
-    ].includes(emailDomain);
-    const tier = isEnterpriseOrDev ? "GOOGLE VERIFIED ARCHITECT" : "GOOGLE VERIFIED CITIZEN";
-    const creditAllowanceUSD = isEnterpriseOrDev ? 1200 : 600;
+    // Same baseline for every Google login; no e-mail-domain bonus (see trustTier.ts).
+    const { tier, creditAllowanceUSD } = googleLoginTier();
 
     // Automatically create / upsert Koliance account and sync to database
     const kolianceUserId = `did:koliance:google:${googleUser.sub}`;

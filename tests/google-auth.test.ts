@@ -89,6 +89,18 @@ describe("Google OAuth API Route", () => {
     expect(data.profile.googleId).toBe("1234567890");
   });
 
+  it.each(["someone@gmail.com", "dev@google.com", "x@github.com", "y@monad.xyz", "z@example.org"])(
+    "gives %s the same baseline tier (no e-mail-domain bonus)",
+    async (email) => {
+      mockTokenInfo(tokenInfo({ email }));
+      const res = await POST(req({ id_token: "t" }));
+      expect(res.status).toBe(200);
+      const { profile } = await res.json();
+      expect(profile.trustTier).toBe("GOOGLE VERIFIED CITIZEN");
+      expect(profile.creditAllowanceUSD).toBe(600);
+    }
+  );
+
   it("keeps the demo token path unchanged (wallet login is a later task)", async () => {
     const res = await POST(req({ id_token: "demo_verified_google_identity" }));
     expect(res.status).toBe(200);
