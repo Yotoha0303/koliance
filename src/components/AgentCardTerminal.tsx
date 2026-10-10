@@ -32,6 +32,7 @@ import {
   Code2,
 } from "lucide-react";
 import { TrustRecordData } from "@/lib/contract";
+import { relayTarget } from "@/lib/oauthState";
 import {
   fetchGameStats,
   generateGameplayProof,
@@ -134,34 +135,12 @@ export function AgentCardTerminal({ currentAccount }: AgentCardTerminalProps) {
     const githubCode = params.get("code");
     const rawState = params.get("state");
     if (githubCode) {
-      if (rawState) {
-        try {
-          const raw = decodeURIComponent(rawState);
-          const decoded = decodeURIComponent(escape(atob(raw)));
-          const stateData = JSON.parse(decoded);
-          const trusted = [
-            "https://koliance.oodai.space",
-            "https://koliance.vercel.app",
-            "http://localhost:3000",
-            "http://127.0.0.1:3000",
-          ];
-          const isTrusted =
-            trusted.includes(stateData?.origin) ||
-            (stateData?.origin && (
-              stateData.origin.startsWith("http://localhost:") ||
-              stateData.origin.startsWith("http://127.0.0.1:") ||
-              stateData.origin.endsWith(".vercel.app") ||
-              stateData.origin.endsWith(".oodai.space")
-            ));
-
-          if (stateData?.origin && stateData.origin !== window.location.origin && isTrusted) {
-            const targetPath = stateData.path || "/agentcard";
-            window.location.replace(`${stateData.origin}${targetPath}?code=${githubCode}`);
-            return;
-          }
-        } catch {
-          // ignore parsing error
-        }
+      // Relay to the originating domain only if it is an exact allow-listed
+      // origin, and carry the state so that domain can verify it.
+      const relay = relayTarget(window.location.origin, githubCode, rawState);
+      if (relay) {
+        window.location.replace(relay);
+        return;
       }
       setAttestationTab("github");
     }

@@ -23,7 +23,7 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 import { createPublicClient, http, fallback, formatEther } from "viem";
-import { GOOGLE_CLIENT_ID, GITHUB_CLIENT_ID } from "@/lib/authConfig";
+import { GOOGLE_CLIENT_ID } from "@/lib/authConfig";
 import { EditProfileModal, UserProfileData } from "@/components/EditProfileModal";
 import { TransferModal } from "@/components/TransferModal";
 import { monadTestnet, KOL_TOKEN_ADDRESS, KOL_TOKEN_ABI } from "@/lib/contract";
@@ -175,18 +175,9 @@ export function NavAuthBadges({
 
   // 2. GitHub 1-Click Login Trigger
   const handleGithubLogin = () => {
-    const clientId =
-      process.env.NEXT_PUBLIC_GITHUB_CLIENT_ID || GITHUB_CLIENT_ID;
-    const state = encodeURIComponent(
-      btoa(
-        JSON.stringify({
-          origin: window.location.origin,
-          path: window.location.pathname || "/",
-          t: Date.now(),
-        })
-      )
-    );
-    window.location.href = `https://github.com/login/oauth/authorize?client_id=${clientId}&prompt=select_account&scope=read:user&state=${state}`;
+    // Server route sets the httpOnly CSRF nonce cookie, then redirects to GitHub.
+    const qs = new URLSearchParams({ path: window.location.pathname || "/" });
+    window.location.href = `/api/auth/github/start?${qs.toString()}`;
   };
 
   // 3. Steam OpenID 2.0 1-Click Redirect

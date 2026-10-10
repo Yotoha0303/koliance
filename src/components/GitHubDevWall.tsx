@@ -24,42 +24,12 @@ import {
   DeveloperStats,
   DeveloperProof,
 } from "@/lib/api";
+import { relayTarget } from "@/lib/oauthState";
 
-// Safe Base64 + URL encode/decode for cross-domain OAuth state relay
-function encodeOAuthState(data: { origin: string; path: string; t: number }): string {
-  try {
-    return encodeURIComponent(btoa(unescape(encodeURIComponent(JSON.stringify(data)))));
-  } catch {
-    return encodeURIComponent(btoa(JSON.stringify(data)));
-  }
-}
-
-function decodeOAuthState(str: string): { origin?: string; path?: string } | null {
-  try {
-    const raw = decodeURIComponent(str);
-    const decoded = decodeURIComponent(escape(atob(raw)));
-    return JSON.parse(decoded);
-  } catch {
-    try {
-      return JSON.parse(atob(decodeURIComponent(str)));
-    } catch {
-      return null;
-    }
-  }
-}
-
-const TRUSTED_ORIGINS = [
-  "https://koliance.oodai.space",
-  "https://koliance.vercel.app",
-  "http://localhost:3000",
-  "http://127.0.0.1:3000",
-];
-
-function isTrustedOrigin(origin: string): boolean {
-  if (TRUSTED_ORIGINS.includes(origin)) return true;
-  if (origin.startsWith("http://localhost:") || origin.startsWith("http://127.0.0.1:")) return true;
-  if (origin.endsWith(".vercel.app") || origin.endsWith(".oodai.space")) return true;
-  return false;
+function githubStartUrl(path: string, customClientId?: string | null): string {
+  const qs = new URLSearchParams({ path });
+  if (customClientId) qs.set("client_id", customClientId);
+  return `/api/auth/github/start?${qs.toString()}`;
 }
 
 interface GitHubDevWallProps {
@@ -94,16 +64,15 @@ export function GitHubDevWall({ currentAccount, onProofMinted }: GitHubDevWallPr
       // If authorization was initiated from another domain (e.g. started on https://koliance.oodai.space,
       // but GitHub redirected to https://koliance.vercel.app as the registered callback),
       // seamlessly bounce the user back to their initiating domain with the authorization code!
-      if (rawState) {
-        const stateData = decodeOAuthState(rawState);
-        if (stateData?.origin && stateData.origin !== window.location.origin && isTrustedOrigin(stateData.origin)) {
-          const targetPath = stateData.path || "/agentcard";
-          window.location.replace(`${stateData.origin}${targetPath}?code=${code}`);
-          return;
-        }
+      // Only to an EXACT allow-listed origin (no *.vercel.app wildcard), and
+      // carrying the state so that origin can verify it against its cookie.
+      const relay = relayTarget(window.location.origin, code, rawState);
+      if (relay) {
+        window.location.replace(relay);
+        return;
       }
 
-      handleOAuthCodeExchange(code);
+      handleOAuthCodeExchange(code, rawState);
       return;
     }
 
@@ -114,7 +83,7 @@ export function GitHubDevWall({ currentAccount, onProofMinted }: GitHubDevWallPr
   }, []);
 
   // Exchange authorization code with Next.js backend API
-  const handleOAuthCodeExchange = async (code: string) => {
+  const handleOAuthCodeExchange = async (code: string, state: string | null) => {
     setLoading(true);
     setNotice("正在完成 GitHub 官方 OAuth 授权验证...");
     try {
@@ -126,6 +95,7 @@ export function GitHubDevWall({ currentAccount, onProofMinted }: GitHubDevWallPr
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           code,
+          state,
           clientId: storedClientId,
           clientSecret: storedClientSecret,
         }),
@@ -182,15 +152,12 @@ export function GitHubDevWall({ currentAccount, onProofMinted }: GitHubDevWallPr
       return;
     }
 
-    const state = encodeOAuthState({
-      origin: window.location.origin,
-      path: window.location.pathname || "/agentcard",
-      t: Date.now(),
-    });
-
-    // Pass prompt=select_account so GitHub forces the account switcher dialog,
-    // allowing the user to pick a different account or sign in with another account!
-    window.location.href = `https://github.com/login/oauth/authorize?client_id=${configuredClientId}&prompt=select_account&scope=read:user&state=${state}`;
+    // The server route mints the CSRF nonce (httpOnly cookie) and redirects to
+    // GitHub with prompt=select_account so the account switcher is shown.
+    window.location.href = githubStartUrl(
+      window.location.pathname || "/agentcard",
+      localStorage.getItem("koliance_github_client_id")
+    );
   };
 
   const handleSaveOAuthAndRedirect = () => {
@@ -201,13 +168,7 @@ export function GitHubDevWall({ currentAccount, onProofMinted }: GitHubDevWallPr
     }
     setOauthModalOpen(false);
 
-    const state = encodeOAuthState({
-      origin: window.location.origin,
-      path: window.location.pathname || "/agentcard",
-      t: Date.now(),
-    });
-
-    window.location.href = `https://github.com/login/oauth/authorize?client_id=${clientIdInput.trim()}&prompt=select_account&scope=read:user&state=${state}`;
+    window.location.href = githubStartUrl(window.location.pathname || "/agentcard", clientIdInput.trim());
   };
 
   const handleCustomSubmit = (e: React.FormEvent) => {
