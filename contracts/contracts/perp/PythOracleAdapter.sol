@@ -49,9 +49,17 @@ contract PythOracleAdapter is IPriceOracle, Ownable {
     error NonPositivePrice(bytes32 feedId, int64 price);
     error ExponentOutOfRange(int32 expo);
     error InsufficientFeeBalance(uint256 required, uint256 held);
+    error NotUpdater(address caller);
 
     event MaxStalenessSet(uint256 maxStaleness);
     event PricePushed(uint256 updateCount, uint256 feePaid);
+    event UpdaterSet(address indexed updater, bool allowed);
+
+    /// @notice Addresses (besides the owner) allowed to push updates. The push
+    /// fee is paid from THIS contract's MON balance, so an open
+    /// `updatePriceFeeds` let anyone drain that balance with valid-but-pointless
+    /// updates. The PositionManager is the intended updater.
+    mapping(address => bool) public isUpdater;
 
     constructor(address pyth_, uint256 maxStaleness_, address owner_) Ownable() {
         if (pyth_ == address(0)) revert ZeroAddress();
@@ -98,6 +106,14 @@ contract PythOracleAdapter is IPriceOracle, Ownable {
         emit MaxStalenessSet(maxStaleness_);
     }
 
+    /// @notice Allow or revoke an address (normally the PositionManager) to push
+    /// price updates paid from this contract's balance.
+    function setUpdater(address updater, bool allowed) external onlyOwner {
+        if (updater == address(0)) revert ZeroAddress();
+        isUpdater[updater] = allowed;
+        emit UpdaterSet(updater, allowed);
+    }
+
     /// @notice Withdraw leftover MON.
     function withdraw(address to, uint256 amount) external onlyOwner {
         if (to == address(0)) revert ZeroAddress();
@@ -117,6 +133,7 @@ contract PythOracleAdapter is IPriceOracle, Ownable {
     /// best-effort push (PositionManager does) will swallow that revert, which is
     /// intended: a funding shortfall should not brick a liquidation.
     function updatePriceFeeds(bytes[] calldata updateData) external {
+        if (msg.sender != owner && !isUpdater[msg.sender]) revert NotUpdater(msg.sender);
         if (updateData.length == 0) return;
 
         uint256 fee = pyth.getUpdateFee(updateData);

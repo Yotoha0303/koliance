@@ -21,4 +21,17 @@ contract MockPositionManager {
     function reservedAssets() external view returns (uint256) {
         return reserved;
     }
+
+    /// @dev LP-pricing liability, settable per direction for Vault tests.
+    uint256 public liabilityForDeposit;
+    uint256 public liabilityForWithdrawal;
+
+    function setLiability(uint256 forDeposit, uint256 forWithdrawal) external {
+        liabilityForDeposit = forDeposit;
+        liabilityForWithdrawal = forWithdrawal;
+    }
+
+    function lpLiabilityUsd(bool forWithdrawal) external view returns (uint256) {
+        return forWithdrawal ? liabilityForWithdrawal : liabilityForDeposit;
+    }
 }

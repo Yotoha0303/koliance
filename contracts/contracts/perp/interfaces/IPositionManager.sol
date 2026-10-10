@@ -250,4 +250,21 @@ interface IPositionManager {
     /// operation. `openPosition` enforces it at admission, which is what makes
     /// payouts unable to revert for insufficient liquidity.
     function reservedAssets() external view returns (uint256);
+
+    // ---------------------------------------------------------------------
+    // Extension (not part of the frozen set): LP pricing.
+    // ---------------------------------------------------------------------
+
+    /// @notice What the pool owes open positions right now, 18-decimal USD, for
+    ///         pricing LP shares (SC-1). Trader collateral is the traders' money,
+    ///         not the LPs', so it is always part of the liability.
+    /// @param forWithdrawal true  -> conservative for LPs leaving: unrealised
+    ///                               trader LOSSES are not credited to the pool
+    ///                               (liability never drops below collateral);
+    ///                      false -> for LPs entering: losses are credited.
+    ///         Unrealised trader GAINS (and funding owed to traders) count in
+    ///         both, capped at the payout cap. If a feed's price cannot be read,
+    ///         that feed falls back to its payout cap (withdrawal) or its
+    ///         collateral (deposit).
+    function lpLiabilityUsd(bool forWithdrawal) external view returns (uint256);
 }

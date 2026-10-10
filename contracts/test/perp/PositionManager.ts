@@ -740,6 +740,7 @@ describe("PositionManager", async function () {
     ]);
     await vault.write.setPositionManager([pm.address]);
     await pm.write.setPriceUpdater([adapter.address]);
+    await adapter.write.setUpdater([pm.address, true]);
     await pyth.write.setUpdateFee([0n]);
 
     const publicClient = await viem.getPublicClient();
@@ -796,6 +797,7 @@ describe("PositionManager", async function () {
     // signature drifted from the adapter's, the call would silently miss and
     // updateCallCount would stay zero.
     await pm.write.setPriceUpdater([adapter.address]);
+    await adapter.write.setUpdater([pm.address, true]);
     await pyth.write.setUpdateFee([0n]);
 
     const publicClient = await viem.getPublicClient();
@@ -840,6 +842,7 @@ describe("PositionManager", async function () {
     ]);
     await vault.write.setPositionManager([pm.address]);
     await pm.write.setPriceUpdater([adapter.address]);
+    await adapter.write.setUpdater([pm.address, true]);
 
     // Fee is non-zero and the adapter holds no MON, so every push reverts.
     await pyth.write.setUpdateFee([1_000_000n]);

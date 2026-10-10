@@ -103,6 +103,39 @@ contract PositionManager is IPositionManager, Ownable {
     mapping(bytes32 => uint256) public longOpenInterestUsd;
     mapping(bytes32 => uint256) public shortOpenInterestUsd;
 
+    // ==================== LP PRICING BOOK (SC-1) ====================
+    //
+    // Per feed and side, O(1) aggregates from which the pool's liability to
+    // open positions can be computed without walking the position set:
+    //
+    //   pnl_long  = price * sum(size / entry) - sum(size)
+    //   pnl_short = sum(size) - price * sum(size / entry)
+    //   funding   = side * (indexNow * sum(size) - sum(size * entryIndex)) / WAD
+    //
+    // The Vault prices LP shares off `assets - lpLiabilityUsd(...)` instead of
+    // the raw balance, which used to count trader collateral as LP money.
+
+    struct SideBook {
+        uint256 collateralUsd;
+        uint256 payoutCapUsd;
+        uint256 sizeUsd;
+        uint256 sizeOverEntry; // sum(sizeUsd * PRICE_SCALE / entryPrice)
+        int256 sizeTimesEntryIndex; // sum(sizeUsd * entryFundingIndex)
+    }
+
+    uint256 internal constant PRICE_SCALE = 1e18;
+
+    mapping(bytes32 => SideBook) internal _longBook;
+    mapping(bytes32 => SideBook) internal _shortBook;
+
+    /// @notice Feeds with at least one open position (bounded by the feeds the
+    ///         oracle knows, not by the number of positions).
+    bytes32[] internal _activeFeeds;
+    mapping(bytes32 => uint256) internal _activeFeedSlot; // index + 1; 0 = absent
+
+    /// @notice Sum of open positions' collateral, 18-decimal USD.
+    uint256 public totalOpenCollateralUsd;
+
     error ZeroAmount();
     error InvalidLeverage(uint256 leverageBps);
     error PositionNotOpen(uint256 positionId);
@@ -426,6 +459,7 @@ contract PositionManager is IPositionManager, Ownable {
         });
         isOpen[positionId] = true;
         totalPayoutCapUsd += payoutCapUsd;
+        _bookAdd(_positions[positionId]);
 
         // This position's notional now counts toward the feed's skew, which is
         // what the next accrual will charge against.
@@ -655,7 +689,103 @@ contract PositionManager is IPositionManager, Ownable {
         return _equityAfterFunding(p, price, _projectedFundingIndex(p.feedId));
     }
 
+    /// @inheritdoc IPositionManager
+    function lpLiabilityUsd(bool forWithdrawal) external view returns (uint256 total) {
+        uint256 n = _activeFeeds.length;
+        for (uint256 i = 0; i < n; i++) {
+            bytes32 feedId = _activeFeeds[i];
+            SideBook memory L = _longBook[feedId];
+            SideBook memory S = _shortBook[feedId];
+
+            bool priced = false;
+            uint256 price = 0;
+            try oracle.getPrice(feedId) returns (uint256 p, uint256) {
+                if (p > 0) {
+                    price = p;
+                    priced = true;
+                }
+            } catch {}
+
+            if (!priced) {
+                // No price, no estimate: assume the worst for whoever the pool
+                // is protecting in this direction.
+                total += forWithdrawal
+                    ? L.payoutCapUsd + S.payoutCapUsd
+                    : L.collateralUsd + S.collateralUsd;
+                continue;
+            }
+
+            int256 indexNow = _projectedFundingIndex(feedId);
+            total += _sideLiability(L, true, price, indexNow, forWithdrawal);
+            total += _sideLiability(S, false, price, indexNow, forWithdrawal);
+        }
+    }
+
+    /// @notice Number of feeds with open positions (for tests and the UI).
+    function activeFeedCount() external view returns (uint256) {
+        return _activeFeeds.length;
+    }
+
     // ==================== INTERNAL ====================
+
+    function _sideLiability(SideBook memory b, bool isLong, uint256 price, int256 indexNow, bool forWithdrawal)
+        internal
+        pure
+        returns (uint256)
+    {
+        if (b.sizeUsd == 0) return 0;
+
+        int256 valueAtPrice = ((price * b.sizeOverEntry) / PRICE_SCALE).toInt256();
+        int256 size = b.sizeUsd.toInt256();
+        int256 pnl = isLong ? valueAtPrice - size : size - valueAtPrice;
+
+        int256 rawFunding = (indexNow * size - b.sizeTimesEntryIndex) / PerpConstants.WAD;
+        int256 funding = isLong ? rawFunding : -rawFunding; // positive = traders pay
+
+        int256 equity = b.collateralUsd.toInt256() + pnl - funding;
+
+        uint256 floor = forWithdrawal ? b.collateralUsd : 0;
+        if (equity <= int256(floor)) return floor;
+        uint256 eq = equity.toUint256();
+        return eq > b.payoutCapUsd ? b.payoutCapUsd : eq;
+    }
+
+    function _bookAdd(Position memory p) internal {
+        SideBook storage b = p.isLong ? _longBook[p.feedId] : _shortBook[p.feedId];
+        b.collateralUsd += p.collateralUsd;
+        b.payoutCapUsd += p.payoutCapUsd;
+        b.sizeUsd += p.sizeUsd;
+        b.sizeOverEntry += (p.sizeUsd * PRICE_SCALE) / p.entryPrice;
+        b.sizeTimesEntryIndex += p.sizeUsd.toInt256() * p.entryFundingIndex;
+        totalOpenCollateralUsd += p.collateralUsd;
+
+        if (_activeFeedSlot[p.feedId] == 0) {
+            _activeFeeds.push(p.feedId);
+            _activeFeedSlot[p.feedId] = _activeFeeds.length;
+        }
+    }
+
+    function _bookRemove(Position memory p) internal {
+        SideBook storage b = p.isLong ? _longBook[p.feedId] : _shortBook[p.feedId];
+        b.collateralUsd -= p.collateralUsd;
+        b.payoutCapUsd -= p.payoutCapUsd;
+        b.sizeUsd -= p.sizeUsd;
+        b.sizeOverEntry -= (p.sizeUsd * PRICE_SCALE) / p.entryPrice;
+        b.sizeTimesEntryIndex -= p.sizeUsd.toInt256() * p.entryFundingIndex;
+        totalOpenCollateralUsd -= p.collateralUsd;
+
+        if (_longBook[p.feedId].sizeUsd == 0 && _shortBook[p.feedId].sizeUsd == 0) {
+            uint256 slot = _activeFeedSlot[p.feedId];
+            uint256 last = _activeFeeds.length;
+            if (slot != last) {
+                bytes32 moved = _activeFeeds[last - 1];
+                _activeFeeds[slot - 1] = moved;
+                _activeFeedSlot[moved] = slot;
+            }
+            _activeFeeds.pop();
+            delete _activeFeedSlot[p.feedId];
+        }
+    }
 
     function _pushPrices(bytes[] calldata pythUpdateData) internal {
         address updater = priceUpdater;
@@ -714,6 +844,7 @@ contract PositionManager is IPositionManager, Ownable {
     function _close(uint256 positionId, Position memory p) internal {
         isOpen[positionId] = false;
         totalPayoutCapUsd -= p.payoutCapUsd;
+        _bookRemove(p);
 
         // Release this position's notional from the feed's skew, or the book
         // would keep charging for a position that no longer exists.

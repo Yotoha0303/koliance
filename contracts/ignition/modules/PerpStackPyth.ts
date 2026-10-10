@@ -50,6 +50,9 @@ export default buildModule("PerpStackPythModule", (m) => {
   m.call(vault, "setPositionManager", [positionManager]);
   // Unlike PerpStack, the adapter has to be registered so updates are pushed.
   m.call(positionManager, "setPriceUpdater", [oracle]);
+  // The adapter only accepts pushes from its owner and allow-listed updaters
+  // (it pays the Pyth fee from its own balance), so authorise the manager.
+  m.call(oracle, "setUpdater", [positionManager, true]);
 
   return { collateral, oracle, vault, positionManager };
 });
